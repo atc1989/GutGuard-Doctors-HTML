@@ -34,6 +34,21 @@ export default function RegistrationExperience() {
   }, [isHydrated, state]);
 
   useEffect(() => {
+    if (!isHydrated || !state.registration || state.tasks.email) return;
+
+    const nextState = {
+      ...state,
+      tasks: { ...state.tasks, email: true },
+    };
+
+    setState(nextState);
+    setScreen(resolveScreen(nextState));
+    updateTask(state.registration.id, "email", true).catch(() => {
+      console.warn("Email verification update failed; keeping local email task completed.");
+    });
+  }, [isHydrated, state]);
+
+  useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [screen]);
 
