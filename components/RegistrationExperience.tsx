@@ -21,6 +21,7 @@ export default function RegistrationExperience() {
   const [state, setState] = useState<ExperienceState>(INITIAL_STATE);
   const [screen, setScreen] = useState<Screen>(1);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [registrationResetKey, setRegistrationResetKey] = useState(0);
 
   const dateLabel = useMemo(
     () => new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date()),
@@ -98,6 +99,7 @@ export default function RegistrationExperience() {
   function handleBackToRegistration() {
     clearExperienceState();
     setState(INITIAL_STATE);
+    setRegistrationResetKey((current) => current + 1);
     setScreen(1);
   }
 
@@ -107,7 +109,11 @@ export default function RegistrationExperience() {
     <main className="stage">
       <ProgressRail screen={screen} />
       <Header dateLabel={dateLabel} />
-      <RegistrationSection active={screen === 1} onRegistered={handleRegistered} />
+      <RegistrationSection
+        key={registrationResetKey}
+        active={screen === 1}
+        onRegistered={handleRegistered}
+      />
       <VerificationSection
         active={screen === 2}
         tasks={state.tasks}

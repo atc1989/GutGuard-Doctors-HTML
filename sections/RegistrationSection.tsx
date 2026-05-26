@@ -84,6 +84,10 @@ export default function RegistrationSection({
           "Registration saved, but the proposal email could not be sent. Please ask the booth coordinator to resend it.",
         );
       }
+      setValues(INITIAL_VALUES);
+      setErrors({});
+      setPendingPayload(null);
+      setSubmitting(false);
       onRegistered({ ...pendingPayload, id: doctor.id, registeredAt: Date.now() });
     } catch {
       setSubmitting(false);
