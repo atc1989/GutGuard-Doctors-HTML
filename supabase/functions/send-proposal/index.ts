@@ -125,32 +125,26 @@ function toBase64(bytes: Uint8Array) {
 
 function proposalEmailHtml(
   fullName: string,
-  proposalUrl: string,
+  _proposalUrl: string,
   registeredCount: number,
 ) {
   const safeName = escapeHtml(fullName);
-  const safeProposalUrl = escapeHtml(proposalUrl);
 
   return `
     <div style="font-family:Arial,sans-serif;color:#0F0F18;line-height:1.6">
-      <p>🌿 Welcome, Doctor.</p>
+      <p>&#127807; Welcome, Doctor ${safeName}.</p>
       <p>
         You're now part of the GutGuard Lead Clinical Adopter (LCA)<br/>
-        community. Read this pinned message first — it saves<br/>
+        community. Read this pinned message first &mdash; it saves<br/>
         you (and us) repeat questions later.
       </p>
       <p>
-        • Founding cohort: 100 physicians, lifetime designation<br/>
-        • Active pilot: First 20 LCAs, 90-day program<br/>
-        • Waitlist: Positions 21–100, activated post-pilot
+        &bull; Founding cohort: 100 physicians, lifetime designation<br/>
+        &bull; Active pilot: First 20 LCAs, 90-day program<br/>
+        &bull; Waitlist: Positions 21&ndash;100, activated post-pilot
       </p>
       <p>Current slot count: ${registeredCount} of 100 confirmed.</p>
       <p>Please see attached email for your perusal.</p>
-      <p>
-        Proposal link:<br/>
-        <a href="${safeProposalUrl}">${safeProposalUrl}</a>
-      </p>
-      <p>Registered to: ${safeName}</p>
     </div>
   `;
 }
