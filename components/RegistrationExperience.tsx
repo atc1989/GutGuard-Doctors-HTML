@@ -60,11 +60,7 @@ export default function RegistrationExperience() {
     try {
       await updateTask(state.registration?.id, taskId, true);
     } catch {
-      setState((current) => ({
-        ...current,
-        tasks: { ...current.tasks, [taskId]: false },
-      }));
-      window.alert("Task update failed. Please check your connection and try again.");
+      console.warn("Task update failed; keeping the local task state completed.");
     }
   }
 

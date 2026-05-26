@@ -4,7 +4,7 @@ export const LINKS = {
   email: null,
   facebook: "https://www.facebook.com/share/g/1AcZoVc7xp/",
   tiktok: "https://www.tiktok.com/@gutguardph",
-  reel: "https://www.tiktok.com/upload",
+  reel: null,
 } as const;
 
 export const SPECIALTIES = [
