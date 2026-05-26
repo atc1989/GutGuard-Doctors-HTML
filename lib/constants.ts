@@ -2,8 +2,8 @@ export const LOCAL_KEY = "gg_lca_v3";
 
 export const LINKS = {
   email: null,
-  facebook: "https://www.facebook.com/GutGuardDoctorsTikTokAffiliate",
-  tiktok: "https://www.tiktok.com/@gutguard.ph",
+  facebook: "https://www.facebook.com/share/g/1AcZoVc7xp/",
+  tiktok: "https://www.tiktok.com/@gutguardph",
   reel: "https://www.tiktok.com/upload",
 } as const;
 
@@ -36,7 +36,7 @@ export const TASKS = [
   {
     id: "tiktok",
     number: "iii.",
-    title: "Follow @gutguard.ph",
+    title: "Follow @gutguardph",
     meta: "Tap follow on the official page.",
     hasTikTokMark: true,
   },

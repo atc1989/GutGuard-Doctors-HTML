@@ -38,24 +38,31 @@ export default function RegistrationExperience() {
   }, [screen]);
 
   function handleRegistered(registration: Registration) {
-    setState((current) => ({ ...current, registration }));
+    setState((current) => ({
+      ...current,
+      registration,
+      tasks: { ...current.tasks, email: true },
+    }));
+    updateTask(registration.id, "email", true).catch(() => {
+      window.alert("Registration saved, but email verification could not be recorded.");
+    });
     setScreen(2);
   }
 
-  async function handleToggleTask(taskId: TaskId) {
-    const nextValue = !state.tasks[taskId];
+  async function handleCompleteTask(taskId: TaskId) {
+    if (state.tasks[taskId]) return;
 
     setState((current) => ({
       ...current,
-      tasks: { ...current.tasks, [taskId]: nextValue },
+      tasks: { ...current.tasks, [taskId]: true },
     }));
 
     try {
-      await updateTask(state.registration?.id, taskId, nextValue);
+      await updateTask(state.registration?.id, taskId, true);
     } catch {
       setState((current) => ({
         ...current,
-        tasks: { ...current.tasks, [taskId]: !nextValue },
+        tasks: { ...current.tasks, [taskId]: false },
       }));
       window.alert("Task update failed. Please check your connection and try again.");
     }
@@ -82,7 +89,7 @@ export default function RegistrationExperience() {
       <VerificationSection
         active={screen === 2}
         tasks={state.tasks}
-        onToggleTask={handleToggleTask}
+        onCompleteTask={handleCompleteTask}
         onContinue={() => setScreen(3)}
       />
       <WheelSection

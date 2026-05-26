@@ -10,22 +10,24 @@ import type { TaskId, TaskState } from "@/lib/types";
 type VerificationSectionProps = {
   active: boolean;
   tasks: TaskState;
-  onToggleTask: (taskId: TaskId) => void;
+  onCompleteTask: (taskId: TaskId) => void;
   onContinue: () => void;
 };
 
 export default function VerificationSection({
   active,
   tasks,
-  onToggleTask,
+  onCompleteTask,
   onContinue,
 }: VerificationSectionProps) {
   const allDone = Object.values(tasks).every(Boolean);
 
   function handleTask(taskId: TaskId) {
+    if (tasks[taskId]) return;
+
     const link = LINKS[taskId];
-    if (!tasks[taskId] && link) window.open(link, "_blank", "noopener");
-    window.setTimeout(() => onToggleTask(taskId), tasks[taskId] ? 0 : 400);
+    if (link) window.open(link, "_blank", "noopener");
+    window.setTimeout(() => onCompleteTask(taskId), 400);
   }
 
   return (
