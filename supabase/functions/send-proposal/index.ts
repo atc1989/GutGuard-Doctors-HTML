@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         from: fromEmail,
         to: [registration.email],
-        subject: "Your GutGuard Doctors TikTok Affiliate Proposal",
+        subject: "Gutguard Doctors TikTok Proposal",
         html: proposalEmailHtml(registration.full_name, proposalPdfUrl),
         attachments: [
           {
@@ -117,11 +117,24 @@ function proposalEmailHtml(fullName: string, proposalUrl: string) {
 
   return `
     <div style="font-family:Arial,sans-serif;color:#0F0F18;line-height:1.6">
-      <p>Dear ${safeName},</p>
-      <p>Thank you for registering for the GutGuard Doctors' TikTok Affiliate Program.</p>
-      <p>Your proposal PDF is attached to this email. You may also view it here:</p>
-      <p><a href="${safeProposalUrl}">${safeProposalUrl}</a></p>
-      <p>With our compliments,<br/>GutGuard Doctors</p>
+      <p>🌿 Welcome, Doctor.</p>
+      <p>
+        You're now part of the GutGuard Lead Clinical Adopter (LCA)<br/>
+        community. Read this pinned message first — it saves<br/>
+        you (and us) repeat questions later.
+      </p>
+      <p>
+        • Founding cohort: 100 physicians, lifetime designation<br/>
+        • Active pilot: First 20 LCAs, 90-day program<br/>
+        • Waitlist: Positions 21–100, activated post-pilot
+      </p>
+      <p>Current slot count: __ of 100 confirmed.</p>
+      <p>Please see attached email for your perusal.</p>
+      <p>
+        Proposal link:<br/>
+        <a href="${safeProposalUrl}">${safeProposalUrl}</a>
+      </p>
+      <p>Registered to: ${safeName}</p>
     </div>
   `;
 }
