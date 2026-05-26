@@ -6,7 +6,7 @@ import { ArrowRightIcon } from "@/components/Icons";
 import { InputField, SelectField } from "@/components/FormField";
 import SectionLabel from "@/components/SectionLabel";
 import { SPECIALTIES } from "@/lib/constants";
-import { registerDoctor } from "@/lib/api";
+import { registerDoctor, sendProposalEmail } from "@/lib/api";
 import type { FieldErrors, FieldName, FormValues } from "@/lib/validation";
 import { normalizeMobile, validateField, validateForm } from "@/lib/validation";
 import type { Registration } from "@/lib/types";
@@ -66,6 +66,13 @@ export default function RegistrationSection({
         location: values.location.trim(),
       };
       const doctor = await registerDoctor(payload);
+      try {
+        await sendProposalEmail(doctor.id);
+      } catch {
+        window.alert(
+          "Registration saved, but the proposal email could not be sent. Please ask the booth coordinator to resend it.",
+        );
+      }
       onRegistered({ ...payload, id: doctor.id, registeredAt: Date.now() });
     } catch {
       setSubmitting(false);

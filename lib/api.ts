@@ -27,6 +27,16 @@ export async function registerDoctor(payload: Omit<Registration, "id" | "registe
   };
 }
 
+export async function sendProposalEmail(registrationId: string) {
+  if (!isSupabaseConfigured || !supabase || registrationId.startsWith("local-")) return;
+
+  const { error } = await supabase.functions.invoke("send-proposal", {
+    body: { registrationId },
+  });
+
+  if (error) throw error;
+}
+
 export async function updateTask(doctorId: string | null | undefined, taskId: TaskId, value: boolean) {
   if (!doctorId || !isSupabaseConfigured || !supabase) return;
 

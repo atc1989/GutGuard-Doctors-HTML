@@ -10,7 +10,7 @@ const eslintConfig = [
     },
   },
   {
-    ignores: ["node_modules/**", ".next/**", "out/**", "build/**"],
+    ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "supabase/functions/**"],
   },
 ];
 
