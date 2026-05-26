@@ -7,7 +7,7 @@ import RegistrationSection from "@/sections/RegistrationSection";
 import VerificationSection from "@/sections/VerificationSection";
 import WheelSection from "@/sections/WheelSection";
 import RevealSection from "@/sections/RevealSection";
-import { recordSpin, updateTask } from "@/lib/api";
+import { claimPrize, updateTask } from "@/lib/api";
 import { getPrizeByLabel } from "@/lib/prizes";
 import { INITIAL_STATE, loadExperienceState, saveExperienceState } from "@/lib/storage";
 import type { ExperienceState, Prize, Registration, Screen, TaskId } from "@/lib/types";
@@ -43,11 +43,22 @@ export default function RegistrationExperience() {
   }
 
   async function handleToggleTask(taskId: TaskId) {
+    const nextValue = !state.tasks[taskId];
+
     setState((current) => ({
       ...current,
-      tasks: { ...current.tasks, [taskId]: !current.tasks[taskId] },
+      tasks: { ...current.tasks, [taskId]: nextValue },
     }));
-    await updateTask();
+
+    try {
+      await updateTask(state.registration?.id, taskId, nextValue);
+    } catch {
+      setState((current) => ({
+        ...current,
+        tasks: { ...current.tasks, [taskId]: !nextValue },
+      }));
+      window.alert("Task update failed. Please check your connection and try again.");
+    }
   }
 
   function handlePrizeWon(prize: Prize) {
@@ -57,7 +68,6 @@ export default function RegistrationExperience() {
       prize: prize.label,
       prizeNote: prize.note,
     }));
-    recordSpin();
     paperConfetti();
     window.setTimeout(() => setScreen(4), 800);
   }
@@ -78,6 +88,7 @@ export default function RegistrationExperience() {
       <WheelSection
         active={screen === 3}
         spun={state.spun}
+        onClaimPrize={() => claimPrize(state.registration?.id)}
         onPrizeWon={handlePrizeWon}
       />
       <RevealSection

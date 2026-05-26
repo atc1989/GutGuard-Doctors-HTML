@@ -6,19 +6,25 @@ import ActionButton from "@/components/ActionButton";
 import { SpinIcon } from "@/components/Icons";
 import SectionLabel from "@/components/SectionLabel";
 import { PRIZES } from "@/lib/constants";
-import { pickPrizeIndex } from "@/lib/prizes";
 import type { Prize } from "@/lib/types";
 
 type WheelSectionProps = {
   active: boolean;
   spun: boolean;
+  onClaimPrize: () => Promise<Prize>;
   onPrizeWon: (prize: Prize) => void;
 };
 
-export default function WheelSection({ active, spun, onPrizeWon }: WheelSectionProps) {
+export default function WheelSection({
+  active,
+  spun,
+  onClaimPrize,
+  onPrizeWon,
+}: WheelSectionProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rotationRef = useRef(0);
   const [isSpinning, setIsSpinning] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     if (active) drawWheel(rotationRef.current);
@@ -84,12 +90,25 @@ export default function WheelSection({ active, spun, onPrizeWon }: WheelSectionP
     ctx.restore();
   }
 
-  function spin() {
+  async function spin() {
     if (spun || isSpinning) return;
 
     setIsSpinning(true);
-    const index = pickPrizeIndex();
-    const prize = PRIZES[index];
+    setErrorMessage("");
+
+    let prize: Prize;
+    try {
+      prize = await onClaimPrize();
+    } catch {
+      setIsSpinning(false);
+      setErrorMessage("Prize claim failed. Please ask the booth coordinator to try again.");
+      return;
+    }
+
+    const index = Math.max(
+      0,
+      PRIZES.findIndex((item) => item.label === prize.label),
+    );
     const slice = (Math.PI * 2) / PRIZES.length;
     const target = -index * slice - slice / 2;
     const turns = 7 + Math.random() * 2;
@@ -156,6 +175,7 @@ export default function WheelSection({ active, spun, onPrizeWon }: WheelSectionP
         sub="One opportunity"
         icon={<SpinIcon />}
       />
+      {errorMessage && <p className="field-err wheel-error">{errorMessage}</p>}
     </section>
   );
 }
