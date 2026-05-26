@@ -638,6 +638,10 @@
       color: var(--ink);
     }
 
+    .reveal-reset-action {
+      margin-top: 32px;
+    }
+
     
     .confetti {
       position: fixed;

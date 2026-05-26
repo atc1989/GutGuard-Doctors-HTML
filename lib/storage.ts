@@ -28,3 +28,11 @@ export function saveExperienceState(state: ExperienceState) {
     // Local persistence is best-effort for booth devices with restricted storage.
   }
 }
+
+export function clearExperienceState() {
+  try {
+    window.localStorage.removeItem(LOCAL_KEY);
+  } catch {
+    // Local persistence is best-effort for booth devices with restricted storage.
+  }
+}

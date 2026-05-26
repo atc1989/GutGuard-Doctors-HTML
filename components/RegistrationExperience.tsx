@@ -9,7 +9,12 @@ import WheelSection from "@/sections/WheelSection";
 import RevealSection from "@/sections/RevealSection";
 import { claimPrize, updateTask } from "@/lib/api";
 import { getPrizeByLabel } from "@/lib/prizes";
-import { INITIAL_STATE, loadExperienceState, saveExperienceState } from "@/lib/storage";
+import {
+  clearExperienceState,
+  INITIAL_STATE,
+  loadExperienceState,
+  saveExperienceState,
+} from "@/lib/storage";
 import type { ExperienceState, Prize, Registration, Screen, TaskId } from "@/lib/types";
 
 export default function RegistrationExperience() {
@@ -90,6 +95,12 @@ export default function RegistrationExperience() {
     window.setTimeout(() => setScreen(4), 800);
   }
 
+  function handleBackToRegistration() {
+    clearExperienceState();
+    setState(INITIAL_STATE);
+    setScreen(1);
+  }
+
   const activePrize = getPrizeByLabel(state.prize);
 
   return (
@@ -114,10 +125,11 @@ export default function RegistrationExperience() {
         registration={state.registration}
         prize={activePrize?.label ?? state.prize}
         prizeNote={activePrize?.note ?? state.prizeNote}
+        onBackToRegistration={handleBackToRegistration}
       />
 
       <div className="colophon">
-        <span>innovision grand international opc</span>
+        <span>GutGuard . innovision grand international opc</span>
         <span className="colophon-l">FDA CPR No. FR-40000015571456</span>
       </div>
     </main>
