@@ -117,7 +117,7 @@ export default function RegistrationExperience() {
       />
 
       <div className="colophon">
-        <span>GutGuard · IG International Corp.</span>
+        <span>innovision grand international opc</span>
         <span className="colophon-l">FDA CPR No. FR-40000015571456</span>
       </div>
     </main>
