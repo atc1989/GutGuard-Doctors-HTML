@@ -1,9 +1,9 @@
 import { PRIZES } from "@/lib/constants";
 import { pickPrizeIndex } from "@/lib/prizes";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
-import type { Prize, Registration, TaskId } from "@/lib/types";
+import type { Prize, RegistrationPayload, TaskId } from "@/lib/types";
 
-export async function registerDoctor(payload: Omit<Registration, "id" | "registeredAt">) {
+export async function registerDoctor(payload: RegistrationPayload) {
   if (isSupabaseConfigured && supabase) {
     const { data, error } = await supabase.rpc("register_doctor", {
       p_full_name: payload.fullName,

@@ -387,6 +387,88 @@
     .action-arrow svg { width: 14px; height: 14px; }
 
     
+    .modal-shell {
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 15, 24, 0.58);
+      backdrop-filter: blur(3px);
+    }
+    .confirm-modal {
+      position: relative;
+      width: min(100%, 520px);
+      max-height: calc(100vh - 48px);
+      overflow: auto;
+      background: var(--bone);
+      border: 1px solid var(--rule-strong);
+      box-shadow: 0 24px 70px rgba(15, 15, 24, 0.22);
+      padding: 32px;
+    }
+    .confirm-modal .section-label {
+      margin-bottom: 14px;
+    }
+    .confirm-modal-copy {
+      font-family: var(--serif);
+      font-size: 17px;
+      line-height: 1.5;
+      color: var(--ink-2);
+      margin-bottom: 26px;
+    }
+    .confirm-list {
+      border-top: 1px solid var(--rule);
+      margin: 0;
+    }
+    .confirm-row {
+      display: grid;
+      grid-template-columns: 104px minmax(0, 1fr);
+      gap: 18px;
+      padding: 15px 0;
+      border-bottom: 1px solid var(--rule);
+    }
+    .confirm-row dt {
+      font-family: var(--serif);
+      font-style: italic;
+      color: var(--ink-3);
+    }
+    .confirm-row dd {
+      margin: 0;
+      min-width: 0;
+      overflow-wrap: anywhere;
+      font-weight: 500;
+      color: var(--ink);
+    }
+    .confirm-actions {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+      margin-top: 28px;
+    }
+    .confirm-primary {
+      margin-top: 0;
+    }
+    .confirm-secondary {
+      width: 100%;
+      border: 1px solid var(--rule-strong);
+      background: transparent;
+      color: var(--ink);
+      padding: 16px 18px;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .confirm-secondary:disabled {
+      color: var(--ink-4);
+      cursor: not-allowed;
+    }
+
+    
     .tasks {
       list-style: none;
       margin-top: 8px;

@@ -10,6 +10,29 @@ type ProposalRequest = {
   registrationId?: string;
 };
 
+const ATTACHMENTS = [
+  {
+    filename: "01_TikTok_Affiliate_Onboarding.pdf",
+    path: "/01_TikTok_Affiliate_Onboarding.pdf",
+  },
+  {
+    filename: "02_LCA_Compensation_Program.pdf",
+    path: "/02_LCA_Compensation_Program.pdf",
+  },
+  {
+    filename: "03_LCA_Short_Form_Consent.pdf",
+    path: "/03_LCA_Short_Form_Consent.pdf",
+  },
+  {
+    filename: "04_LCA_Detailed_Terms_Annex.pdf",
+    path: "/04_LCA_Detailed_Terms_Annex.pdf",
+  },
+  {
+    filename: "05_LCA_Announcements_and_FAQ.pdf",
+    path: "/05_LCA_Announcements_and_FAQ.pdf",
+  },
+];
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -28,11 +51,11 @@ Deno.serve(async (req) => {
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
     const fromEmail =
       Deno.env.get("PROPOSAL_FROM_EMAIL") ?? "GutGuard Doctors <onboarding@resend.dev>";
-    const proposalPdfUrl = Deno.env.get("PROPOSAL_PDF_URL");
+    const attachmentBaseUrl = getAttachmentBaseUrl();
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    if (!resendApiKey || !proposalPdfUrl || !supabaseUrl || !serviceRoleKey) {
+    if (!resendApiKey || !supabaseUrl || !serviceRoleKey) {
       return jsonResponse({ error: "Missing Edge Function secrets" }, 500);
     }
 
@@ -55,13 +78,9 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Registration count could not be fetched" }, 500);
     }
 
-    const pdfResponse = await fetch(proposalPdfUrl);
-    if (!pdfResponse.ok) {
-      return jsonResponse({ error: "Proposal PDF could not be fetched" }, 500);
-    }
-
-    const pdfBytes = new Uint8Array(await pdfResponse.arrayBuffer());
-    const pdfBase64 = toBase64(pdfBytes);
+    const attachments = await Promise.all(
+      ATTACHMENTS.map((attachment) => fetchAttachment(attachmentBaseUrl, attachment)),
+    );
 
     const resendResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -73,17 +92,8 @@ Deno.serve(async (req) => {
         from: fromEmail,
         to: [registration.email],
         subject: "Gutguard Doctors TikTok Proposal",
-        html: proposalEmailHtml(
-          registration.full_name,
-          proposalPdfUrl,
-          Math.min(registeredCount ?? 1, 100),
-        ),
-        attachments: [
-          {
-            filename: "GutGuard_Doctor_TikTok_Proposal.pdf",
-            content: pdfBase64,
-          },
-        ],
+        html: proposalEmailHtml(registration.full_name, Math.min(registeredCount ?? 1, 100)),
+        attachments,
       }),
     });
 
@@ -123,11 +133,34 @@ function toBase64(bytes: Uint8Array) {
   return btoa(binary);
 }
 
-function proposalEmailHtml(
-  fullName: string,
-  _proposalUrl: string,
-  registeredCount: number,
+function getAttachmentBaseUrl() {
+  const explicitBaseUrl = Deno.env.get("ATTACHMENT_BASE_URL") ?? Deno.env.get("PUBLIC_SITE_URL");
+  if (explicitBaseUrl) return explicitBaseUrl.replace(/\/$/, "");
+
+  const legacyPdfUrl = Deno.env.get("PROPOSAL_PDF_URL");
+  if (legacyPdfUrl) return new URL(legacyPdfUrl).origin;
+
+  return "https://gut-guard-doctors-html.vercel.app";
+}
+
+async function fetchAttachment(
+  baseUrl: string,
+  attachment: { filename: string; path: string },
 ) {
+  const response = await fetch(`${baseUrl}${attachment.path}`);
+  if (!response.ok) {
+    throw new Error(`${attachment.filename} could not be fetched`);
+  }
+
+  const bytes = new Uint8Array(await response.arrayBuffer());
+
+  return {
+    filename: attachment.filename,
+    content: toBase64(bytes),
+  };
+}
+
+function proposalEmailHtml(fullName: string, registeredCount: number) {
   const safeName = escapeHtml(fullName);
 
   return `

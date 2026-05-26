@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import ActionButton from "@/components/ActionButton";
+import ConfirmRegistrationModal from "@/components/ConfirmRegistrationModal";
 import { ArrowRightIcon } from "@/components/Icons";
 import { InputField, SelectField } from "@/components/FormField";
 import SectionLabel from "@/components/SectionLabel";
@@ -9,7 +10,7 @@ import { SPECIALTIES } from "@/lib/constants";
 import { registerDoctor, sendProposalEmail } from "@/lib/api";
 import type { FieldErrors, FieldName, FormValues } from "@/lib/validation";
 import { normalizeMobile, validateField, validateForm } from "@/lib/validation";
-import type { Registration } from "@/lib/types";
+import type { Registration, RegistrationPayload } from "@/lib/types";
 
 type RegistrationSectionProps = {
   active: boolean;
@@ -31,6 +32,7 @@ export default function RegistrationSection({
   const [values, setValues] = useState(INITIAL_VALUES);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
+  const [pendingPayload, setPendingPayload] = useState<RegistrationPayload | null>(null);
 
   function handleValueChange(name: FieldName, value: string) {
     setValues((current) => ({ ...current, [name]: value }));
@@ -49,23 +51,32 @@ export default function RegistrationSection({
     }));
   }
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  function buildPayload(): RegistrationPayload {
+    return {
+      fullName: values.fullName.trim(),
+      email: values.email.trim().toLowerCase(),
+      mobile: normalizeMobile(values.mobile),
+      specialty: values.specialty,
+      location: values.location.trim(),
+    };
+  }
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const nextErrors = validateForm(values);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
+    setPendingPayload(buildPayload());
+  }
+
+  async function handleConfirmRegistration() {
+    if (!pendingPayload) return;
+
     setSubmitting(true);
     try {
-      const payload = {
-        fullName: values.fullName.trim(),
-        email: values.email.trim().toLowerCase(),
-        mobile: normalizeMobile(values.mobile),
-        specialty: values.specialty,
-        location: values.location.trim(),
-      };
-      const doctor = await registerDoctor(payload);
+      const doctor = await registerDoctor(pendingPayload);
       try {
         await sendProposalEmail(doctor.id);
       } catch {
@@ -73,7 +84,7 @@ export default function RegistrationSection({
           "Registration saved, but the proposal email could not be sent. Please ask the booth coordinator to resend it.",
         );
       }
-      onRegistered({ ...payload, id: doctor.id, registeredAt: Date.now() });
+      onRegistered({ ...pendingPayload, id: doctor.id, registeredAt: Date.now() });
     } catch {
       setSubmitting(false);
       window.alert("Registration failed. Please try again or ask the booth coordinator.");
@@ -162,6 +173,14 @@ export default function RegistrationSection({
           icon={<ArrowRightIcon />}
         />
       </form>
+
+      <ConfirmRegistrationModal
+        open={Boolean(pendingPayload)}
+        payload={pendingPayload}
+        submitting={submitting}
+        onCancel={() => setPendingPayload(null)}
+        onConfirm={handleConfirmRegistration}
+      />
     </section>
   );
 }

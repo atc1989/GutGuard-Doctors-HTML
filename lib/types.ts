@@ -13,6 +13,8 @@ export type Registration = {
   registeredAt: number;
 };
 
+export type RegistrationPayload = Omit<Registration, "id" | "registeredAt">;
+
 export type TaskState = Record<TaskId, boolean>;
 
 export type ExperienceState = {
