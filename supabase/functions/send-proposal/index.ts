@@ -47,6 +47,14 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Registration not found" }, 404);
     }
 
+    const { count: registeredCount, error: countError } = await supabase
+      .from("doctor_registrations")
+      .select("id", { count: "exact", head: true });
+
+    if (countError) {
+      return jsonResponse({ error: "Registration count could not be fetched" }, 500);
+    }
+
     const pdfResponse = await fetch(proposalPdfUrl);
     if (!pdfResponse.ok) {
       return jsonResponse({ error: "Proposal PDF could not be fetched" }, 500);
@@ -65,7 +73,11 @@ Deno.serve(async (req) => {
         from: fromEmail,
         to: [registration.email],
         subject: "Gutguard Doctors TikTok Proposal",
-        html: proposalEmailHtml(registration.full_name, proposalPdfUrl),
+        html: proposalEmailHtml(
+          registration.full_name,
+          proposalPdfUrl,
+          Math.min(registeredCount ?? 1, 100),
+        ),
         attachments: [
           {
             filename: "GutGuard_Doctor_TikTok_Proposal.pdf",
@@ -111,7 +123,11 @@ function toBase64(bytes: Uint8Array) {
   return btoa(binary);
 }
 
-function proposalEmailHtml(fullName: string, proposalUrl: string) {
+function proposalEmailHtml(
+  fullName: string,
+  proposalUrl: string,
+  registeredCount: number,
+) {
   const safeName = escapeHtml(fullName);
   const safeProposalUrl = escapeHtml(proposalUrl);
 
@@ -128,7 +144,7 @@ function proposalEmailHtml(fullName: string, proposalUrl: string) {
         • Active pilot: First 20 LCAs, 90-day program<br/>
         • Waitlist: Positions 21–100, activated post-pilot
       </p>
-      <p>Current slot count: __ of 100 confirmed.</p>
+      <p>Current slot count: ${registeredCount} of 100 confirmed.</p>
       <p>Please see attached email for your perusal.</p>
       <p>
         Proposal link:<br/>
