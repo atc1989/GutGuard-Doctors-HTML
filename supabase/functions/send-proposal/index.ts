@@ -31,6 +31,10 @@ const ATTACHMENTS = [
     filename: "05_LCA_Announcements_and_FAQ.pdf",
     path: "/05_LCA_Announcements_and_FAQ.pdf",
   },
+  {
+    filename: "06_LCA_Clinical_Dosing_Guide.pdf",
+    path: "/06_LCA_Clinical_Dosing_Guide.pdf",
+  },
 ];
 
 Deno.serve(async (req) => {

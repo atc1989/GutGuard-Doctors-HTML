@@ -9,6 +9,7 @@ import type { Prize } from "@/lib/types";
 type WheelSectionProps = {
   active: boolean;
   spun: boolean;
+  doctorName?: string | null;
   onClaimPrize: () => Promise<Prize>;
   onPrizeWon: (prize: Prize) => void;
 };
@@ -16,6 +17,7 @@ type WheelSectionProps = {
 export default function WheelSection({
   active,
   spun,
+  doctorName,
   onClaimPrize,
   onPrizeWon,
 }: WheelSectionProps) {
@@ -42,7 +44,11 @@ export default function WheelSection({
       <SectionLabel number="iii.">Congratulations</SectionLabel>
 
       <div className="congrats-banner">
-        <p className="congrats-title">Congratulations, Doctor!</p>
+        <p className="congrats-title">
+          <span className="congrats-title-prefix">Congratulations, Doctor</span>
+          {doctorName ? <span className="congrats-title-name">{doctorName}</span> : null}
+          <span className="congrats-title-mark">!</span>
+        </p>
         <p className="congrats-copy">
           You&apos;ve officially joined the <strong>GutGuard Doctors&apos; TikTok Affiliate Program</strong>.
         </p>

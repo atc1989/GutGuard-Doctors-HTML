@@ -123,6 +123,7 @@ export default function RegistrationExperience() {
       <WheelSection
         active={screen === 3}
         spun={state.spun}
+        doctorName={state.registration?.fullName}
         onClaimPrize={() => claimPrize(state.registration?.id)}
         onPrizeWon={handlePrizeWon}
       />
