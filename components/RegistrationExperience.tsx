@@ -6,16 +6,14 @@ import ProgressRail from "@/components/ProgressRail";
 import RegistrationSection from "@/sections/RegistrationSection";
 import VerificationSection from "@/sections/VerificationSection";
 import WheelSection from "@/sections/WheelSection";
-import RevealSection from "@/sections/RevealSection";
-import { claimPrize, updateTask } from "@/lib/api";
-import { getPrizeByLabel } from "@/lib/prizes";
+import { updateTask } from "@/lib/api";
 import {
   clearExperienceState,
   INITIAL_STATE,
   loadExperienceState,
   saveExperienceState,
 } from "@/lib/storage";
-import type { ExperienceState, Prize, Registration, Screen, TaskId } from "@/lib/types";
+import type { ExperienceState, Registration, Screen, TaskId } from "@/lib/types";
 
 export default function RegistrationExperience() {
   const [state, setState] = useState<ExperienceState>(INITIAL_STATE);
@@ -85,16 +83,6 @@ export default function RegistrationExperience() {
     }
   }
 
-  function handlePrizeWon(prize: Prize) {
-    setState((current) => ({
-      ...current,
-      spun: true,
-      prize: prize.label,
-      prizeNote: prize.note,
-    }));
-    paperConfetti();
-    window.setTimeout(() => setScreen(4), 800);
-  }
 
   function handleBackToRegistration() {
     clearExperienceState();
@@ -103,7 +91,6 @@ export default function RegistrationExperience() {
     setScreen(1);
   }
 
-  const activePrize = getPrizeByLabel(state.prize);
 
   return (
     <main className="stage">
@@ -122,15 +109,7 @@ export default function RegistrationExperience() {
       />
       <WheelSection
         active={screen === 3}
-        spun={state.spun}
-        onClaimPrize={() => claimPrize(state.registration?.id)}
-        onPrizeWon={handlePrizeWon}
-      />
-      <RevealSection
-        active={screen === 4}
-        registration={state.registration}
-        prize={activePrize?.label ?? state.prize}
-        prizeNote={activePrize?.note ?? state.prizeNote}
+        doctorName={state.registration?.fullName}
         onBackToRegistration={handleBackToRegistration}
       />
 
@@ -143,29 +122,8 @@ export default function RegistrationExperience() {
 }
 
 function resolveScreen(state: ExperienceState): Screen {
-  if (state.spun && state.prize) return 4;
   if (state.registration && Object.values(state.tasks).every(Boolean)) return 3;
   if (state.registration) return 2;
   return 1;
 }
 
-function paperConfetti() {
-  const palette = ["#0608A9", "#B08D5B", "#F4F1EA", "#0F0F18", "#04067A"];
-
-  for (let i = 0; i < 50; i += 1) {
-    const piece = document.createElement("div");
-    const isRect = Math.random() > 0.5;
-    piece.className = "confetti";
-    piece.style.width = `${isRect ? 10 : 6}px`;
-    piece.style.height = `${isRect ? 3 : 6}px`;
-    piece.style.background = palette[Math.floor(Math.random() * palette.length)];
-    piece.style.left = `${Math.random() * 100}vw`;
-    piece.style.top = "-30px";
-    piece.style.opacity = `${0.7 + Math.random() * 0.3}`;
-    piece.style.transform = `rotate(${Math.random() * 360}deg)`;
-    piece.style.animationDuration = `${3 + Math.random() * 2}s`;
-    piece.style.animationDelay = `${Math.random() * 0.4}s`;
-    document.body.appendChild(piece);
-    window.setTimeout(() => piece.remove(), 6000);
-  }
-}
