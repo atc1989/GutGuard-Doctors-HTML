@@ -10,7 +10,13 @@ type ProposalRequest = {
   registrationId?: string;
 };
 
-const ATTACHMENTS = [
+type AttachmentConfig = {
+  filename: string;
+  path: string;
+  required?: boolean;
+};
+
+const ATTACHMENTS: AttachmentConfig[] = [
   {
     filename: "01_TikTok_Affiliate_Onboarding.pdf",
     path: "/01_TikTok_Affiliate_Onboarding.pdf",
@@ -34,6 +40,7 @@ const ATTACHMENTS = [
   {
     filename: "06_LCA_Clinical_Dosing_Guide.pdf",
     path: "/06_LCA_Clinical_Dosing_Guide.pdf",
+    required: false,
   },
 ];
 
@@ -82,9 +89,12 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Registration count could not be fetched" }, 500);
     }
 
-    const attachments = await Promise.all(
+    const attachmentResults = await Promise.all(
       ATTACHMENTS.map((attachment) => fetchAttachment(attachmentBaseUrl, attachment)),
     );
+    const attachments = attachmentResults
+      .filter((item): item is { filename: string; content: string } => item !== null);
+
 
     const resendResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -147,12 +157,14 @@ function getAttachmentBaseUrl() {
   return "https://gut-guard-doctors-html.vercel.app";
 }
 
-async function fetchAttachment(
-  baseUrl: string,
-  attachment: { filename: string; path: string },
-) {
+async function fetchAttachment(baseUrl: string, attachment: AttachmentConfig) {
   const response = await fetch(`${baseUrl}${attachment.path}`);
   if (!response.ok) {
+    if (attachment.required === false) {
+      console.warn(`Optional attachment skipped: ${attachment.filename}`);
+      return null;
+    }
+
     throw new Error(`${attachment.filename} could not be fetched`);
   }
 

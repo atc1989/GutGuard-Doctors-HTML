@@ -1,44 +1,20 @@
 "use client";
 
-import { useState } from "react";
 import ActionButton from "@/components/ActionButton";
 import { ArrowRightIcon } from "@/components/Icons";
 import SectionLabel from "@/components/SectionLabel";
-import type { Prize } from "@/lib/types";
 
 type WheelSectionProps = {
   active: boolean;
-  spun: boolean;
   doctorName?: string | null;
-  onClaimPrize: () => Promise<Prize>;
-  onPrizeWon: (prize: Prize) => void;
+  onBackToRegistration: () => void;
 };
 
 export default function WheelSection({
   active,
-  spun,
   doctorName,
-  onClaimPrize,
-  onPrizeWon,
+  onBackToRegistration,
 }: WheelSectionProps) {
-  const [isClaiming, setIsClaiming] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-
-  async function claimGift() {
-    if (spun || isClaiming) return;
-
-    setIsClaiming(true);
-    setErrorMessage("");
-
-    try {
-      const prize = await onClaimPrize();
-      onPrizeWon(prize);
-    } catch {
-      setErrorMessage("Gift claim failed. Please ask the booth coordinator to try again.");
-      setIsClaiming(false);
-    }
-  }
-
   return (
     <section className={`screen wheel-stage ${active ? "active" : ""}`.trim()}>
       <SectionLabel number="iii.">Congratulations</SectionLabel>
@@ -64,15 +40,12 @@ export default function WheelSection({
 
       <ActionButton
         type="button"
-        className="action-spin"
-        disabled={spun || isClaiming}
-        onClick={claimGift}
-        main={isClaiming ? "Claiming your gift" : "Continue"}
-        sub={spun ? "Gift recorded" : "Record and proceed"}
+        className="reveal-reset-action"
+        main="Back to Registration"
+        sub="Start another doctor"
         icon={<ArrowRightIcon />}
+        onClick={onBackToRegistration}
       />
-
-      {errorMessage && <p className="field-err wheel-error">{errorMessage}</p>}
     </section>
   );
 }
