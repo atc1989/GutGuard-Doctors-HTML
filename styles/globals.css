@@ -791,3 +791,72 @@
       .masthead { gap: 8px; }
       .masthead-edition { font-size: 9px; line-height: 1.4; }
     }
+
+.congrats-banner {
+  border: 1px solid var(--rule);
+  background: linear-gradient(180deg, #f7f4ed 0%, #f4f1ea 100%);
+  border-radius: 20px;
+  padding: 28px 20px;
+  margin-bottom: 28px;
+  text-align: center;
+}
+
+.congrats-title {
+  font-family: var(--serif);
+  font-size: clamp(42px, 10vw, 62px);
+  font-style: italic;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  color: var(--gold);
+  margin-bottom: 18px;
+}
+
+.congrats-copy {
+  font-size: 19px;
+  line-height: 1.35;
+  color: var(--ink-2);
+  margin: 0 auto 24px;
+  max-width: 22ch;
+}
+
+.congrats-copy strong {
+  color: var(--blue);
+}
+
+.congrats-card {
+  background: linear-gradient(135deg, #04067a 0%, #0608a9 45%, #0f2d9d 100%);
+  color: var(--bone);
+  border-radius: 18px;
+  padding: 20px 16px;
+  box-shadow: 0 10px 28px rgba(4, 6, 122, 0.25);
+}
+
+.congrats-card-lead {
+  font-size: 17px;
+  line-height: 1.35;
+  opacity: 0.94;
+  margin-bottom: 10px;
+}
+
+.congrats-card-highlight {
+  font-family: var(--serif);
+  font-size: clamp(40px, 11vw, 56px);
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  color: #f6d59d;
+  margin-bottom: 8px;
+}
+
+.congrats-card-sub {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.congrats-footnote {
+  margin-top: 20px;
+  font-family: var(--serif);
+  font-size: 18px;
+  font-style: italic;
+  color: var(--blue);
+}
