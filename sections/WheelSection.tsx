@@ -45,7 +45,9 @@ export default function WheelSection({
 
       <div className="congrats-banner">
         <p className="congrats-title">
-          Congratulations, Doctor{doctorName ? ` ${doctorName}` : ""}!
+          <span className="congrats-title-prefix">Congratulations, Doctor</span>
+          {doctorName ? <span className="congrats-title-name">{doctorName}</span> : null}
+          <span className="congrats-title-mark">!</span>
         </p>
         <p className="congrats-copy">
           You&apos;ve officially joined the <strong>GutGuard Doctors&apos; TikTok Affiliate Program</strong>.
