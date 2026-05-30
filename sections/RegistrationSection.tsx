@@ -56,7 +56,7 @@ export default function RegistrationSection({
       fullName: values.fullName.trim(),
       email: values.email.trim().toLowerCase(),
       mobile: normalizeMobile(values.mobile),
-      specialty: values.specialty,
+      specialty: values.specialty.trim(),
       location: values.location.trim(),
     };
   }
@@ -147,7 +147,7 @@ export default function RegistrationSection({
         />
         <SelectField
           id="specialty"
-          label="Specialty"
+          label="Specialty (optional)"
           error="Please select your specialty."
           value={values.specialty}
           hasError={errors.specialty}
