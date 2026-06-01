@@ -73,12 +73,11 @@ export function SelectField({
           className="field-input"
           id={id}
           name={id}
-          required
           value={value}
           onChange={(event) => onValueChange(id, event.target.value)}
           onBlur={() => onFieldBlur(id)}
         >
-          <option value="">Select your field</option>
+          <option value="">Select your field (optional)</option>
           {options.map((option) => (
             <option key={option}>{option}</option>
           ))}

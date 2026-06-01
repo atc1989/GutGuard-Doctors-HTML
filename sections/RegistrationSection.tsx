@@ -56,7 +56,7 @@ export default function RegistrationSection({
       fullName: values.fullName.trim(),
       email: values.email.trim().toLowerCase(),
       mobile: normalizeMobile(values.mobile),
-      specialty: values.specialty,
+      specialty: values.specialty.trim(),
       location: values.location.trim(),
     };
   }
@@ -77,12 +77,14 @@ export default function RegistrationSection({
     setSubmitting(true);
     try {
       const doctor = await registerDoctor(pendingPayload);
-      try {
-        await sendProposalEmail(doctor.id);
-      } catch {
-        window.alert(
-          "Registration saved, but the proposal email could not be sent. Please ask the booth coordinator to resend it.",
-        );
+      if (pendingPayload.email) {
+        try {
+          await sendProposalEmail(doctor.id);
+        } catch {
+          window.alert(
+            "Registration saved, but the proposal email could not be sent. Please ask the booth coordinator to resend it.",
+          );
+        }
       }
       setValues(INITIAL_VALUES);
       setErrors({});
@@ -100,7 +102,7 @@ export default function RegistrationSection({
       <SectionLabel number="i.">Booth Registration</SectionLabel>
       <p className="lede dropcap">
         Lead Clinical Adopters are a closed cohort of one hundred Filipino physicians.
-        Register here. Your proposal arrives by email within minutes.
+        Register here. Add your email if you would like the proposal delivered to your inbox.
       </p>
 
       <form noValidate onSubmit={handleSubmit}>
@@ -119,7 +121,7 @@ export default function RegistrationSection({
         />
         <InputField
           id="email"
-          label="Email"
+          label="Email (optional)"
           error="Please enter a valid email."
           value={values.email}
           hasError={errors.email}
@@ -127,7 +129,6 @@ export default function RegistrationSection({
           onFieldBlur={handleFieldBlur}
           type="email"
           placeholder="you@clinic.com"
-          required
           autoComplete="email"
           inputMode="email"
         />
@@ -147,7 +148,7 @@ export default function RegistrationSection({
         />
         <SelectField
           id="specialty"
-          label="Specialty"
+          label="Specialty (optional)"
           error="Please select your specialty."
           value={values.specialty}
           hasError={errors.specialty}

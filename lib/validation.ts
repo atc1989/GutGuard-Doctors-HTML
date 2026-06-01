@@ -15,6 +15,8 @@ export function normalizeMobile(value: string) {
 export function validateField(name: FieldName, value: string) {
   const trimmed = value.trim();
 
+  if (name === "email" && !trimmed) return true;
+  if (name === "specialty") return true;
   if (!trimmed) return false;
   if (name === "email") return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
   if (name === "mobile") return /^(09|\+639)\d{9}$/.test(normalizeMobile(trimmed));
