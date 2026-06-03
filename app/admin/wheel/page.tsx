@@ -50,6 +50,7 @@ const emptyPrize: AdminWheelPrize = {
   is_active: true,
   sort_order: 0,
 };
+const DOCTORS_PER_PAGE = 8;
 
 async function loadWheelApi(): Promise<WheelApi> {
   const api = (await import("@/lib/api")) as WheelApi;
@@ -74,6 +75,8 @@ export default function AdminWheelPage() {
   const [password, setPassword] = useState("");
   const [prizes, setPrizes] = useState<AdminWheelPrize[]>([]);
   const [doctors, setDoctors] = useState<AdminDoctorRegistration[]>([]);
+  const [doctorSearch, setDoctorSearch] = useState("");
+  const [doctorPage, setDoctorPage] = useState(1);
   const [newPrize, setNewPrize] = useState<AdminWheelPrize>(emptyPrize);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -89,6 +92,30 @@ export default function AdminWheelPage() {
         return sum + prize.chance_weight;
       }, 0),
     [prizes],
+  );
+  const filteredDoctors = useMemo(() => {
+    const query = doctorSearch.trim().toLowerCase();
+    if (!query) return doctors;
+
+    return doctors.filter((doctor) =>
+      [
+        doctor.full_name,
+        doctor.email,
+        doctor.mobile,
+        doctor.tiktok_username,
+        doctor.specialty,
+        doctor.practice_location,
+        doctor.prize_label ?? "",
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [doctorSearch, doctors]);
+  const totalDoctorPages = Math.max(1, Math.ceil(filteredDoctors.length / DOCTORS_PER_PAGE));
+  const visibleDoctors = filteredDoctors.slice(
+    (doctorPage - 1) * DOCTORS_PER_PAGE,
+    doctorPage * DOCTORS_PER_PAGE,
   );
 
   async function handleUnlock(event: FormEvent<HTMLFormElement>) {
@@ -109,6 +136,7 @@ export default function AdminWheelPage() {
       ]);
       setPrizes(loadedPrizes.sort((a, b) => a.sort_order - b.sort_order));
       setDoctors(loadedDoctors);
+      setDoctorPage(1);
       setIsUnlocked(true);
       setNotice("Admin data loaded.");
     } catch (caught) {
@@ -130,6 +158,7 @@ export default function AdminWheelPage() {
       }
 
       setDoctors(await api.getDoctorRegistrations(password));
+      setDoctorPage(1);
       setNotice("Doctor registrations refreshed.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to load doctor registrations.");
@@ -445,14 +474,29 @@ export default function AdminWheelPage() {
               <p className="admin-wheel-kicker">Registered Doctors</p>
               <h2>Doctor Directory</h2>
             </div>
-            <button type="button" onClick={refreshDoctors} disabled={isLoading}>
-              {isLoading ? "Refreshing" : "Refresh"}
-            </button>
+            <div className="admin-doctor-actions">
+              <label htmlFor="doctor-search">
+                Search
+                <input
+                  id="doctor-search"
+                  type="search"
+                  value={doctorSearch}
+                  placeholder="Name, email, TikTok, clinic..."
+                  onChange={(event) => {
+                    setDoctorSearch(event.target.value);
+                    setDoctorPage(1);
+                  }}
+                />
+              </label>
+              <button type="button" onClick={refreshDoctors} disabled={isLoading}>
+                {isLoading ? "Refreshing" : "Refresh"}
+              </button>
+            </div>
           </div>
 
           <div className="admin-doctor-list">
-            {doctors.length > 0 ? (
-              doctors.map((doctor) => (
+            {visibleDoctors.length > 0 ? (
+              visibleDoctors.map((doctor) => (
                 <article className="admin-doctor-row" key={doctor.id}>
                   <div className="admin-doctor-primary">
                     <strong>{doctor.full_name || "Unnamed doctor"}</strong>
@@ -488,9 +532,36 @@ export default function AdminWheelPage() {
               ))
             ) : (
               <div className="admin-wheel-empty">
-                <p>No doctor registrations found.</p>
+                <p>{doctors.length > 0 ? "No doctors match that search." : "No doctor registrations found."}</p>
               </div>
             )}
+          </div>
+
+          <div className="admin-pagination">
+            <p>
+              Showing {visibleDoctors.length > 0 ? (doctorPage - 1) * DOCTORS_PER_PAGE + 1 : 0}
+              {"-"}
+              {Math.min(doctorPage * DOCTORS_PER_PAGE, filteredDoctors.length)} of {filteredDoctors.length}
+            </p>
+            <div className="admin-pagination-controls">
+              <button
+                type="button"
+                onClick={() => setDoctorPage((current) => Math.max(1, current - 1))}
+                disabled={doctorPage <= 1}
+              >
+                Previous
+              </button>
+              <span>
+                Page {doctorPage} of {totalDoctorPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setDoctorPage((current) => Math.min(totalDoctorPages, current + 1))}
+                disabled={doctorPage >= totalDoctorPages}
+              >
+                Next
+              </button>
+            </div>
           </div>
         </section>
       ) : null}

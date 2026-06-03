@@ -1100,8 +1100,8 @@
 
 .admin-tabs button:hover,
 .admin-tabs button.active {
-  background: transparent;
-  color: var(--blue);
+  background: var(--blue);
+  color: var(--bone);
   border-bottom-color: var(--blue);
 }
 
@@ -1322,6 +1322,24 @@
   gap: 14px;
 }
 
+.admin-doctor-actions {
+  display: grid;
+  grid-template-columns: minmax(240px, 360px) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.admin-doctor-actions label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
 .admin-doctor-row {
   display: grid;
   grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.4fr);
@@ -1381,6 +1399,37 @@
   overflow-wrap: anywhere;
 }
 
+.admin-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--rule);
+  color: var(--ink-3);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.admin-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-pagination-controls span {
+  min-width: 92px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.admin-pagination-controls button {
+  min-height: 38px;
+  padding: 10px 14px;
+}
+
 @media (max-width: 820px) {
   .admin-wheel-shell {
     padding: 22px;
@@ -1396,6 +1445,11 @@
   .admin-wheel-panel-head > p {
     width: 100%;
     text-align: left;
+  }
+
+  .admin-doctor-actions {
+    width: 100%;
+    grid-template-columns: 1fr auto;
   }
 
   .admin-wheel-auth {
@@ -1423,11 +1477,22 @@
   .admin-wheel-auth-row,
   .admin-wheel-prize-footer,
   .admin-wheel-grid,
-  .admin-doctor-details {
+  .admin-doctor-details,
+  .admin-doctor-actions {
     grid-template-columns: 1fr;
   }
 
   .admin-wheel-odds {
     text-align: left;
+  }
+
+  .admin-pagination {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-pagination-controls {
+    width: 100%;
+    justify-content: space-between;
   }
 }
