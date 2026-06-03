@@ -420,6 +420,23 @@
       color: var(--ink-2);
       margin-bottom: 26px;
     }
+    .confirm-warning {
+      border: 1px solid rgba(176, 32, 46, 0.38);
+      background: rgba(176, 32, 46, 0.07);
+      color: #8F1824;
+      padding: 14px 16px;
+      margin-bottom: 22px;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    .confirm-warning-title {
+      margin-bottom: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #B0202E;
+    }
     .confirm-list {
       border-top: 1px solid var(--rule);
       margin: 0;

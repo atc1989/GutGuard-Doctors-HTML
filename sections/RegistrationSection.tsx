@@ -39,9 +39,11 @@ export default function RegistrationSection({
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [pendingPayload, setPendingPayload] = useState<RegistrationPayload | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   function handleValueChange(name: FieldName, value: string) {
     setValues((current) => ({ ...current, [name]: value }));
+    setSubmitError(null);
     if (errors[name]) {
       setErrors((current) => ({
         ...current,
@@ -75,6 +77,7 @@ export default function RegistrationSection({
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
+    setSubmitError(null);
     setPendingPayload(buildPayload());
   }
 
@@ -102,9 +105,9 @@ export default function RegistrationSection({
       setSubmitting(false);
       const message = error instanceof Error ? error.message : "";
       if (message.toLowerCase().includes("tiktok")) {
-        window.alert("This TikTok username has already been registered. Please check the handle and try again.");
+        setSubmitError("This TikTok username has already been registered. Please check the handle and try again.");
       } else {
-        window.alert("Registration failed. Please try again or ask the booth coordinator.");
+        setSubmitError("Registration failed. Please try again or ask the booth coordinator.");
       }
     }
   }
@@ -209,7 +212,11 @@ export default function RegistrationSection({
         open={Boolean(pendingPayload)}
         payload={pendingPayload}
         submitting={submitting}
-        onCancel={() => setPendingPayload(null)}
+        error={submitError}
+        onCancel={() => {
+          setSubmitError(null);
+          setPendingPayload(null);
+        }}
         onConfirm={handleConfirmRegistration}
       />
     </section>

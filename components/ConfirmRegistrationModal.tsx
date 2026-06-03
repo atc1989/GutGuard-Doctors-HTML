@@ -6,6 +6,7 @@ type ConfirmRegistrationModalProps = {
   open: boolean;
   payload: RegistrationPayload | null;
   submitting: boolean;
+  error?: string | null;
   onCancel: () => void;
   onConfirm: () => void;
 };
@@ -26,6 +27,7 @@ export default function ConfirmRegistrationModal({
   open,
   payload,
   submitting,
+  error,
   onCancel,
   onConfirm,
 }: ConfirmRegistrationModalProps) {
@@ -47,6 +49,12 @@ export default function ConfirmRegistrationModal({
           Please confirm these details are correct before we save the registration and
           send the onboarding documents.
         </p>
+        {error ? (
+          <div className="confirm-warning" role="alert">
+            <p className="confirm-warning-title">Registration needs attention</p>
+            <p>{error}</p>
+          </div>
+        ) : null}
 
         <dl className="confirm-list">
           {REVIEW_FIELDS.map((field) => (
