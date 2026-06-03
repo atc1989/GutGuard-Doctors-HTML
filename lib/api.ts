@@ -35,6 +35,19 @@ type AdminWheelPrize = {
   claim_count?: number;
 };
 
+type AdminDoctorRegistration = {
+  id: string;
+  full_name: string;
+  email: string;
+  mobile: string;
+  tiktok_username: string;
+  specialty: string;
+  practice_location: string;
+  created_at: string;
+  prize_label?: string | null;
+  prize_claimed_at?: string | null;
+};
+
 export async function registerDoctor(payload: RegistrationPayload) {
   if (isSupabaseConfigured && supabase) {
     const { data, error } = await supabase.rpc("register_doctor", {
@@ -46,7 +59,7 @@ export async function registerDoctor(payload: RegistrationPayload) {
       p_practice_location: payload.location,
     });
 
-    if (error) throw new Error(`Prize claim failed: ${error.message}`);
+    if (error) throw new Error(`Registration failed: ${error.message}`);
 
     return {
       id: data as string,
@@ -175,6 +188,17 @@ export async function createWheelPrize(
 ): Promise<AdminWheelPrize> {
   const saved = await adminSaveWheelPrize(adminPassword, mapWheelPrizeInput(prize));
   return mapAdminWheelPrize(saved);
+}
+
+export async function getDoctorRegistrations(adminPassword: string): Promise<AdminDoctorRegistration[]> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.rpc("admin_list_doctor_registrations", {
+    p_admin_password: adminPassword,
+  });
+
+  if (error) throw error;
+  return (data ?? []) as AdminDoctorRegistration[];
 }
 
 function mapClaimedPrize(row: PrizeRow | null | undefined): Prize {

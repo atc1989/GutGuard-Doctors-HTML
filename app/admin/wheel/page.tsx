@@ -16,6 +16,19 @@ type AdminWheelPrize = {
   sort_order: number;
 };
 
+type AdminDoctorRegistration = {
+  id: string;
+  full_name: string;
+  email: string;
+  mobile: string;
+  tiktok_username: string;
+  specialty: string;
+  practice_location: string;
+  created_at: string;
+  prize_label?: string | null;
+  prize_claimed_at?: string | null;
+};
+
 type WheelApi = {
   getWheelPrizes?: (adminPassword: string) => Promise<AdminWheelPrize[]>;
   saveWheelPrize?: (adminPassword: string, prize: AdminWheelPrize) => Promise<AdminWheelPrize>;
@@ -23,6 +36,7 @@ type WheelApi = {
     adminPassword: string,
     prize: Omit<AdminWheelPrize, "id">,
   ) => Promise<AdminWheelPrize>;
+  getDoctorRegistrations?: (adminPassword: string) => Promise<AdminDoctorRegistration[]>;
 };
 
 const emptyPrize: AdminWheelPrize = {
@@ -56,8 +70,10 @@ function getPrizeOdds(prize: AdminWheelPrize, activeWeightTotal: number) {
 }
 
 export default function AdminWheelPage() {
+  const [activeTab, setActiveTab] = useState<"wheel" | "doctors">("wheel");
   const [password, setPassword] = useState("");
   const [prizes, setPrizes] = useState<AdminWheelPrize[]>([]);
+  const [doctors, setDoctors] = useState<AdminDoctorRegistration[]>([]);
   const [newPrize, setNewPrize] = useState<AdminWheelPrize>(emptyPrize);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -87,12 +103,36 @@ export default function AdminWheelPage() {
         throw new Error("Missing getWheelPrizes helper in lib/api.ts.");
       }
 
-      const loadedPrizes = await api.getWheelPrizes(password);
+      const [loadedPrizes, loadedDoctors] = await Promise.all([
+        api.getWheelPrizes(password),
+        api.getDoctorRegistrations ? api.getDoctorRegistrations(password) : Promise.resolve([]),
+      ]);
       setPrizes(loadedPrizes.sort((a, b) => a.sort_order - b.sort_order));
+      setDoctors(loadedDoctors);
       setIsUnlocked(true);
-      setNotice("Wheel prizes loaded.");
+      setNotice("Admin data loaded.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to load wheel prizes.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function refreshDoctors() {
+    setError(null);
+    setNotice(null);
+    setIsLoading(true);
+
+    try {
+      const api = await loadWheelApi();
+      if (!api.getDoctorRegistrations) {
+        throw new Error("Missing getDoctorRegistrations helper in lib/api.ts.");
+      }
+
+      setDoctors(await api.getDoctorRegistrations(password));
+      setNotice("Doctor registrations refreshed.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to load doctor registrations.");
     } finally {
       setIsLoading(false);
     }
@@ -176,11 +216,28 @@ export default function AdminWheelPage() {
           </h1>
         </div>
         <div className="admin-wheel-summary" aria-live="polite">
-          <span>{prizes.length} prizes</span>
-          <strong>{activeWeightTotal}</strong>
-          <span>active weight</span>
+          <span>{activeTab === "wheel" ? `${prizes.length} prizes` : `${doctors.length} doctors`}</span>
+          <strong>{activeTab === "wheel" ? activeWeightTotal : doctors.length}</strong>
+          <span>{activeTab === "wheel" ? "active weight" : "registrations"}</span>
         </div>
       </section>
+
+      <nav className="admin-tabs" aria-label="Admin sections">
+        <button
+          className={activeTab === "wheel" ? "active" : ""}
+          onClick={() => setActiveTab("wheel")}
+          type="button"
+        >
+          Wheel
+        </button>
+        <button
+          className={activeTab === "doctors" ? "active" : ""}
+          onClick={() => setActiveTab("doctors")}
+          type="button"
+        >
+          Doctors
+        </button>
+      </nav>
 
       <form className="admin-wheel-auth" onSubmit={handleUnlock}>
         <label htmlFor="admin-password">Admin password</label>
@@ -201,7 +258,7 @@ export default function AdminWheelPage() {
       {error ? <div className="admin-wheel-alert error">{error}</div> : null}
       {notice ? <div className="admin-wheel-alert">{notice}</div> : null}
 
-      {isUnlocked ? (
+      {isUnlocked && activeTab === "wheel" ? (
         <>
           <section className="admin-wheel-panel">
             <div className="admin-wheel-panel-head">
@@ -379,11 +436,83 @@ export default function AdminWheelPage() {
             </form>
           </section>
         </>
-      ) : (
-        <section className="admin-wheel-empty">
-          <p>Enter the admin password to load editable wheel prizes and stock.</p>
+      ) : null}
+
+      {isUnlocked && activeTab === "doctors" ? (
+        <section className="admin-wheel-panel">
+          <div className="admin-wheel-panel-head">
+            <div>
+              <p className="admin-wheel-kicker">Registered Doctors</p>
+              <h2>Doctor Directory</h2>
+            </div>
+            <button type="button" onClick={refreshDoctors} disabled={isLoading}>
+              {isLoading ? "Refreshing" : "Refresh"}
+            </button>
+          </div>
+
+          <div className="admin-doctor-list">
+            {doctors.length > 0 ? (
+              doctors.map((doctor) => (
+                <article className="admin-doctor-row" key={doctor.id}>
+                  <div className="admin-doctor-primary">
+                    <strong>{doctor.full_name || "Unnamed doctor"}</strong>
+                    <span>@{doctor.tiktok_username || "no-handle"}</span>
+                  </div>
+                  <dl className="admin-doctor-details">
+                    <div>
+                      <dt>Email</dt>
+                      <dd>{doctor.email || "--"}</dd>
+                    </div>
+                    <div>
+                      <dt>Mobile</dt>
+                      <dd>{doctor.mobile || "--"}</dd>
+                    </div>
+                    <div>
+                      <dt>Specialty</dt>
+                      <dd>{doctor.specialty || "--"}</dd>
+                    </div>
+                    <div>
+                      <dt>Clinic</dt>
+                      <dd>{doctor.practice_location || "--"}</dd>
+                    </div>
+                    <div>
+                      <dt>Prize</dt>
+                      <dd>{doctor.prize_label || "Not spun"}</dd>
+                    </div>
+                    <div>
+                      <dt>Registered</dt>
+                      <dd>{formatAdminDate(doctor.created_at)}</dd>
+                    </div>
+                  </dl>
+                </article>
+              ))
+            ) : (
+              <div className="admin-wheel-empty">
+                <p>No doctor registrations found.</p>
+              </div>
+            )}
+          </div>
         </section>
-      )}
+      ) : null}
+
+      {!isUnlocked ? (
+        <section className="admin-wheel-empty">
+          <p>Enter the admin password to load wheel prizes and doctor registrations.</p>
+        </section>
+      ) : null}
     </main>
   );
+}
+
+function formatAdminDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "--";
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
 }
