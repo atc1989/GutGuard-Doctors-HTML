@@ -46,7 +46,7 @@ export async function registerDoctor(payload: RegistrationPayload) {
       p_practice_location: payload.location,
     });
 
-    if (error) throw error;
+    if (error) throw new Error(`Prize claim failed: ${error.message}`);
 
     return {
       id: data as string,

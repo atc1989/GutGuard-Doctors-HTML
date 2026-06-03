@@ -66,8 +66,8 @@ export default function WheelSection({
   const visibleResult = localSpinning ? localResult : localResult ?? externalResult;
   const resultPrize = resolveResultPrize(visibleResult, segments);
   const isSpinning = spinning || localSpinning;
-  const activeError = error ?? spinError;
-  const canSpin = Boolean(onSpin) && !loading && !activeError && segments.length > 0 && !isSpinning && !visibleResult;
+  const canSpin =
+    Boolean(onSpin) && !loading && !error && segments.length > 0 && !isSpinning && !visibleResult;
   const wheelSlices = useMemo(() => buildWheelSlices(segments), [segments]);
   const wheelStyle = { "--wheel-rotation": `${rotation}deg` } as CSSProperties;
 
@@ -86,7 +86,8 @@ export default function WheelSection({
         setLocalResult(nextResult ?? claimedPrize ?? "Prize recorded");
         setLocalSpinning(false);
       }, SPIN_DURATION_MS);
-    } catch {
+    } catch (caught) {
+      console.error("Prize claim failed", caught);
       setSpinError("The wheel could not complete the spin. Please try again.");
       setLocalSpinning(false);
     }
@@ -155,8 +156,10 @@ export default function WheelSection({
         <div className="wheel-status">
           {loading ? (
             <WheelNotice title="Loading prizes" copy="Checking available segments and current stock." />
-          ) : activeError ? (
-            <WheelNotice title="Wheel unavailable" copy={activeError} tone="error" />
+          ) : error ? (
+            <WheelNotice title="Wheel unavailable" copy={error} tone="error" />
+          ) : spinError ? (
+            <WheelNotice title="Spin not completed" copy={spinError} tone="error" />
           ) : isSpinning ? (
             <WheelNotice title="Wheel spinning" copy="Your prize is being revealed." />
           ) : visibleResult ? (
