@@ -9,16 +9,16 @@ export type FieldName =
 export type FormValues = Record<FieldName, string>;
 export type FieldErrors = Partial<Record<FieldName, boolean>>;
 
-export function normalizeMobile(value: string) {
-  return value.replace(/\s|-/g, "");
+export function normalizeMobile(value: string | undefined) {
+  return (value ?? "").replace(/\s|-/g, "");
 }
 
-export function normalizeTikTokUsername(value: string) {
-  return value.trim().replace(/^@+/, "").toLowerCase();
+export function normalizeTikTokUsername(value: string | undefined) {
+  return (value ?? "").trim().replace(/^@+/, "").toLowerCase();
 }
 
-export function validateField(name: FieldName, value: string) {
-  const trimmed = value.trim();
+export function validateField(name: FieldName, value: string | undefined) {
+  const trimmed = (value ?? "").trim();
 
   if (name === "email" && !trimmed) return true;
   if (name === "specialty") return true;

@@ -34,7 +34,7 @@ export function InputField({
           className="field-input"
           id={id}
           name={id}
-          value={value}
+          value={value ?? ""}
           onChange={(event: ChangeEvent<HTMLInputElement>) =>
             onValueChange(id, event.target.value)
           }
@@ -73,7 +73,7 @@ export function SelectField({
           className="field-input"
           id={id}
           name={id}
-          value={value}
+          value={value ?? ""}
           onChange={(event) => onValueChange(id, event.target.value)}
           onBlur={() => onFieldBlur(id)}
         >

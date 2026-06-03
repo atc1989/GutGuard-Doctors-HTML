@@ -35,7 +35,7 @@ export default function RegistrationSection({
   active,
   onRegistered,
 }: RegistrationSectionProps) {
-  const [values, setValues] = useState(INITIAL_VALUES);
+  const [values, setValues] = useState<FormValues>(INITIAL_VALUES);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [pendingPayload, setPendingPayload] = useState<RegistrationPayload | null>(null);
@@ -62,7 +62,7 @@ export default function RegistrationSection({
       fullName: values.fullName.trim(),
       email: values.email.trim().toLowerCase(),
       mobile: normalizeMobile(values.mobile),
-      tiktokUsername: normalizeTikTokUsername(values.tiktokUsername),
+      tiktokUsername: normalizeTikTokUsername(values.tiktokUsername ?? ""),
       specialty: values.specialty.trim(),
       location: values.location.trim(),
     };
