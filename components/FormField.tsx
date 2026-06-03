@@ -51,6 +51,8 @@ export function InputField({
 
 type SelectFieldProps = BaseProps & {
   options: string[];
+  placeholder?: string;
+  required?: boolean;
 };
 
 export function SelectField({
@@ -60,8 +62,10 @@ export function SelectField({
   value,
   hasError,
   options,
+  placeholder = "Select your field",
   onValueChange,
   onFieldBlur,
+  required,
 }: SelectFieldProps) {
   return (
     <div className={`field ${hasError ? "has-error" : ""}`.trim()}>
@@ -76,8 +80,9 @@ export function SelectField({
           value={value ?? ""}
           onChange={(event) => onValueChange(id, event.target.value)}
           onBlur={() => onFieldBlur(id)}
+          required={required}
         >
-          <option value="">Select your field (optional)</option>
+          <option value="">{placeholder}</option>
           {options.map((option) => (
             <option key={option}>{option}</option>
           ))}

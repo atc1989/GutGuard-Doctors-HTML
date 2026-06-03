@@ -28,6 +28,7 @@ const INITIAL_VALUES: FormValues = {
   mobile: "",
   tiktokUsername: "",
   specialty: "",
+  otherSpecialty: "",
   location: "",
 };
 
@@ -42,7 +43,11 @@ export default function RegistrationSection({
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   function handleValueChange(name: FieldName, value: string) {
-    setValues((current) => ({ ...current, [name]: value }));
+    setValues((current) => ({
+      ...current,
+      [name]: value,
+      ...(name === "specialty" && value !== "Other" ? { otherSpecialty: "" } : {}),
+    }));
     setSubmitError(null);
     if (errors[name]) {
       setErrors((current) => ({
@@ -65,7 +70,10 @@ export default function RegistrationSection({
       email: values.email.trim().toLowerCase(),
       mobile: normalizeMobile(values.mobile),
       tiktokUsername: normalizeTikTokUsername(values.tiktokUsername ?? ""),
-      specialty: values.specialty.trim(),
+      specialty:
+        values.specialty === "Other"
+          ? values.otherSpecialty.trim()
+          : values.specialty.trim(),
       location: values.location.trim(),
     };
   }
@@ -74,6 +82,7 @@ export default function RegistrationSection({
     event.preventDefault();
 
     const nextErrors = validateForm(values);
+    if (values.specialty !== "Other") delete nextErrors.otherSpecialty;
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
@@ -177,14 +186,31 @@ export default function RegistrationSection({
         />
         <SelectField
           id="specialty"
-          label="Specialty (optional)"
+          label="Specialty"
           error="Please select your specialty."
           value={values.specialty}
           hasError={errors.specialty}
           options={SPECIALTIES}
           onValueChange={handleValueChange}
           onFieldBlur={handleFieldBlur}
+          placeholder="Select your field"
+          required
         />
+        {values.specialty === "Other" ? (
+          <InputField
+            id="otherSpecialty"
+            label="Other specialty"
+            error="Please enter your specialty."
+            value={values.otherSpecialty}
+            hasError={errors.otherSpecialty}
+            onValueChange={handleValueChange}
+            onFieldBlur={handleFieldBlur}
+            type="text"
+            placeholder="Enter specialty"
+            required
+            autoComplete="off"
+          />
+        ) : null}
         <InputField
           id="location"
           label="Clinic location"

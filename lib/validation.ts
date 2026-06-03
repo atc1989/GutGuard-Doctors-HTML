@@ -4,6 +4,7 @@ export type FieldName =
   | "mobile"
   | "tiktokUsername"
   | "specialty"
+  | "otherSpecialty"
   | "location";
 
 export type FormValues = Record<FieldName, string>;
@@ -21,7 +22,6 @@ export function validateField(name: FieldName, value: string | undefined) {
   const trimmed = (value ?? "").trim();
 
   if (name === "email" && !trimmed) return true;
-  if (name === "specialty") return true;
   if (!trimmed) return false;
   if (name === "email") return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
   if (name === "mobile") return /^(09|\+639)\d{9}$/.test(normalizeMobile(trimmed));
