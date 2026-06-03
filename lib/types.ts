@@ -21,14 +21,55 @@ export type ExperienceState = {
   registration: Registration | null;
   tasks: TaskState;
   spun: boolean;
-  prize: string | null;
+  prize: Prize | null;
   prizeNote: string | null;
 };
 
 export type Prize = {
+  id?: string;
   label: string;
   color: string;
   text: string;
+  textColor?: string;
   weight: number;
+  chanceWeight?: number;
   note: string;
+  totalStock?: number;
+  remainingStock?: number;
+  isActive?: boolean;
+  sortOrder?: number;
+  claimCount?: number;
+};
+
+export type WheelPrize = Required<
+  Pick<
+    Prize,
+    | "id"
+    | "label"
+    | "note"
+    | "color"
+    | "totalStock"
+    | "remainingStock"
+    | "isActive"
+    | "sortOrder"
+  >
+> &
+  Pick<Prize, "claimCount"> & {
+    text: string;
+    textColor: string;
+    weight: number;
+    chanceWeight: number;
+  };
+
+export type WheelPrizeInput = {
+  id?: string;
+  label: string;
+  note: string;
+  color: string;
+  textColor: string;
+  chanceWeight: number;
+  totalStock: number;
+  remainingStock: number;
+  isActive: boolean;
+  sortOrder: number;
 };

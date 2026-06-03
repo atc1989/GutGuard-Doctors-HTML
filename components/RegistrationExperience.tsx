@@ -6,20 +6,23 @@ import ProgressRail from "@/components/ProgressRail";
 import RegistrationSection from "@/sections/RegistrationSection";
 import VerificationSection from "@/sections/VerificationSection";
 import WheelSection from "@/sections/WheelSection";
-import { updateTask } from "@/lib/api";
+import { claimPrize, listWheelPrizes, updateTask } from "@/lib/api";
 import {
   clearExperienceState,
   INITIAL_STATE,
   loadExperienceState,
   saveExperienceState,
 } from "@/lib/storage";
-import type { ExperienceState, Registration, Screen, TaskId } from "@/lib/types";
+import type { ExperienceState, Prize, Registration, Screen, TaskId, WheelPrize } from "@/lib/types";
 
 export default function RegistrationExperience() {
   const [state, setState] = useState<ExperienceState>(INITIAL_STATE);
   const [screen, setScreen] = useState<Screen>(1);
   const [isHydrated, setIsHydrated] = useState(false);
   const [registrationResetKey, setRegistrationResetKey] = useState(0);
+  const [wheelPrizes, setWheelPrizes] = useState<WheelPrize[]>([]);
+  const [wheelLoading, setWheelLoading] = useState(false);
+  const [wheelError, setWheelError] = useState<string | null>(null);
 
   const dateLabel = useMemo(
     () => new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date()),
@@ -56,6 +59,19 @@ export default function RegistrationExperience() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [screen]);
 
+  useEffect(() => {
+    if (screen !== 3) return;
+
+    setWheelLoading(true);
+    setWheelError(null);
+    listWheelPrizes()
+      .then(setWheelPrizes)
+      .catch(() => {
+        setWheelError("The prize wheel could not load. Please ask the booth coordinator to refresh.");
+      })
+      .finally(() => setWheelLoading(false));
+  }, [screen]);
+
   function handleRegistered(registration: Registration) {
     setState((current) => ({
       ...current,
@@ -83,6 +99,18 @@ export default function RegistrationExperience() {
     }
   }
 
+  async function handleClaimPrize(): Promise<Prize> {
+    if (state.spun && state.prize) return state.prize;
+
+    const prize = await claimPrize(state.registration?.id);
+    setState((current) => ({
+      ...current,
+      spun: true,
+      prize,
+      prizeNote: prize.note,
+    }));
+    return prize;
+  }
 
   function handleBackToRegistration() {
     clearExperienceState();
@@ -110,6 +138,12 @@ export default function RegistrationExperience() {
       <WheelSection
         active={screen === 3}
         doctorName={state.registration?.fullName}
+        prizes={wheelPrizes}
+        loading={wheelLoading}
+        error={wheelError}
+        spun={state.spun}
+        prize={state.prize}
+        onSpin={handleClaimPrize}
         onBackToRegistration={handleBackToRegistration}
       />
 
