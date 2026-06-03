@@ -121,7 +121,7 @@ export default function RegistrationSection({
         />
         <InputField
           id="email"
-          label="Email (optional)"
+          label="Email"
           error="Please enter a valid email."
           value={values.email}
           hasError={errors.email}
@@ -158,7 +158,7 @@ export default function RegistrationSection({
         />
         <InputField
           id="location"
-          label="Practice"
+          label="Clinic location"
           error="Please enter your practice location."
           value={values.location}
           hasError={errors.location}
