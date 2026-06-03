@@ -8,6 +8,7 @@ export type Registration = {
   fullName: string;
   email: string;
   mobile: string;
+  tiktokUsername: string;
   specialty: string;
   location: string;
   registeredAt: number;

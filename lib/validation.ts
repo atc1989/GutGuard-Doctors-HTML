@@ -2,6 +2,7 @@ export type FieldName =
   | "fullName"
   | "email"
   | "mobile"
+  | "tiktokUsername"
   | "specialty"
   | "location";
 
@@ -12,6 +13,10 @@ export function normalizeMobile(value: string) {
   return value.replace(/\s|-/g, "");
 }
 
+export function normalizeTikTokUsername(value: string) {
+  return value.trim().replace(/^@+/, "").toLowerCase();
+}
+
 export function validateField(name: FieldName, value: string) {
   const trimmed = value.trim();
 
@@ -20,6 +25,7 @@ export function validateField(name: FieldName, value: string) {
   if (!trimmed) return false;
   if (name === "email") return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
   if (name === "mobile") return /^(09|\+639)\d{9}$/.test(normalizeMobile(trimmed));
+  if (name === "tiktokUsername") return /^[A-Za-z0-9._]{2,24}$/.test(normalizeTikTokUsername(trimmed));
 
   return true;
 }

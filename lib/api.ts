@@ -41,6 +41,7 @@ export async function registerDoctor(payload: RegistrationPayload) {
       p_full_name: payload.fullName,
       p_email: payload.email,
       p_mobile: payload.mobile,
+      p_tiktok_username: payload.tiktokUsername,
       p_specialty: payload.specialty,
       p_practice_location: payload.location,
     });

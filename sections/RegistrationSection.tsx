@@ -9,7 +9,12 @@ import SectionLabel from "@/components/SectionLabel";
 import { SPECIALTIES } from "@/lib/constants";
 import { registerDoctor, sendProposalEmail } from "@/lib/api";
 import type { FieldErrors, FieldName, FormValues } from "@/lib/validation";
-import { normalizeMobile, validateField, validateForm } from "@/lib/validation";
+import {
+  normalizeMobile,
+  normalizeTikTokUsername,
+  validateField,
+  validateForm,
+} from "@/lib/validation";
 import type { Registration, RegistrationPayload } from "@/lib/types";
 
 type RegistrationSectionProps = {
@@ -21,6 +26,7 @@ const INITIAL_VALUES: FormValues = {
   fullName: "",
   email: "",
   mobile: "",
+  tiktokUsername: "",
   specialty: "",
   location: "",
 };
@@ -56,6 +62,7 @@ export default function RegistrationSection({
       fullName: values.fullName.trim(),
       email: values.email.trim().toLowerCase(),
       mobile: normalizeMobile(values.mobile),
+      tiktokUsername: normalizeTikTokUsername(values.tiktokUsername),
       specialty: values.specialty.trim(),
       location: values.location.trim(),
     };
@@ -91,9 +98,14 @@ export default function RegistrationSection({
       setPendingPayload(null);
       setSubmitting(false);
       onRegistered({ ...pendingPayload, id: doctor.id, registeredAt: Date.now() });
-    } catch {
+    } catch (error) {
       setSubmitting(false);
-      window.alert("Registration failed. Please try again or ask the booth coordinator.");
+      const message = error instanceof Error ? error.message : "";
+      if (message.toLowerCase().includes("tiktok")) {
+        window.alert("This TikTok username has already been registered. Please check the handle and try again.");
+      } else {
+        window.alert("Registration failed. Please try again or ask the booth coordinator.");
+      }
     }
   }
 
@@ -145,6 +157,20 @@ export default function RegistrationSection({
           required
           autoComplete="tel"
           inputMode="tel"
+        />
+        <InputField
+          id="tiktokUsername"
+          label="TikTok username"
+          error="Please enter a valid TikTok username."
+          value={values.tiktokUsername}
+          hasError={errors.tiktokUsername}
+          onValueChange={handleValueChange}
+          onFieldBlur={handleFieldBlur}
+          type="text"
+          placeholder="@gutguardph"
+          required
+          autoComplete="off"
+          inputMode="text"
         />
         <SelectField
           id="specialty"
