@@ -48,6 +48,32 @@ type AdminDoctorRegistration = {
   prize_claimed_at?: string | null;
 };
 
+type NewsletterSendHistory = {
+  id: string;
+  doctor_id: string;
+  email: string;
+  subject: string;
+  status: "sent" | "failed" | "skipped";
+  resend_id?: string | null;
+  error_message?: string | null;
+  sent_at: string;
+};
+
+type NewsletterSendResult = {
+  doctorId: string;
+  email: string;
+  status: "sent" | "failed" | "skipped";
+  resendId?: string | null;
+  error?: string | null;
+};
+
+type NewsletterResponse = {
+  sent: number;
+  failed: number;
+  skipped: number;
+  results: NewsletterSendResult[];
+};
+
 export async function registerDoctor(payload: RegistrationPayload) {
   if (isSupabaseConfigured && supabase) {
     const { data, error } = await supabase.rpc("register_doctor", {
@@ -199,6 +225,31 @@ export async function getDoctorRegistrations(adminPassword: string): Promise<Adm
 
   if (error) throw error;
   return (data ?? []) as AdminDoctorRegistration[];
+}
+
+export async function getNewsletterSendHistory(adminPassword: string): Promise<NewsletterSendHistory[]> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.rpc("admin_list_newsletter_sends", {
+    p_admin_password: adminPassword,
+  });
+
+  if (error) throw error;
+  return (data ?? []) as NewsletterSendHistory[];
+}
+
+export async function sendNewsletter(
+  adminPassword: string,
+  doctorIds: string[],
+): Promise<NewsletterResponse> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.functions.invoke("send-newsletter", {
+    body: { adminPassword, doctorIds },
+  });
+
+  if (error) throw error;
+  return data as NewsletterResponse;
 }
 
 function mapClaimedPrize(row: PrizeRow | null | undefined): Prize {

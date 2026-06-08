@@ -29,6 +29,25 @@ type AdminDoctorRegistration = {
   prize_claimed_at?: string | null;
 };
 
+type NewsletterSendHistory = {
+  id: string;
+  doctor_id: string;
+  email: string;
+  subject: string;
+  status: "sent" | "failed" | "skipped";
+  resend_id?: string | null;
+  error_message?: string | null;
+  sent_at: string;
+};
+
+type NewsletterSendResult = {
+  doctorId: string;
+  email: string;
+  status: "sent" | "failed" | "skipped";
+  resendId?: string | null;
+  error?: string | null;
+};
+
 type WheelApi = {
   getWheelPrizes?: (adminPassword: string) => Promise<AdminWheelPrize[]>;
   saveWheelPrize?: (adminPassword: string, prize: AdminWheelPrize) => Promise<AdminWheelPrize>;
@@ -37,6 +56,16 @@ type WheelApi = {
     prize: Omit<AdminWheelPrize, "id">,
   ) => Promise<AdminWheelPrize>;
   getDoctorRegistrations?: (adminPassword: string) => Promise<AdminDoctorRegistration[]>;
+  getNewsletterSendHistory?: (adminPassword: string) => Promise<NewsletterSendHistory[]>;
+  sendNewsletter?: (
+    adminPassword: string,
+    doctorIds: string[],
+  ) => Promise<{
+    sent: number;
+    failed: number;
+    skipped: number;
+    results: NewsletterSendResult[];
+  }>;
 };
 
 const emptyPrize: AdminWheelPrize = {
@@ -51,6 +80,7 @@ const emptyPrize: AdminWheelPrize = {
   sort_order: 0,
 };
 const DOCTORS_PER_PAGE = 8;
+const NEWSLETTER_RECIPIENTS_PER_PAGE = 8;
 
 async function loadWheelApi(): Promise<WheelApi> {
   const api = (await import("@/lib/api")) as WheelApi;
@@ -71,12 +101,19 @@ function getPrizeOdds(prize: AdminWheelPrize, activeWeightTotal: number) {
 }
 
 export default function AdminWheelPage() {
-  const [activeTab, setActiveTab] = useState<"wheel" | "doctors">("wheel");
+  const [activeTab, setActiveTab] = useState<"wheel" | "doctors" | "newsletter">("wheel");
   const [password, setPassword] = useState("");
   const [prizes, setPrizes] = useState<AdminWheelPrize[]>([]);
   const [doctors, setDoctors] = useState<AdminDoctorRegistration[]>([]);
   const [doctorSearch, setDoctorSearch] = useState("");
   const [doctorPage, setDoctorPage] = useState(1);
+  const [newsletterSearch, setNewsletterSearch] = useState("");
+  const [newsletterPage, setNewsletterPage] = useState(1);
+  const [selectedDoctorIds, setSelectedDoctorIds] = useState<string[]>([]);
+  const [newsletterHistory, setNewsletterHistory] = useState<NewsletterSendHistory[]>([]);
+  const [newsletterResults, setNewsletterResults] = useState<NewsletterSendResult[]>([]);
+  const [isNewsletterSending, setIsNewsletterSending] = useState(false);
+  const [needsNewsletterConfirm, setNeedsNewsletterConfirm] = useState(false);
   const [newPrize, setNewPrize] = useState<AdminWheelPrize>(emptyPrize);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -117,6 +154,52 @@ export default function AdminWheelPage() {
     (doctorPage - 1) * DOCTORS_PER_PAGE,
     doctorPage * DOCTORS_PER_PAGE,
   );
+  const filteredNewsletterDoctors = useMemo(() => {
+    const query = newsletterSearch.trim().toLowerCase();
+    const withEmail = doctors.filter((doctor) => doctor.email);
+    if (!query) return withEmail;
+
+    return withEmail.filter((doctor) =>
+      [
+        doctor.full_name,
+        doctor.email,
+        doctor.mobile,
+        doctor.tiktok_username,
+        doctor.specialty,
+        doctor.practice_location,
+        doctor.prize_label ?? "",
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [newsletterSearch, doctors]);
+  const totalNewsletterPages = Math.max(
+    1,
+    Math.ceil(filteredNewsletterDoctors.length / NEWSLETTER_RECIPIENTS_PER_PAGE),
+  );
+  const visibleNewsletterDoctors = filteredNewsletterDoctors.slice(
+    (newsletterPage - 1) * NEWSLETTER_RECIPIENTS_PER_PAGE,
+    newsletterPage * NEWSLETTER_RECIPIENTS_PER_PAGE,
+  );
+  const selectedDoctors = useMemo(
+    () => doctors.filter((doctor) => selectedDoctorIds.includes(doctor.id)),
+    [doctors, selectedDoctorIds],
+  );
+  const latestNewsletterByDoctor = useMemo(() => {
+    return newsletterHistory.reduce<Record<string, NewsletterSendHistory>>((current, item) => {
+      const existing = current[item.doctor_id];
+      if (!existing || new Date(item.sent_at).getTime() > new Date(existing.sent_at).getTime()) {
+        current[item.doctor_id] = item;
+      }
+      return current;
+    }, {});
+  }, [newsletterHistory]);
+  const visibleSelectedCount = visibleNewsletterDoctors.filter((doctor) =>
+    selectedDoctorIds.includes(doctor.id),
+  ).length;
+  const allVisibleSelected =
+    visibleNewsletterDoctors.length > 0 && visibleSelectedCount === visibleNewsletterDoctors.length;
 
   async function handleUnlock(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -130,13 +213,16 @@ export default function AdminWheelPage() {
         throw new Error("Missing getWheelPrizes helper in lib/api.ts.");
       }
 
-      const [loadedPrizes, loadedDoctors] = await Promise.all([
+      const [loadedPrizes, loadedDoctors, loadedNewsletterHistory] = await Promise.all([
         api.getWheelPrizes(password),
         api.getDoctorRegistrations ? api.getDoctorRegistrations(password) : Promise.resolve([]),
+        api.getNewsletterSendHistory ? api.getNewsletterSendHistory(password) : Promise.resolve([]),
       ]);
       setPrizes(loadedPrizes.sort((a, b) => a.sort_order - b.sort_order));
       setDoctors(loadedDoctors);
+      setNewsletterHistory(loadedNewsletterHistory);
       setDoctorPage(1);
+      setNewsletterPage(1);
       setIsUnlocked(true);
       setNotice("Admin data loaded.");
     } catch (caught) {
@@ -164,6 +250,66 @@ export default function AdminWheelPage() {
       setError(caught instanceof Error ? caught.message : "Unable to load doctor registrations.");
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function refreshNewsletterHistory() {
+    const api = await loadWheelApi();
+    if (!api.getNewsletterSendHistory) return;
+    setNewsletterHistory(await api.getNewsletterSendHistory(password));
+  }
+
+  function toggleNewsletterDoctor(doctorId: string) {
+    setNeedsNewsletterConfirm(false);
+    setSelectedDoctorIds((current) =>
+      current.includes(doctorId)
+        ? current.filter((id) => id !== doctorId)
+        : [...current, doctorId],
+    );
+  }
+
+  function toggleVisibleNewsletterDoctors() {
+    setNeedsNewsletterConfirm(false);
+    const visibleIds = visibleNewsletterDoctors.map((doctor) => doctor.id);
+    setSelectedDoctorIds((current) => {
+      if (visibleIds.every((id) => current.includes(id))) {
+        return current.filter((id) => !visibleIds.includes(id));
+      }
+
+      return Array.from(new Set([...current, ...visibleIds]));
+    });
+  }
+
+  async function handleNewsletterSend() {
+    if (selectedDoctorIds.length === 0) return;
+
+    if (!needsNewsletterConfirm) {
+      setNeedsNewsletterConfirm(true);
+      return;
+    }
+
+    setError(null);
+    setNotice(null);
+    setNewsletterResults([]);
+    setIsNewsletterSending(true);
+
+    try {
+      const api = await loadWheelApi();
+      if (!api.sendNewsletter) {
+        throw new Error("Missing sendNewsletter helper in lib/api.ts.");
+      }
+
+      const response = await api.sendNewsletter(password, selectedDoctorIds);
+      setNewsletterResults(response.results);
+      setNotice(
+        `Newsletter complete: ${response.sent} sent, ${response.failed} failed, ${response.skipped} skipped.`,
+      );
+      setNeedsNewsletterConfirm(false);
+      await refreshNewsletterHistory();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to send newsletter.");
+    } finally {
+      setIsNewsletterSending(false);
     }
   }
 
@@ -245,9 +391,27 @@ export default function AdminWheelPage() {
           </h1>
         </div>
         <div className="admin-wheel-summary" aria-live="polite">
-          <span>{activeTab === "wheel" ? `${prizes.length} prizes` : `${doctors.length} doctors`}</span>
-          <strong>{activeTab === "wheel" ? activeWeightTotal : doctors.length}</strong>
-          <span>{activeTab === "wheel" ? "active weight" : "registrations"}</span>
+          <span>
+            {activeTab === "wheel"
+              ? `${prizes.length} prizes`
+              : activeTab === "doctors"
+                ? `${doctors.length} doctors`
+                : `${selectedDoctorIds.length} selected`}
+          </span>
+          <strong>
+            {activeTab === "wheel"
+              ? activeWeightTotal
+              : activeTab === "doctors"
+                ? doctors.length
+                : selectedDoctorIds.length}
+          </strong>
+          <span>
+            {activeTab === "wheel"
+              ? "active weight"
+              : activeTab === "doctors"
+                ? "registrations"
+                : "newsletter recipients"}
+          </span>
         </div>
       </section>
 
@@ -265,6 +429,13 @@ export default function AdminWheelPage() {
           type="button"
         >
           Doctors
+        </button>
+        <button
+          className={activeTab === "newsletter" ? "active" : ""}
+          onClick={() => setActiveTab("newsletter")}
+          type="button"
+        >
+          Newsletter
         </button>
       </nav>
 
@@ -558,6 +729,153 @@ export default function AdminWheelPage() {
                 type="button"
                 onClick={() => setDoctorPage((current) => Math.min(totalDoctorPages, current + 1))}
                 disabled={doctorPage >= totalDoctorPages}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {isUnlocked && activeTab === "newsletter" ? (
+        <section className="admin-wheel-panel">
+          <div className="admin-wheel-panel-head">
+            <div>
+              <p className="admin-wheel-kicker">Bulk Email</p>
+              <h2>Newsletter Send</h2>
+            </div>
+            <div className="admin-doctor-actions">
+              <label htmlFor="newsletter-search">
+                Search recipients
+                <input
+                  id="newsletter-search"
+                  type="search"
+                  value={newsletterSearch}
+                  placeholder="Name, email, TikTok, clinic..."
+                  onChange={(event) => {
+                    setNewsletterSearch(event.target.value);
+                    setNewsletterPage(1);
+                  }}
+                />
+              </label>
+              <button type="button" onClick={refreshNewsletterHistory} disabled={isLoading}>
+                Refresh history
+              </button>
+            </div>
+          </div>
+
+          <div className="admin-newsletter-toolbar">
+            <label className="admin-newsletter-select-all">
+              <input
+                type="checkbox"
+                checked={allVisibleSelected}
+                onChange={toggleVisibleNewsletterDoctors}
+              />
+              Select visible recipients
+            </label>
+            <div className="admin-newsletter-sendbox">
+              <p>
+                {selectedDoctorIds.length} selected
+                {needsNewsletterConfirm ? " - click send again to confirm" : ""}
+              </p>
+              <button
+                type="button"
+                onClick={handleNewsletterSend}
+                disabled={isNewsletterSending || selectedDoctorIds.length === 0}
+              >
+                {isNewsletterSending
+                  ? "Sending"
+                  : needsNewsletterConfirm
+                    ? `Confirm send to ${selectedDoctorIds.length}`
+                    : "Send newsletter"}
+              </button>
+            </div>
+          </div>
+
+          {selectedDoctors.length > 0 ? (
+            <div className="admin-newsletter-selected">
+              <p>Selected emails</p>
+              <div>
+                {selectedDoctors.map((doctor) => (
+                  <span key={doctor.id}>{doctor.email}</span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="admin-doctor-list">
+            {visibleNewsletterDoctors.length > 0 ? (
+              visibleNewsletterDoctors.map((doctor) => {
+                const latestSend = latestNewsletterByDoctor[doctor.id];
+                const latestResult = newsletterResults.find((result) => result.doctorId === doctor.id);
+
+                return (
+                  <article className="admin-doctor-row newsletter" key={doctor.id}>
+                    <label className="admin-newsletter-recipient">
+                      <input
+                        type="checkbox"
+                        checked={selectedDoctorIds.includes(doctor.id)}
+                        onChange={() => toggleNewsletterDoctor(doctor.id)}
+                      />
+                      <span>
+                        <strong>{doctor.full_name || "Unnamed doctor"}</strong>
+                        <em>{doctor.email}</em>
+                      </span>
+                    </label>
+                    <dl className="admin-doctor-details">
+                      <div>
+                        <dt>TikTok</dt>
+                        <dd>@{doctor.tiktok_username || "no-handle"}</dd>
+                      </div>
+                      <div>
+                        <dt>Clinic</dt>
+                        <dd>{doctor.practice_location || "--"}</dd>
+                      </div>
+                      <div>
+                        <dt>Last newsletter</dt>
+                        <dd>
+                          {latestSend
+                            ? `${latestSend.status} - ${formatAdminDate(latestSend.sent_at)}`
+                            : "Never sent"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>This send</dt>
+                        <dd>{latestResult ? latestResult.status : "--"}</dd>
+                      </div>
+                    </dl>
+                  </article>
+                );
+              })
+            ) : (
+              <div className="admin-wheel-empty">
+                <p>No email-ready doctors match that search.</p>
+              </div>
+            )}
+          </div>
+
+          <div className="admin-pagination">
+            <p>
+              Showing {visibleNewsletterDoctors.length > 0 ? (newsletterPage - 1) * NEWSLETTER_RECIPIENTS_PER_PAGE + 1 : 0}
+              {"-"}
+              {Math.min(newsletterPage * NEWSLETTER_RECIPIENTS_PER_PAGE, filteredNewsletterDoctors.length)} of{" "}
+              {filteredNewsletterDoctors.length}
+            </p>
+            <div className="admin-pagination-controls">
+              <button
+                type="button"
+                onClick={() => setNewsletterPage((current) => Math.max(1, current - 1))}
+                disabled={newsletterPage <= 1}
+              >
+                Previous
+              </button>
+              <span>
+                Page {newsletterPage} of {totalNewsletterPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setNewsletterPage((current) => Math.min(totalNewsletterPages, current + 1))}
+                disabled={newsletterPage >= totalNewsletterPages}
               >
                 Next
               </button>
