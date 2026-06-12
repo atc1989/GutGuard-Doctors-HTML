@@ -9,13 +9,26 @@ const corsHeaders = {
 type NewsletterRequest = {
   adminPassword?: string;
   doctorIds?: string[];
+  subject?: string;
+  html?: string;
 };
 
 type DoctorRegistration = {
   id: string;
   full_name: string | null;
   email: string | null;
+  mobile: string | null;
+  tiktok_username: string | null;
+  specialty: string | null;
+  practice_location: string | null;
+  created_at: string | null;
+  wheel_claims?: Array<{
+    prize_label: string | null;
+    claimed_at: string | null;
+  }> | null;
 };
+
+type SendStatus = "sent" | "failed" | "skipped";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -27,18 +40,22 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { adminPassword, doctorIds } = (await req.json()) as NewsletterRequest;
+    const { adminPassword, doctorIds, subject, html } = (await req.json()) as NewsletterRequest;
     const cleanDoctorIds = Array.from(new Set(doctorIds ?? [])).filter(Boolean);
+    const cleanSubject = (subject ?? "").trim();
+    const cleanHtml = stripScriptTags(html ?? "").trim();
 
     if (!adminPassword) return jsonResponse({ error: "Missing adminPassword" }, 400);
     if (cleanDoctorIds.length === 0) return jsonResponse({ error: "No doctors selected" }, 400);
+    if (!cleanSubject) return jsonResponse({ error: "Missing newsletter subject" }, 400);
+    if (!cleanHtml) return jsonResponse({ error: "Missing newsletter HTML" }, 400);
+    if (cleanHtml.length > 250_000) return jsonResponse({ error: "Newsletter HTML is too large" }, 400);
 
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
     const fromEmail =
       Deno.env.get("NEWSLETTER_FROM_EMAIL") ??
       Deno.env.get("PROPOSAL_FROM_EMAIL") ??
       "GutGuard Doctors <onboarding@resend.dev>";
-    const subject = Deno.env.get("NEWSLETTER_SUBJECT") ?? "GutGuard Doctors Newsletter";
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -53,9 +70,26 @@ Deno.serve(async (req) => {
 
     if (adminError) return jsonResponse({ error: "Invalid admin password" }, 401);
 
+    const { data: campaign, error: campaignError } = await supabase
+      .from("newsletter_campaigns")
+      .insert({
+        title: cleanSubject,
+        subject: cleanSubject,
+        html_template: cleanHtml,
+        recipient_count: cleanDoctorIds.length,
+      })
+      .select("id")
+      .single();
+
+    if (campaignError || !campaign?.id) {
+      return jsonResponse({ error: "Newsletter campaign could not be created" }, 500);
+    }
+
     const { data: doctors, error: doctorsError } = await supabase
       .from("doctor_registrations")
-      .select("id, full_name, email")
+      .select(
+        "id, full_name, email, mobile, tiktok_username, specialty, practice_location, created_at, wheel_claims(prize_label, claimed_at)",
+      )
       .in("id", cleanDoctorIds);
 
     if (doctorsError) return jsonResponse({ error: "Doctors could not be fetched" }, 500);
@@ -67,9 +101,10 @@ Deno.serve(async (req) => {
 
       if (!isValidEmail(email)) {
         await recordSendAttempt(supabase, {
+          newsletterId: campaign.id,
           doctorId: doctor.id,
           email,
-          subject,
+          subject: cleanSubject,
           status: "skipped",
           errorMessage: "Missing or invalid email address",
         });
@@ -92,8 +127,8 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             from: fromEmail,
             to: [email],
-            subject,
-            html: newsletterEmailHtml(doctor.full_name ?? "Doctor"),
+            subject: cleanSubject,
+            html: renderDoctorTemplate(cleanHtml, doctor),
           }),
         });
         const resendBody = await resendResponse.json();
@@ -101,9 +136,10 @@ Deno.serve(async (req) => {
         if (!resendResponse.ok) {
           const message = stringifyError(resendBody);
           await recordSendAttempt(supabase, {
+            newsletterId: campaign.id,
             doctorId: doctor.id,
             email,
-            subject,
+            subject: cleanSubject,
             status: "failed",
             errorMessage: message,
           });
@@ -112,9 +148,10 @@ Deno.serve(async (req) => {
         }
 
         await recordSendAttempt(supabase, {
+          newsletterId: campaign.id,
           doctorId: doctor.id,
           email,
-          subject,
+          subject: cleanSubject,
           status: "sent",
           resendId: resendBody.id,
         });
@@ -122,9 +159,10 @@ Deno.serve(async (req) => {
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unexpected send error";
         await recordSendAttempt(supabase, {
+          newsletterId: campaign.id,
           doctorId: doctor.id,
           email,
-          subject,
+          subject: cleanSubject,
           status: "failed",
           errorMessage: message,
         });
@@ -134,6 +172,14 @@ Deno.serve(async (req) => {
 
     const knownDoctorIds = new Set((doctors ?? []).map((doctor) => doctor.id));
     for (const missingId of cleanDoctorIds.filter((id) => !knownDoctorIds.has(id))) {
+      await recordSendAttempt(supabase, {
+        newsletterId: campaign.id,
+        doctorId: missingId,
+        email: "",
+        subject: cleanSubject,
+        status: "skipped",
+        errorMessage: "Doctor registration not found",
+      });
       results.push({
         doctorId: missingId,
         email: "",
@@ -169,15 +215,17 @@ function jsonResponse(body: unknown, status = 200) {
 async function recordSendAttempt(
   supabase: ReturnType<typeof createClient>,
   input: {
+    newsletterId: string;
     doctorId: string;
     email: string;
     subject: string;
-    status: "sent" | "failed" | "skipped";
+    status: SendStatus;
     resendId?: string | null;
     errorMessage?: string | null;
   },
 ) {
   await supabase.from("newsletter_sends").insert({
+    newsletter_id: input.newsletterId,
     doctor_id: input.doctorId,
     email: input.email,
     subject: input.subject,
@@ -187,84 +235,40 @@ async function recordSendAttempt(
   });
 }
 
-function newsletterEmailHtml(fullName: string) {
-  const safeName = escapeHtml(fullName);
+function renderDoctorTemplate(html: string, doctor: DoctorRegistration) {
+  const latestClaim = [...(doctor.wheel_claims ?? [])].sort((a, b) => {
+    return new Date(b.claimed_at ?? "").getTime() - new Date(a.claimed_at ?? "").getTime();
+  })[0];
+  const replacements: Record<string, string> = {
+    doctor_name: doctor.full_name ?? "",
+    doctor_email: doctor.email ?? "",
+    doctor_mobile: doctor.mobile ?? "",
+    tiktok_username: doctor.tiktok_username ?? "",
+    specialty: doctor.specialty ?? "",
+    clinic_location: doctor.practice_location ?? "",
+    registered_at: formatDate(doctor.created_at),
+    prize_label: latestClaim?.prize_label ?? "",
+  };
 
-  return `<!doctype html>
-<html lang="en">
-  <body style="margin:0;padding:0;background:#f4f1ea;color:#0f0f18;font-family:Arial,Helvetica,sans-serif;">
-    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
-      GutGuard Doctors update: onboarding reminders, TikTok tasks, and next steps.
-    </div>
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f4f1ea;">
-      <tr>
-        <td align="center" style="padding:22px 12px;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:640px;background:#ffffff;border:1px solid #ded8ca;">
-            <tr>
-              <td style="background:#0608a9;padding:18px 24px;text-align:center;">
-                <img src="https://gut-guard-doctors-html.vercel.app/gutguard-logo.png" width="44" alt="GutGuard" style="display:inline-block;border:0;vertical-align:middle;margin-right:8px;" />
-                <span style="display:inline-block;color:#f4f1ea;font-size:18px;font-weight:700;vertical-align:middle;">GutGuard Doctors</span>
-              </td>
-            </tr>
-            <tr>
-              <td style="background:#0f0f18;padding:38px 28px 34px;text-align:left;">
-                <p style="margin:0 0 12px;color:#c9ac7e;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Doctors' TikTok Affiliate Program</p>
-                <h1 style="margin:0;color:#f4f1ea;font-family:Georgia,'Times New Roman',serif;font-size:38px;line-height:1.05;font-weight:400;">Your GutGuard activation starts here.</h1>
-                <p style="margin:18px 0 0;color:#ebe7de;font-size:16px;line-height:1.55;">Hello Doctor ${safeName}, here are your quick reminders for completing your affiliate onboarding.</p>
-              </td>
-            </tr>
-            <tr>
-              <td style="background:#eaff18;padding:26px 28px;">
-                <h2 style="margin:0 0 10px;color:#0f0f18;font-size:28px;line-height:1.12;font-weight:800;">Complete your TikTok steps</h2>
-                <p style="margin:0;color:#0f0f18;font-size:16px;line-height:1.5;">Follow the official page, post your first introduction reel, and keep your registered TikTok username active for tracking.</p>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:28px;background:#ffffff;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                  <tr>
-                    <td style="padding:18px;border:1px solid #e5e0d2;background:#f8f6ef;">
-                      <p style="margin:0 0 8px;color:#0608a9;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">This Week's Checklist</p>
-                      <p style="margin:0 0 10px;color:#0f0f18;font-size:18px;font-weight:700;">Keep these three items moving:</p>
-                      <ul style="margin:0;padding-left:20px;color:#3a3a48;font-size:15px;line-height:1.7;">
-                        <li>Confirm your email and review your onboarding documents.</li>
-                        <li>Follow GutGuard on TikTok and Facebook.</li>
-                        <li>Post your first short introduction reel.</li>
-                      </ul>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:0 28px 28px;background:#ffffff;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                  <tr>
-                    <td style="padding:20px;background:#0608a9;color:#f4f1ea;">
-                      <p style="margin:0 0 8px;color:#c9ac7e;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Booth Reminder</p>
-                      <p style="margin:0;color:#ffffff;font-size:20px;line-height:1.35;font-weight:700;">After completing verification, proceed to the GutGuard exhibitor for your prize wheel spin.</p>
-                    </td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-            <tr>
-              <td align="center" style="padding:4px 28px 32px;background:#ffffff;">
-                <a href="https://www.tiktok.com/@gutguardph" style="display:inline-block;background:#0f0f18;color:#f4f1ea;text-decoration:none;font-size:15px;font-weight:700;padding:15px 24px;">Visit GutGuard TikTok</a>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:22px 28px;background:#ebe7de;text-align:center;">
-                <p style="margin:0;color:#6b6b7a;font-size:12px;line-height:1.5;">GutGuard Doctors | Innovision Grand International OPC<br />FDA CPR No. FR-40000015571456</p>
-                <p style="margin:14px 0 0;color:#6b6b7a;font-size:11px;line-height:1.5;">You are receiving this email because you registered for the GutGuard Doctors TikTok Affiliate Program.</p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>`;
+  return html.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, key: string) => {
+    if (!(key in replacements)) return match;
+    return escapeHtml(replacements[key]);
+  });
+}
+
+function formatDate(value: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function stripScriptTags(value: string) {
+  return value.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
 }
 
 function isValidEmail(value: string) {

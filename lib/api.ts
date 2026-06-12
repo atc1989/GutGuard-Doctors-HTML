@@ -48,9 +48,21 @@ type AdminDoctorRegistration = {
   prize_claimed_at?: string | null;
 };
 
+type AdminDoctorRegistrationUpdate = {
+  id: string;
+  full_name: string;
+  email: string;
+  mobile: string;
+  tiktok_username: string;
+  specialty: string;
+  practice_location: string;
+};
+
 type NewsletterSendHistory = {
   id: string;
   doctor_id: string;
+  newsletter_id?: string | null;
+  newsletter_title?: string | null;
   email: string;
   subject: string;
   status: "sent" | "failed" | "skipped";
@@ -227,6 +239,27 @@ export async function getDoctorRegistrations(adminPassword: string): Promise<Adm
   return (data ?? []) as AdminDoctorRegistration[];
 }
 
+export async function updateDoctorRegistration(
+  adminPassword: string,
+  doctor: AdminDoctorRegistrationUpdate,
+): Promise<AdminDoctorRegistration> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.rpc("admin_update_doctor_registration", {
+    p_admin_password: adminPassword,
+    p_doctor_id: doctor.id,
+    p_full_name: doctor.full_name,
+    p_email: doctor.email,
+    p_mobile: doctor.mobile,
+    p_tiktok_username: doctor.tiktok_username,
+    p_specialty: doctor.specialty,
+    p_practice_location: doctor.practice_location,
+  });
+
+  if (error) throw error;
+  return (Array.isArray(data) ? data[0] : data) as AdminDoctorRegistration;
+}
+
 export async function getNewsletterSendHistory(adminPassword: string): Promise<NewsletterSendHistory[]> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
 
@@ -241,11 +274,13 @@ export async function getNewsletterSendHistory(adminPassword: string): Promise<N
 export async function sendNewsletter(
   adminPassword: string,
   doctorIds: string[],
+  subject: string,
+  html: string,
 ): Promise<NewsletterResponse> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
 
   const { data, error } = await supabase.functions.invoke("send-newsletter", {
-    body: { adminPassword, doctorIds },
+    body: { adminPassword, doctorIds, subject, html },
   });
 
   if (error) throw error;

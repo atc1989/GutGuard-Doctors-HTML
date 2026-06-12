@@ -1324,7 +1324,7 @@
 
 .admin-doctor-actions {
   display: grid;
-  grid-template-columns: minmax(240px, 360px) auto;
+  grid-template-columns: minmax(240px, 360px) minmax(90px, 120px) auto;
   align-items: end;
   gap: 12px;
 }
@@ -1342,7 +1342,7 @@
 
 .admin-doctor-row {
   display: grid;
-  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.4fr);
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.4fr) auto;
   gap: 18px;
   border: 1px solid var(--rule);
   background: rgba(244, 241, 234, 0.54);
@@ -1351,6 +1351,18 @@
 
 .admin-doctor-row.newsletter {
   align-items: center;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(0, 1.5fr);
+}
+
+.admin-doctor-row-actions {
+  display: flex;
+  align-items: start;
+  justify-content: end;
+}
+
+.admin-doctor-row-actions button {
+  min-height: 36px;
+  padding: 9px 13px;
 }
 
 .admin-doctor-primary {
@@ -1445,6 +1457,70 @@
   margin-bottom: 16px;
 }
 
+.admin-newsletter-upload {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr);
+  gap: 14px;
+  border: 1px solid var(--rule);
+  background: rgba(244, 241, 234, 0.54);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.admin-newsletter-upload label,
+.admin-edit-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--ink-3);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.admin-newsletter-placeholder-box {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--rule-soft);
+  padding-top: 14px;
+}
+
+.admin-newsletter-placeholder-box p,
+.admin-newsletter-placeholder-box strong,
+.admin-newsletter-placeholder-box span {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-newsletter-placeholder-box strong {
+  color: #9b1c31;
+}
+
+.admin-newsletter-placeholder-box span {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.admin-newsletter-placeholder-box div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-newsletter-placeholder-box code {
+  border: 1px solid var(--rule);
+  background: var(--bone);
+  color: var(--blue);
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .admin-newsletter-select-all,
 .admin-newsletter-recipient {
   display: flex;
@@ -1537,6 +1613,173 @@
   overflow-wrap: anywhere;
 }
 
+.admin-history-link {
+  min-height: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--blue);
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+  text-decoration: underline;
+}
+
+.admin-history-link:hover {
+  background: transparent;
+  color: var(--ink);
+}
+
+.admin-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(15, 15, 24, 0.72);
+}
+
+.admin-modal {
+  width: min(720px, 100%);
+  max-height: min(760px, calc(100vh - 44px));
+  overflow: auto;
+  border: 1px solid var(--rule);
+  background: var(--bone);
+  padding: 24px;
+  box-shadow: 0 20px 70px rgba(15, 15, 24, 0.34);
+}
+
+.admin-modal-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 16px;
+  margin-bottom: 18px;
+}
+
+.admin-modal-head h2 {
+  margin: 5px 0 0;
+  font-family: var(--serif);
+  font-size: 32px;
+  font-weight: 400;
+}
+
+.admin-modal-head button,
+.admin-modal-actions button {
+  min-height: 38px;
+  padding: 10px 14px;
+}
+
+.admin-modal-body {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-confirm-summary {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.admin-confirm-summary div {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 12px;
+  border-bottom: 1px solid var(--rule-soft);
+  padding-bottom: 10px;
+}
+
+.admin-confirm-summary dt,
+.admin-confirm-summary dd {
+  margin: 0;
+}
+
+.admin-confirm-summary dt {
+  color: var(--ink-3);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.admin-confirm-summary dd {
+  color: var(--ink);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.admin-email-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--rule);
+  padding: 12px;
+  background: rgba(235, 231, 222, 0.5);
+}
+
+.admin-email-list span {
+  border: 1px solid var(--rule);
+  background: var(--bone);
+  padding: 7px 9px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.admin-history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-history-list article {
+  border: 1px solid var(--rule);
+  background: rgba(244, 241, 234, 0.54);
+  padding: 14px;
+}
+
+.admin-history-list strong,
+.admin-history-list span,
+.admin-history-list p {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.admin-history-list strong {
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 400;
+}
+
+.admin-history-list span,
+.admin-history-list p {
+  margin-top: 6px;
+  color: var(--ink-3);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.admin-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid var(--rule);
+  padding-top: 18px;
+  margin-top: 20px;
+}
+
 @media (max-width: 820px) {
   .admin-wheel-shell {
     padding: 22px;
@@ -1572,13 +1815,19 @@
   }
 
   .admin-newsletter-toolbar,
-  .admin-newsletter-sendbox {
+  .admin-newsletter-sendbox,
+  .admin-modal-head {
     align-items: stretch;
     flex-direction: column;
   }
 
   .admin-wheel-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-newsletter-upload,
+  .admin-edit-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1591,7 +1840,8 @@
   .admin-wheel-prize-footer,
   .admin-wheel-grid,
   .admin-doctor-details,
-  .admin-doctor-actions {
+  .admin-doctor-actions,
+  .admin-confirm-summary div {
     grid-template-columns: 1fr;
   }
 
@@ -1607,5 +1857,9 @@
   .admin-pagination-controls {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .admin-modal-actions {
+    flex-direction: column;
   }
 }

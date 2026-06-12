@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useMemo, useState } from "react";
 import Header from "@/components/Header";
 
 type AdminWheelPrize = {
@@ -32,6 +32,8 @@ type AdminDoctorRegistration = {
 type NewsletterSendHistory = {
   id: string;
   doctor_id: string;
+  newsletter_id?: string | null;
+  newsletter_title?: string | null;
   email: string;
   subject: string;
   status: "sent" | "failed" | "skipped";
@@ -56,10 +58,19 @@ type WheelApi = {
     prize: Omit<AdminWheelPrize, "id">,
   ) => Promise<AdminWheelPrize>;
   getDoctorRegistrations?: (adminPassword: string) => Promise<AdminDoctorRegistration[]>;
+  updateDoctorRegistration?: (
+    adminPassword: string,
+    doctor: Pick<
+      AdminDoctorRegistration,
+      "id" | "full_name" | "email" | "mobile" | "tiktok_username" | "specialty" | "practice_location"
+    >,
+  ) => Promise<AdminDoctorRegistration>;
   getNewsletterSendHistory?: (adminPassword: string) => Promise<NewsletterSendHistory[]>;
   sendNewsletter?: (
     adminPassword: string,
     doctorIds: string[],
+    subject: string,
+    html: string,
   ) => Promise<{
     sent: number;
     failed: number;
@@ -79,8 +90,17 @@ const emptyPrize: AdminWheelPrize = {
   is_active: true,
   sort_order: 0,
 };
-const DOCTORS_PER_PAGE = 8;
-const NEWSLETTER_RECIPIENTS_PER_PAGE = 8;
+const PAGE_SIZE_OPTIONS = [10, 20, 100];
+const PLACEHOLDER_TOKENS = [
+  "{{doctor_name}}",
+  "{{doctor_email}}",
+  "{{doctor_mobile}}",
+  "{{tiktok_username}}",
+  "{{specialty}}",
+  "{{clinic_location}}",
+  "{{registered_at}}",
+  "{{prize_label}}",
+];
 
 async function loadWheelApi(): Promise<WheelApi> {
   const api = (await import("@/lib/api")) as WheelApi;
@@ -107,13 +127,22 @@ export default function AdminWheelPage() {
   const [doctors, setDoctors] = useState<AdminDoctorRegistration[]>([]);
   const [doctorSearch, setDoctorSearch] = useState("");
   const [doctorPage, setDoctorPage] = useState(1);
+  const [doctorPageSize, setDoctorPageSize] = useState(10);
   const [newsletterSearch, setNewsletterSearch] = useState("");
   const [newsletterPage, setNewsletterPage] = useState(1);
+  const [newsletterPageSize, setNewsletterPageSize] = useState(10);
   const [selectedDoctorIds, setSelectedDoctorIds] = useState<string[]>([]);
   const [newsletterHistory, setNewsletterHistory] = useState<NewsletterSendHistory[]>([]);
   const [newsletterResults, setNewsletterResults] = useState<NewsletterSendResult[]>([]);
   const [isNewsletterSending, setIsNewsletterSending] = useState(false);
-  const [needsNewsletterConfirm, setNeedsNewsletterConfirm] = useState(false);
+  const [showNewsletterConfirm, setShowNewsletterConfirm] = useState(false);
+  const [newsletterSubject, setNewsletterSubject] = useState("");
+  const [newsletterHtml, setNewsletterHtml] = useState("");
+  const [newsletterFileName, setNewsletterFileName] = useState("");
+  const [newsletterFileError, setNewsletterFileError] = useState<string | null>(null);
+  const [historyDoctorId, setHistoryDoctorId] = useState<string | null>(null);
+  const [editingDoctor, setEditingDoctor] = useState<AdminDoctorRegistration | null>(null);
+  const [isDoctorSaving, setIsDoctorSaving] = useState(false);
   const [newPrize, setNewPrize] = useState<AdminWheelPrize>(emptyPrize);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -149,10 +178,10 @@ export default function AdminWheelPage() {
         .includes(query),
     );
   }, [doctorSearch, doctors]);
-  const totalDoctorPages = Math.max(1, Math.ceil(filteredDoctors.length / DOCTORS_PER_PAGE));
+  const totalDoctorPages = Math.max(1, Math.ceil(filteredDoctors.length / doctorPageSize));
   const visibleDoctors = filteredDoctors.slice(
-    (doctorPage - 1) * DOCTORS_PER_PAGE,
-    doctorPage * DOCTORS_PER_PAGE,
+    (doctorPage - 1) * doctorPageSize,
+    doctorPage * doctorPageSize,
   );
   const filteredNewsletterDoctors = useMemo(() => {
     const query = newsletterSearch.trim().toLowerCase();
@@ -176,11 +205,11 @@ export default function AdminWheelPage() {
   }, [newsletterSearch, doctors]);
   const totalNewsletterPages = Math.max(
     1,
-    Math.ceil(filteredNewsletterDoctors.length / NEWSLETTER_RECIPIENTS_PER_PAGE),
+    Math.ceil(filteredNewsletterDoctors.length / newsletterPageSize),
   );
   const visibleNewsletterDoctors = filteredNewsletterDoctors.slice(
-    (newsletterPage - 1) * NEWSLETTER_RECIPIENTS_PER_PAGE,
-    newsletterPage * NEWSLETTER_RECIPIENTS_PER_PAGE,
+    (newsletterPage - 1) * newsletterPageSize,
+    newsletterPage * newsletterPageSize,
   );
   const selectedDoctors = useMemo(
     () => doctors.filter((doctor) => selectedDoctorIds.includes(doctor.id)),
@@ -195,11 +224,28 @@ export default function AdminWheelPage() {
       return current;
     }, {});
   }, [newsletterHistory]);
+  const newsletterHistoryByDoctor = useMemo(() => {
+    return newsletterHistory.reduce<Record<string, NewsletterSendHistory[]>>((current, item) => {
+      current[item.doctor_id] = [...(current[item.doctor_id] ?? []), item].sort(
+        (a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime(),
+      );
+      return current;
+    }, {});
+  }, [newsletterHistory]);
+  const historyDoctor = historyDoctorId ? doctors.find((doctor) => doctor.id === historyDoctorId) : null;
+  const historyItems = historyDoctorId ? newsletterHistoryByDoctor[historyDoctorId] ?? [] : [];
+  const detectedPlaceholders = useMemo(() => {
+    return Array.from(new Set(newsletterHtml.match(/\{\{\s*[a-zA-Z0-9_]+\s*\}\}/g) ?? [])).map((token) =>
+      token.replace(/\s+/g, ""),
+    );
+  }, [newsletterHtml]);
   const visibleSelectedCount = visibleNewsletterDoctors.filter((doctor) =>
     selectedDoctorIds.includes(doctor.id),
   ).length;
   const allVisibleSelected =
     visibleNewsletterDoctors.length > 0 && visibleSelectedCount === visibleNewsletterDoctors.length;
+  const canSendNewsletter =
+    selectedDoctorIds.length > 0 && newsletterSubject.trim().length > 0 && newsletterHtml.trim().length > 0;
 
   async function handleUnlock(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -260,7 +306,7 @@ export default function AdminWheelPage() {
   }
 
   function toggleNewsletterDoctor(doctorId: string) {
-    setNeedsNewsletterConfirm(false);
+    setShowNewsletterConfirm(false);
     setSelectedDoctorIds((current) =>
       current.includes(doctorId)
         ? current.filter((id) => id !== doctorId)
@@ -269,7 +315,7 @@ export default function AdminWheelPage() {
   }
 
   function toggleVisibleNewsletterDoctors() {
-    setNeedsNewsletterConfirm(false);
+    setShowNewsletterConfirm(false);
     const visibleIds = visibleNewsletterDoctors.map((doctor) => doctor.id);
     setSelectedDoctorIds((current) => {
       if (visibleIds.every((id) => current.includes(id))) {
@@ -280,13 +326,51 @@ export default function AdminWheelPage() {
     });
   }
 
-  async function handleNewsletterSend() {
-    if (selectedDoctorIds.length === 0) return;
+  async function handleNewsletterUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    setNewsletterFileError(null);
+    setShowNewsletterConfirm(false);
 
-    if (!needsNewsletterConfirm) {
-      setNeedsNewsletterConfirm(true);
+    if (!file) {
+      setNewsletterFileName("");
+      setNewsletterHtml("");
       return;
     }
+
+    if (!file.name.toLowerCase().endsWith(".html") && file.type !== "text/html") {
+      setNewsletterFileName("");
+      setNewsletterHtml("");
+      setNewsletterFileError("Please upload a .html newsletter file.");
+      return;
+    }
+
+    if (file.size > 250_000) {
+      setNewsletterFileName("");
+      setNewsletterHtml("");
+      setNewsletterFileError("Please keep the HTML file under 250 KB.");
+      return;
+    }
+
+    const content = await file.text();
+    setNewsletterFileName(file.name);
+    setNewsletterHtml(content);
+
+    if (!newsletterSubject.trim()) {
+      setNewsletterSubject(file.name.replace(/\.html?$/i, "").replace(/[-_]+/g, " "));
+    }
+  }
+
+  async function handleNewsletterSend() {
+    if (!canSendNewsletter) {
+      setError("Upload an HTML file, enter a subject, and select at least one recipient.");
+      return;
+    }
+
+    setShowNewsletterConfirm(true);
+  }
+
+  async function confirmNewsletterSend() {
+    if (!canSendNewsletter) return;
 
     setError(null);
     setNotice(null);
@@ -299,17 +383,63 @@ export default function AdminWheelPage() {
         throw new Error("Missing sendNewsletter helper in lib/api.ts.");
       }
 
-      const response = await api.sendNewsletter(password, selectedDoctorIds);
+      const response = await api.sendNewsletter(
+        password,
+        selectedDoctorIds,
+        newsletterSubject.trim(),
+        newsletterHtml,
+      );
       setNewsletterResults(response.results);
       setNotice(
         `Newsletter complete: ${response.sent} sent, ${response.failed} failed, ${response.skipped} skipped.`,
       );
-      setNeedsNewsletterConfirm(false);
+      setShowNewsletterConfirm(false);
       await refreshNewsletterHistory();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to send newsletter.");
     } finally {
       setIsNewsletterSending(false);
+    }
+  }
+
+  function openDoctorEditor(doctor: AdminDoctorRegistration) {
+    setError(null);
+    setNotice(null);
+    setEditingDoctor({ ...doctor });
+  }
+
+  async function saveDoctorEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingDoctor) return;
+
+    setError(null);
+    setNotice(null);
+    setIsDoctorSaving(true);
+
+    try {
+      const api = await loadWheelApi();
+      if (!api.updateDoctorRegistration) {
+        throw new Error("Missing updateDoctorRegistration helper in lib/api.ts.");
+      }
+
+      const updatedDoctor = await api.updateDoctorRegistration(password, {
+        id: editingDoctor.id,
+        full_name: editingDoctor.full_name.trim(),
+        email: editingDoctor.email.trim(),
+        mobile: editingDoctor.mobile.trim(),
+        tiktok_username: editingDoctor.tiktok_username.trim().replace(/^@+/, ""),
+        specialty: editingDoctor.specialty.trim(),
+        practice_location: editingDoctor.practice_location.trim(),
+      });
+      setDoctors((current) =>
+        current.map((doctor) => (doctor.id === updatedDoctor.id ? { ...doctor, ...updatedDoctor } : doctor)),
+      );
+      setEditingDoctor(null);
+      setNotice("Doctor details updated.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to update doctor details.");
+    } finally {
+      setIsDoctorSaving(false);
     }
   }
 
@@ -659,6 +789,23 @@ export default function AdminWheelPage() {
                   }}
                 />
               </label>
+              <label htmlFor="doctor-page-size">
+                Show
+                <select
+                  id="doctor-page-size"
+                  value={doctorPageSize}
+                  onChange={(event) => {
+                    setDoctorPageSize(Number(event.target.value));
+                    setDoctorPage(1);
+                  }}
+                >
+                  {PAGE_SIZE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <button type="button" onClick={refreshDoctors} disabled={isLoading}>
                 {isLoading ? "Refreshing" : "Refresh"}
               </button>
@@ -699,6 +846,11 @@ export default function AdminWheelPage() {
                       <dd>{formatAdminDate(doctor.created_at)}</dd>
                     </div>
                   </dl>
+                  <div className="admin-doctor-row-actions">
+                    <button type="button" onClick={() => openDoctorEditor(doctor)}>
+                      Edit
+                    </button>
+                  </div>
                 </article>
               ))
             ) : (
@@ -710,9 +862,9 @@ export default function AdminWheelPage() {
 
           <div className="admin-pagination">
             <p>
-              Showing {visibleDoctors.length > 0 ? (doctorPage - 1) * DOCTORS_PER_PAGE + 1 : 0}
+              Showing {visibleDoctors.length > 0 ? (doctorPage - 1) * doctorPageSize + 1 : 0}
               {"-"}
-              {Math.min(doctorPage * DOCTORS_PER_PAGE, filteredDoctors.length)} of {filteredDoctors.length}
+              {Math.min(doctorPage * doctorPageSize, filteredDoctors.length)} of {filteredDoctors.length}
             </p>
             <div className="admin-pagination-controls">
               <button
@@ -758,9 +910,65 @@ export default function AdminWheelPage() {
                   }}
                 />
               </label>
+              <label htmlFor="newsletter-page-size">
+                Show
+                <select
+                  id="newsletter-page-size"
+                  value={newsletterPageSize}
+                  onChange={(event) => {
+                    setNewsletterPageSize(Number(event.target.value));
+                    setNewsletterPage(1);
+                  }}
+                >
+                  {PAGE_SIZE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <button type="button" onClick={refreshNewsletterHistory} disabled={isLoading}>
                 Refresh history
               </button>
+            </div>
+          </div>
+
+          <div className="admin-newsletter-upload">
+            <label htmlFor="newsletter-subject">
+              Newsletter subject
+              <input
+                id="newsletter-subject"
+                value={newsletterSubject}
+                placeholder="GutGuard Doctors Newsletter"
+                onChange={(event) => {
+                  setNewsletterSubject(event.target.value);
+                  setShowNewsletterConfirm(false);
+                }}
+              />
+            </label>
+            <label htmlFor="newsletter-html-file">
+              Upload HTML file
+              <input id="newsletter-html-file" type="file" accept=".html,text/html" onChange={handleNewsletterUpload} />
+            </label>
+            <div className="admin-newsletter-placeholder-box">
+              <p>{newsletterFileName ? `Loaded ${newsletterFileName}` : "No newsletter uploaded yet."}</p>
+              {newsletterFileError ? <strong>{newsletterFileError}</strong> : null}
+              <span>Available placeholders</span>
+              <div>
+                {PLACEHOLDER_TOKENS.map((token) => (
+                  <code key={token}>{token}</code>
+                ))}
+              </div>
+              {detectedPlaceholders.length > 0 ? (
+                <>
+                  <span>Detected in uploaded HTML</span>
+                  <div>
+                    {detectedPlaceholders.map((token) => (
+                      <code key={token}>{token}</code>
+                    ))}
+                  </div>
+                </>
+              ) : null}
             </div>
           </div>
 
@@ -774,20 +982,13 @@ export default function AdminWheelPage() {
               Select visible recipients
             </label>
             <div className="admin-newsletter-sendbox">
-              <p>
-                {selectedDoctorIds.length} selected
-                {needsNewsletterConfirm ? " - click send again to confirm" : ""}
-              </p>
+              <p>{selectedDoctorIds.length} selected</p>
               <button
                 type="button"
                 onClick={handleNewsletterSend}
-                disabled={isNewsletterSending || selectedDoctorIds.length === 0}
+                disabled={isNewsletterSending || !canSendNewsletter}
               >
-                {isNewsletterSending
-                  ? "Sending"
-                  : needsNewsletterConfirm
-                    ? `Confirm send to ${selectedDoctorIds.length}`
-                    : "Send newsletter"}
+                {isNewsletterSending ? "Sending" : "Review and send"}
               </button>
             </div>
           </div>
@@ -807,6 +1008,7 @@ export default function AdminWheelPage() {
             {visibleNewsletterDoctors.length > 0 ? (
               visibleNewsletterDoctors.map((doctor) => {
                 const latestSend = latestNewsletterByDoctor[doctor.id];
+                const doctorHistory = newsletterHistoryByDoctor[doctor.id] ?? [];
                 const latestResult = newsletterResults.find((result) => result.doctorId === doctor.id);
 
                 return (
@@ -834,14 +1036,24 @@ export default function AdminWheelPage() {
                       <div>
                         <dt>Last newsletter</dt>
                         <dd>
-                          {latestSend
-                            ? `${latestSend.status} - ${formatAdminDate(latestSend.sent_at)}`
-                            : "Never sent"}
+                          {doctorHistory.length > 1 ? (
+                            <button
+                              className="admin-history-link"
+                              type="button"
+                              onClick={() => setHistoryDoctorId(doctor.id)}
+                            >
+                              {doctorHistory.length} newsletters sent
+                            </button>
+                          ) : latestSend ? (
+                            `${latestSend.newsletter_title || latestSend.subject} - ${formatAdminDate(latestSend.sent_at)}`
+                          ) : (
+                            "Never sent"
+                          )}
                         </dd>
                       </div>
                       <div>
-                        <dt>This send</dt>
-                        <dd>{latestResult ? latestResult.status : "--"}</dd>
+                        <dt>Send result</dt>
+                        <dd>{latestResult ? formatSendResult(latestResult) : "--"}</dd>
                       </div>
                     </dl>
                   </article>
@@ -856,9 +1068,9 @@ export default function AdminWheelPage() {
 
           <div className="admin-pagination">
             <p>
-              Showing {visibleNewsletterDoctors.length > 0 ? (newsletterPage - 1) * NEWSLETTER_RECIPIENTS_PER_PAGE + 1 : 0}
+              Showing {visibleNewsletterDoctors.length > 0 ? (newsletterPage - 1) * newsletterPageSize + 1 : 0}
               {"-"}
-              {Math.min(newsletterPage * NEWSLETTER_RECIPIENTS_PER_PAGE, filteredNewsletterDoctors.length)} of{" "}
+              {Math.min(newsletterPage * newsletterPageSize, filteredNewsletterDoctors.length)} of{" "}
               {filteredNewsletterDoctors.length}
             </p>
             <div className="admin-pagination-controls">
@@ -884,6 +1096,148 @@ export default function AdminWheelPage() {
         </section>
       ) : null}
 
+      {showNewsletterConfirm ? (
+        <div className="admin-modal-backdrop" role="presentation">
+          <section className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="newsletter-confirm-title">
+            <div className="admin-modal-head">
+              <div>
+                <p className="admin-wheel-kicker">Confirm Newsletter</p>
+                <h2 id="newsletter-confirm-title">Send to {selectedDoctors.length} doctors</h2>
+              </div>
+              <button type="button" onClick={() => setShowNewsletterConfirm(false)}>
+                Close
+              </button>
+            </div>
+            <div className="admin-modal-body">
+              <dl className="admin-confirm-summary">
+                <div>
+                  <dt>Subject</dt>
+                  <dd>{newsletterSubject}</dd>
+                </div>
+                <div>
+                  <dt>HTML file</dt>
+                  <dd>{newsletterFileName || "Uploaded HTML"}</dd>
+                </div>
+              </dl>
+              <div className="admin-email-list">
+                {selectedDoctors.map((doctor) => (
+                  <span key={doctor.id}>{doctor.email}</span>
+                ))}
+              </div>
+            </div>
+            <div className="admin-modal-actions">
+              <button type="button" onClick={() => setShowNewsletterConfirm(false)}>
+                Cancel
+              </button>
+              <button type="button" onClick={confirmNewsletterSend} disabled={isNewsletterSending}>
+                {isNewsletterSending ? "Sending" : "Send newsletter"}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {historyDoctor ? (
+        <div className="admin-modal-backdrop" role="presentation">
+          <section className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="newsletter-history-title">
+            <div className="admin-modal-head">
+              <div>
+                <p className="admin-wheel-kicker">Newsletter History</p>
+                <h2 id="newsletter-history-title">{historyDoctor.full_name || "Unnamed doctor"}</h2>
+              </div>
+              <button type="button" onClick={() => setHistoryDoctorId(null)}>
+                Close
+              </button>
+            </div>
+            <div className="admin-history-list">
+              {historyItems.map((item) => (
+                <article key={item.id}>
+                  <strong>{item.newsletter_title || item.subject}</strong>
+                  <span>
+                    {item.status} - {formatAdminDate(item.sent_at)}
+                  </span>
+                  {item.error_message ? <p>{item.error_message}</p> : null}
+                </article>
+              ))}
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {editingDoctor ? (
+        <div className="admin-modal-backdrop" role="presentation">
+          <form className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="doctor-edit-title" onSubmit={saveDoctorEdit}>
+            <div className="admin-modal-head">
+              <div>
+                <p className="admin-wheel-kicker">Edit Doctor</p>
+                <h2 id="doctor-edit-title">Registration Details</h2>
+              </div>
+              <button type="button" onClick={() => setEditingDoctor(null)}>
+                Close
+              </button>
+            </div>
+            <div className="admin-edit-grid">
+              <label>
+                Name
+                <input
+                  required
+                  value={editingDoctor.full_name}
+                  onChange={(event) => setEditingDoctor({ ...editingDoctor, full_name: event.target.value })}
+                />
+              </label>
+              <label>
+                Email
+                <input
+                  type="email"
+                  value={editingDoctor.email}
+                  onChange={(event) => setEditingDoctor({ ...editingDoctor, email: event.target.value })}
+                />
+              </label>
+              <label>
+                Mobile
+                <input
+                  required
+                  value={editingDoctor.mobile}
+                  onChange={(event) => setEditingDoctor({ ...editingDoctor, mobile: event.target.value })}
+                />
+              </label>
+              <label>
+                TikTok username
+                <input
+                  required
+                  value={editingDoctor.tiktok_username}
+                  onChange={(event) => setEditingDoctor({ ...editingDoctor, tiktok_username: event.target.value })}
+                />
+              </label>
+              <label>
+                Specialty
+                <input
+                  required
+                  value={editingDoctor.specialty}
+                  onChange={(event) => setEditingDoctor({ ...editingDoctor, specialty: event.target.value })}
+                />
+              </label>
+              <label>
+                Clinic location
+                <input
+                  required
+                  value={editingDoctor.practice_location}
+                  onChange={(event) => setEditingDoctor({ ...editingDoctor, practice_location: event.target.value })}
+                />
+              </label>
+            </div>
+            <div className="admin-modal-actions">
+              <button type="button" onClick={() => setEditingDoctor(null)}>
+                Cancel
+              </button>
+              <button type="submit" disabled={isDoctorSaving}>
+                {isDoctorSaving ? "Saving" : "Save changes"}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
       {!isUnlocked ? (
         <section className="admin-wheel-empty">
           <p>Enter the admin password to load wheel prizes and doctor registrations.</p>
@@ -904,4 +1258,10 @@ function formatAdminDate(value: string) {
     hour: "numeric",
     minute: "2-digit",
   }).format(date);
+}
+
+function formatSendResult(result: NewsletterSendResult) {
+  if (result.status === "sent") return "Sent";
+  if (result.status === "skipped") return `Skipped${result.error ? ` - ${result.error}` : ""}`;
+  return `Failed${result.error ? ` - ${result.error}` : ""}`;
 }
