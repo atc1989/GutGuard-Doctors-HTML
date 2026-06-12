@@ -1847,7 +1847,7 @@
 }
 
 .registration-email-upload {
-  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto auto;
   margin-bottom: 0;
 }
 

@@ -1631,6 +1631,14 @@ export default function AdminWheelPage() {
                 >
                   Preview HTML
                 </button>
+                <button
+                  className="admin-newsletter-upload-action"
+                  type="button"
+                  onClick={() => setShowRegistrationEmailRemoveHtmlConfirm(true)}
+                  disabled={registrationEmail.html.trim().length === 0 || isRegistrationEmailRemovingHtml}
+                >
+                  Remove HTML
+                </button>
               </div>
 
               <div className="admin-registration-email-actions">
@@ -1665,15 +1673,6 @@ export default function AdminWheelPage() {
               <div className="admin-newsletter-placeholder-box">
                 <div className="admin-registration-html-status">
                   <p>{registrationEmailFileName || "No registration HTML uploaded yet."}</p>
-                  {registrationEmail.html.trim() ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowRegistrationEmailRemoveHtmlConfirm(true)}
-                      disabled={isRegistrationEmailRemovingHtml}
-                    >
-                      Remove HTML
-                    </button>
-                  ) : null}
                 </div>
                 {registrationEmailFileError ? <strong>{registrationEmailFileError}</strong> : null}
                 {registrationAttachmentError ? <strong>{registrationAttachmentError}</strong> : null}
