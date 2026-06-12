@@ -1459,7 +1459,7 @@
   margin-top: 8px;
 }
 
-.admin-doctor-qr svg {
+.admin-doctor-qr-code {
   width: 108px;
   height: 108px;
   background: #fff;
@@ -1487,10 +1487,30 @@
   overflow-wrap: anywhere;
 }
 
-.admin-doctor-qr button {
+.admin-doctor-qr-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-doctor-qr-actions button {
   min-height: 32px;
   padding: 7px 10px;
   font-size: 12px;
+}
+
+.admin-doctor-qr-actions .icon-only {
+  display: inline-flex;
+  width: 32px;
+  min-width: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 7px;
+}
+
+.admin-doctor-qr-actions .icon-only svg {
+  width: 16px;
+  height: 16px;
 }
 
 .admin-doctor-qr-missing {

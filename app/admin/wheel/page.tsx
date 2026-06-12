@@ -3,6 +3,7 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import Header from "@/components/Header";
+import { DownloadIcon } from "@/components/Icons";
 
 type AdminWheelPrize = {
   id?: string;
@@ -137,6 +138,10 @@ function getPrizeOdds(prize: AdminWheelPrize, activeWeightTotal: number) {
 function getDoctorQrUrl(doctor: AdminDoctorRegistration) {
   if (!doctor.routing_slug) return "";
   return `${PUBLIC_SITE_ORIGIN}/dr/${encodeURIComponent(doctor.routing_slug)}`;
+}
+
+function getDoctorQrElementId(doctorId: string) {
+  return `doctor-qr-${doctorId}`;
 }
 
 export default function AdminWheelPage() {
@@ -503,6 +508,36 @@ export default function AdminWheelPage() {
     } catch {
       setError("Unable to copy the QR link. Please copy it from the text field instead.");
     }
+  }
+
+  function downloadDoctorQr(doctor: AdminDoctorRegistration, qrUrl: string) {
+    setError(null);
+    setNotice(null);
+
+    const svg = document.getElementById(getDoctorQrElementId(doctor.id));
+    if (!(svg instanceof SVGSVGElement)) {
+      setError("Unable to find the QR code for download.");
+      return;
+    }
+
+    const clone = svg.cloneNode(true) as SVGSVGElement;
+    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    clone.setAttribute("width", "512");
+    clone.setAttribute("height", "512");
+
+    const blob = new Blob([new XMLSerializer().serializeToString(clone)], {
+      type: "image/svg+xml;charset=utf-8",
+    });
+    const downloadUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = downloadUrl;
+    link.download = `${doctor.routing_slug || slugifyDownloadName(doctor.full_name)}-qr.svg`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(downloadUrl);
+    setNotice(`QR downloaded for ${doctor.full_name || qrUrl}.`);
   }
 
   function updatePrize(index: number, patch: Partial<AdminWheelPrize>) {
@@ -891,13 +926,30 @@ export default function AdminWheelPage() {
                       <span>@{doctor.tiktok_username || "no-handle"}</span>
                       {qrUrl ? (
                         <div className="admin-doctor-qr">
-                          <QRCodeSVG value={qrUrl} size={108} marginSize={2} />
+                          <QRCodeSVG
+                            id={getDoctorQrElementId(doctor.id)}
+                            className="admin-doctor-qr-code"
+                            value={qrUrl}
+                            size={108}
+                            marginSize={2}
+                          />
                           <div>
                             <small>Permanent QR route</small>
                             <code>{qrUrl}</code>
-                            <button type="button" onClick={() => copyDoctorQrUrl(qrUrl)}>
-                              Copy QR link
-                            </button>
+                            <div className="admin-doctor-qr-actions">
+                              <button type="button" onClick={() => copyDoctorQrUrl(qrUrl)}>
+                                Copy QR link
+                              </button>
+                              <button
+                                type="button"
+                                className="icon-only"
+                                title="Download QR code"
+                                aria-label={`Download QR code for ${doctor.full_name || "doctor"}`}
+                                onClick={() => downloadDoctorQr(doctor, qrUrl)}
+                              >
+                                <DownloadIcon />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ) : (
@@ -1443,6 +1495,16 @@ function renderNewsletterPreview(html: string) {
     if (!(key in replacements)) return match;
     return escapeHtml(replacements[key]);
   });
+}
+
+function slugifyDownloadName(value: string | null | undefined) {
+  const slug = (value ?? "doctor")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return slug || "doctor";
 }
 
 function escapeHtml(value: string) {
