@@ -22,10 +22,7 @@ type DoctorRegistration = {
   specialty: string | null;
   practice_location: string | null;
   created_at: string | null;
-  wheel_claims?: Array<{
-    prize_label: string | null;
-    claimed_at: string | null;
-  }> | null;
+  prize_label?: string | null;
 };
 
 type SendStatus = "sent" | "failed" | "skipped";
@@ -87,16 +84,18 @@ Deno.serve(async (req) => {
 
     const { data: doctors, error: doctorsError } = await supabase
       .from("doctor_registrations")
-      .select(
-        "id, full_name, email, mobile, tiktok_username, specialty, practice_location, created_at, wheel_claims(prize_label, claimed_at)",
-      )
+      .select("id, full_name, email, mobile, tiktok_username, specialty, practice_location, created_at")
       .in("id", cleanDoctorIds);
 
-    if (doctorsError) return jsonResponse({ error: "Doctors could not be fetched" }, 500);
+    if (doctorsError) {
+      return jsonResponse({ error: `Doctors could not be fetched: ${doctorsError.message}` }, 500);
+    }
 
     const results = [];
+    const prizeLabelsByDoctor = await getPrizeLabelsByDoctor(supabase, cleanDoctorIds);
 
     for (const doctor of (doctors ?? []) as DoctorRegistration[]) {
+      doctor.prize_label = prizeLabelsByDoctor[doctor.id] ?? "";
       const email = (doctor.email ?? "").trim().toLowerCase();
 
       if (!isValidEmail(email)) {
@@ -235,10 +234,25 @@ async function recordSendAttempt(
   });
 }
 
+async function getPrizeLabelsByDoctor(supabase: ReturnType<typeof createClient>, doctorIds: string[]) {
+  const { data, error } = await supabase
+    .from("wheel_claims")
+    .select("doctor_id, prize_label, claimed_at")
+    .in("doctor_id", doctorIds)
+    .order("claimed_at", { ascending: false });
+
+  if (error) return {};
+
+  return ((data ?? []) as Array<{ doctor_id: string; prize_label: string | null }>).reduce<Record<string, string>>(
+    (current, claim) => {
+      if (!current[claim.doctor_id]) current[claim.doctor_id] = claim.prize_label ?? "";
+      return current;
+    },
+    {},
+  );
+}
+
 function renderDoctorTemplate(html: string, doctor: DoctorRegistration) {
-  const latestClaim = [...(doctor.wheel_claims ?? [])].sort((a, b) => {
-    return new Date(b.claimed_at ?? "").getTime() - new Date(a.claimed_at ?? "").getTime();
-  })[0];
   const replacements: Record<string, string> = {
     doctor_name: doctor.full_name ?? "",
     doctor_email: doctor.email ?? "",
@@ -247,7 +261,7 @@ function renderDoctorTemplate(html: string, doctor: DoctorRegistration) {
     specialty: doctor.specialty ?? "",
     clinic_location: doctor.practice_location ?? "",
     registered_at: formatDate(doctor.created_at),
-    prize_label: latestClaim?.prize_label ?? "",
+    prize_label: doctor.prize_label ?? "",
   };
 
   return html.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, key: string) => {

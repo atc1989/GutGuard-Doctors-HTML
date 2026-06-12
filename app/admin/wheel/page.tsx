@@ -152,7 +152,11 @@ export default function AdminWheelPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [newsletterToast, setNewsletterToast] = useState<string | null>(null);
+  const [newsletterToast, setNewsletterToast] = useState<{
+    tone: "success" | "error";
+    title: string;
+    message: string;
+  } | null>(null);
 
   const activeWeightTotal = useMemo(
     () =>
@@ -416,16 +420,24 @@ export default function AdminWheelPage() {
         newsletterHtml,
       );
       setNewsletterResults(response.results);
-      setNewsletterToast(
-        `Newsletter sent: ${response.sent} sent, ${response.failed} failed, ${response.skipped} skipped.`,
-      );
+      setNewsletterToast({
+        tone: "success",
+        title: "Newsletter send complete",
+        message: `Newsletter sent: ${response.sent} sent, ${response.failed} failed, ${response.skipped} skipped.`,
+      });
       setNotice(
         `Newsletter complete: ${response.sent} sent, ${response.failed} failed, ${response.skipped} skipped.`,
       );
       setShowNewsletterConfirm(false);
       await refreshNewsletterHistory();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to send newsletter.");
+      const message = caught instanceof Error ? caught.message : "Unable to send newsletter.";
+      setError(message);
+      setNewsletterToast({
+        tone: "error",
+        title: "Newsletter send failed",
+        message,
+      });
     } finally {
       setIsNewsletterSending(false);
     }
@@ -628,10 +640,10 @@ export default function AdminWheelPage() {
       {error ? <div className="admin-wheel-alert error">{error}</div> : null}
       {notice ? <div className="admin-wheel-alert">{notice}</div> : null}
       {newsletterToast ? (
-        <div className="admin-toast" role="status" aria-live="polite">
+        <div className={`admin-toast ${newsletterToast.tone}`} role="status" aria-live="polite">
           <div>
-            <strong>Newsletter send complete</strong>
-            <span>{newsletterToast}</span>
+            <strong>{newsletterToast.title}</strong>
+            <span>{newsletterToast.message}</span>
           </div>
           <button type="button" onClick={() => setNewsletterToast(null)} aria-label="Dismiss notification">
             Close

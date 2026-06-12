@@ -1240,6 +1240,10 @@
   text-transform: uppercase;
 }
 
+.admin-toast.error strong {
+  color: #ffb8c2;
+}
+
 .admin-toast span {
   color: var(--bone);
   font-size: 14px;
@@ -1741,13 +1745,14 @@
 }
 
 .admin-newsletter-preview-modal {
-  width: min(880px, 100%);
+  width: min(960px, 100%);
+  max-height: min(900px, calc(100vh - 28px));
 }
 
 .admin-newsletter-preview-frame {
   display: block;
   width: 100%;
-  min-height: min(680px, calc(100vh - 190px));
+  min-height: min(780px, calc(100vh - 150px));
   border: 1px solid var(--rule);
   background: #ffffff;
 }
