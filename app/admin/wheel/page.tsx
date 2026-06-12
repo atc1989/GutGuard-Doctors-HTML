@@ -141,7 +141,6 @@ export default function AdminWheelPage() {
   const [newsletterFileName, setNewsletterFileName] = useState("");
   const [newsletterFileError, setNewsletterFileError] = useState<string | null>(null);
   const [showNewsletterPreview, setShowNewsletterPreview] = useState(false);
-  const [previewDoctorId, setPreviewDoctorId] = useState("");
   const [historyDoctorId, setHistoryDoctorId] = useState<string | null>(null);
   const [editingDoctor, setEditingDoctor] = useState<AdminDoctorRegistration | null>(null);
   const [isDoctorSaving, setIsDoctorSaving] = useState(false);
@@ -253,19 +252,7 @@ export default function AdminWheelPage() {
     visibleNewsletterDoctors.length > 0 && visibleSelectedCount === visibleNewsletterDoctors.length;
   const canSendNewsletter =
     selectedDoctorIds.length > 0 && newsletterSubject.trim().length > 0 && newsletterHtml.trim().length > 0;
-  const previewDoctor = useMemo(() => {
-    return (
-      doctors.find((doctor) => doctor.id === previewDoctorId) ??
-      selectedDoctors[0] ??
-      filteredNewsletterDoctors[0] ??
-      doctors[0] ??
-      null
-    );
-  }, [doctors, filteredNewsletterDoctors, previewDoctorId, selectedDoctors]);
-  const previewHtml = useMemo(() => renderNewsletterPreview(newsletterHtml, previewDoctor), [
-    newsletterHtml,
-    previewDoctor,
-  ]);
+  const previewHtml = useMemo(() => renderNewsletterPreview(newsletterHtml), [newsletterHtml]);
 
   useEffect(() => {
     if (!newsletterToast) return;
@@ -996,30 +983,21 @@ export default function AdminWheelPage() {
               Upload HTML file
               <input id="newsletter-html-file" type="file" accept=".html,text/html" onChange={handleNewsletterUpload} />
             </label>
-            <div className="admin-newsletter-preview-actions">
-              <label htmlFor="newsletter-preview-doctor">
-                Preview as
-                <select
-                  id="newsletter-preview-doctor"
-                  value={previewDoctor?.id ?? ""}
-                  onChange={(event) => setPreviewDoctorId(event.target.value)}
-                >
-                  {doctors.length === 0 ? <option value="">Sample doctor</option> : null}
-                  {doctors.map((doctor) => (
-                    <option key={doctor.id} value={doctor.id}>
-                      {doctor.full_name || doctor.email || "Unnamed doctor"}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowNewsletterPreview(true)}
-                disabled={newsletterHtml.trim().length === 0}
-              >
-                Preview HTML
-              </button>
-            </div>
+            <button
+              className="admin-newsletter-upload-action"
+              type="button"
+              onClick={() => setShowNewsletterPreview(true)}
+              disabled={newsletterHtml.trim().length === 0}
+            >
+              Preview HTML
+            </button>
+            <a
+              className="admin-newsletter-download"
+              href="/sample-upload-newsletter.html"
+              download="sample-upload-newsletter.html"
+            >
+              Download sample HTML
+            </a>
             <div className="admin-newsletter-placeholder-box">
               <p>{newsletterFileName ? `Loaded ${newsletterFileName}` : "No newsletter uploaded yet."}</p>
               {newsletterFileError ? <strong>{newsletterFileError}</strong> : null}
@@ -1380,16 +1358,16 @@ function formatSendResult(result: NewsletterSendResult) {
   return `Failed${result.error ? ` - ${result.error}` : ""}`;
 }
 
-function renderNewsletterPreview(html: string, doctor: AdminDoctorRegistration | null) {
+function renderNewsletterPreview(html: string) {
   const replacements: Record<string, string> = {
-    doctor_name: doctor?.full_name || "Dr. Maria Santos",
-    doctor_email: doctor?.email || "doctor@example.com",
-    doctor_mobile: doctor?.mobile || "09171234567",
-    tiktok_username: doctor?.tiktok_username || "gutguarddoctor",
-    specialty: doctor?.specialty || "Internal Medicine",
-    clinic_location: doctor?.practice_location || "Makati City",
-    registered_at: doctor ? formatAdminDate(doctor.created_at) : "Jun 12, 2026, 10:00 AM",
-    prize_label: doctor?.prize_label || "GutGuard Tote",
+    doctor_name: "Dr. Maria Santos",
+    doctor_email: "doctor@example.com",
+    doctor_mobile: "09171234567",
+    tiktok_username: "gutguarddoctor",
+    specialty: "Internal Medicine",
+    clinic_location: "Makati City",
+    registered_at: "Jun 12, 2026",
+    prize_label: "GutGuard Tote",
   };
 
   return html.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, key: string) => {

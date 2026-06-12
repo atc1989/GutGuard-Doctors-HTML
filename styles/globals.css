@@ -1539,7 +1539,8 @@
 
 .admin-newsletter-upload {
   display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr);
+  grid-template-columns: minmax(220px, 1.25fr) minmax(220px, 1.25fr) auto auto;
+  align-items: end;
   gap: 14px;
   border: 1px solid var(--rule);
   background: rgba(244, 241, 234, 0.54);
@@ -1548,7 +1549,6 @@
 }
 
 .admin-newsletter-upload label,
-.admin-newsletter-preview-actions label,
 .admin-edit-grid label {
   display: flex;
   flex-direction: column;
@@ -1560,17 +1560,26 @@
   text-transform: uppercase;
 }
 
-.admin-newsletter-preview-actions {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) auto;
-  align-items: end;
-  gap: 12px;
-}
-
-.admin-newsletter-preview-actions button {
+.admin-newsletter-upload-action,
+.admin-newsletter-download {
   min-height: 44px;
   padding: 12px 16px;
+}
+
+.admin-newsletter-download {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ink);
+  color: var(--bone);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.admin-newsletter-download:hover {
+  background: var(--blue);
 }
 
 .admin-newsletter-placeholder-box {
@@ -1933,7 +1942,6 @@
   }
 
   .admin-newsletter-upload,
-  .admin-newsletter-preview-actions,
   .admin-edit-grid {
     grid-template-columns: 1fr;
   }
