@@ -1434,6 +1434,23 @@
   gap: 10px;
 }
 
+.admin-pagination-controls label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink-3);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.admin-pagination-controls select {
+  min-height: 38px;
+  min-width: 72px;
+  padding: 8px 10px;
+}
+
 .admin-pagination-controls span {
   min-width: 92px;
   text-align: center;

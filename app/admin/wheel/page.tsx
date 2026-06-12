@@ -575,6 +575,7 @@ export default function AdminWheelPage() {
           <input
             id="admin-password"
             type="password"
+            autoComplete="new-password"
             value={password}
             placeholder="Enter password"
             onChange={(event) => setPassword(event.target.value)}
@@ -910,23 +911,6 @@ export default function AdminWheelPage() {
                   }}
                 />
               </label>
-              <label htmlFor="newsletter-page-size">
-                Show
-                <select
-                  id="newsletter-page-size"
-                  value={newsletterPageSize}
-                  onChange={(event) => {
-                    setNewsletterPageSize(Number(event.target.value));
-                    setNewsletterPage(1);
-                  }}
-                >
-                  {PAGE_SIZE_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
               <button type="button" onClick={refreshNewsletterHistory} disabled={isLoading}>
                 Refresh history
               </button>
@@ -1074,6 +1058,23 @@ export default function AdminWheelPage() {
               {filteredNewsletterDoctors.length}
             </p>
             <div className="admin-pagination-controls">
+              <label htmlFor="newsletter-page-size">
+                Show
+                <select
+                  id="newsletter-page-size"
+                  value={newsletterPageSize}
+                  onChange={(event) => {
+                    setNewsletterPageSize(Number(event.target.value));
+                    setNewsletterPage(1);
+                  }}
+                >
+                  {PAGE_SIZE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <button
                 type="button"
                 onClick={() => setNewsletterPage((current) => Math.max(1, current - 1))}
