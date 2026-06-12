@@ -41,6 +41,8 @@ type AdminDoctorRegistration = {
   email: string;
   mobile: string;
   tiktok_username: string;
+  routing_slug: string;
+  redirect_url: string;
   specialty: string;
   practice_location: string;
   created_at: string;
@@ -54,6 +56,7 @@ type AdminDoctorRegistrationUpdate = {
   email: string;
   mobile: string;
   tiktok_username: string;
+  redirect_url: string;
   specialty: string;
   practice_location: string;
 };
@@ -252,6 +255,7 @@ export async function updateDoctorRegistration(
     p_email: doctor.email,
     p_mobile: doctor.mobile,
     p_tiktok_username: doctor.tiktok_username,
+    p_redirect_url: doctor.redirect_url,
     p_specialty: doctor.specialty,
     p_practice_location: doctor.practice_location,
   });

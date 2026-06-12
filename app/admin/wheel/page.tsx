@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import Header from "@/components/Header";
 
 type AdminWheelPrize = {
@@ -22,6 +23,8 @@ type AdminDoctorRegistration = {
   email: string;
   mobile: string;
   tiktok_username: string;
+  routing_slug: string;
+  redirect_url: string;
   specialty: string;
   practice_location: string;
   created_at: string;
@@ -62,7 +65,14 @@ type WheelApi = {
     adminPassword: string,
     doctor: Pick<
       AdminDoctorRegistration,
-      "id" | "full_name" | "email" | "mobile" | "tiktok_username" | "specialty" | "practice_location"
+      | "id"
+      | "full_name"
+      | "email"
+      | "mobile"
+      | "tiktok_username"
+      | "redirect_url"
+      | "specialty"
+      | "practice_location"
     >,
   ) => Promise<AdminDoctorRegistration>;
   getNewsletterSendHistory?: (adminPassword: string) => Promise<NewsletterSendHistory[]>;
@@ -91,6 +101,10 @@ const emptyPrize: AdminWheelPrize = {
   sort_order: 0,
 };
 const PAGE_SIZE_OPTIONS = [10, 20, 100];
+const PUBLIC_SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://gut-guard-doctors-html.vercel.app").replace(
+  /\/$/,
+  "",
+);
 const PLACEHOLDER_TOKENS = [
   "{{doctor_name}}",
   "{{doctor_email}}",
@@ -118,6 +132,11 @@ function getPrizeOdds(prize: AdminWheelPrize, activeWeightTotal: number) {
   }
 
   return (prize.chance_weight / activeWeightTotal) * 100;
+}
+
+function getDoctorQrUrl(doctor: AdminDoctorRegistration) {
+  if (!doctor.routing_slug) return "";
+  return `${PUBLIC_SITE_ORIGIN}/dr/${encodeURIComponent(doctor.routing_slug)}`;
 }
 
 export default function AdminWheelPage() {
@@ -175,6 +194,8 @@ export default function AdminWheelPage() {
         doctor.email,
         doctor.mobile,
         doctor.tiktok_username,
+        doctor.routing_slug,
+        doctor.redirect_url,
         doctor.specialty,
         doctor.practice_location,
         doctor.prize_label ?? "",
@@ -456,6 +477,7 @@ export default function AdminWheelPage() {
         email: editingDoctor.email.trim(),
         mobile: editingDoctor.mobile.trim(),
         tiktok_username: editingDoctor.tiktok_username.trim().replace(/^@+/, ""),
+        redirect_url: editingDoctor.redirect_url.trim(),
         specialty: editingDoctor.specialty.trim(),
         practice_location: editingDoctor.practice_location.trim(),
       });
@@ -468,6 +490,18 @@ export default function AdminWheelPage() {
       setError(caught instanceof Error ? caught.message : "Unable to update doctor details.");
     } finally {
       setIsDoctorSaving(false);
+    }
+  }
+
+  async function copyDoctorQrUrl(url: string) {
+    setError(null);
+    setNotice(null);
+
+    try {
+      await navigator.clipboard.writeText(url);
+      setNotice("Doctor QR link copied.");
+    } catch {
+      setError("Unable to copy the QR link. Please copy it from the text field instead.");
     }
   }
 
@@ -847,45 +881,67 @@ export default function AdminWheelPage() {
 
           <div className="admin-doctor-list">
             {visibleDoctors.length > 0 ? (
-              visibleDoctors.map((doctor) => (
-                <article className="admin-doctor-row" key={doctor.id}>
-                  <div className="admin-doctor-primary">
-                    <strong>{doctor.full_name || "Unnamed doctor"}</strong>
-                    <span>@{doctor.tiktok_username || "no-handle"}</span>
-                  </div>
-                  <dl className="admin-doctor-details">
-                    <div>
-                      <dt>Email</dt>
-                      <dd>{doctor.email || "--"}</dd>
+              visibleDoctors.map((doctor) => {
+                const qrUrl = getDoctorQrUrl(doctor);
+
+                return (
+                  <article className="admin-doctor-row" key={doctor.id}>
+                    <div className="admin-doctor-primary">
+                      <strong>{doctor.full_name || "Unnamed doctor"}</strong>
+                      <span>@{doctor.tiktok_username || "no-handle"}</span>
+                      {qrUrl ? (
+                        <div className="admin-doctor-qr">
+                          <QRCodeSVG value={qrUrl} size={108} marginSize={2} />
+                          <div>
+                            <small>Permanent QR route</small>
+                            <code>{qrUrl}</code>
+                            <button type="button" onClick={() => copyDoctorQrUrl(qrUrl)}>
+                              Copy QR link
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="admin-doctor-qr-missing">Run the QR redirect SQL to create this doctor&apos;s route.</p>
+                      )}
                     </div>
-                    <div>
-                      <dt>Mobile</dt>
-                      <dd>{doctor.mobile || "--"}</dd>
+                    <dl className="admin-doctor-details">
+                      <div>
+                        <dt>Email</dt>
+                        <dd>{doctor.email || "--"}</dd>
+                      </div>
+                      <div>
+                        <dt>Mobile</dt>
+                        <dd>{doctor.mobile || "--"}</dd>
+                      </div>
+                      <div>
+                        <dt>Redirect</dt>
+                        <dd>{doctor.redirect_url || "--"}</dd>
+                      </div>
+                      <div>
+                        <dt>Specialty</dt>
+                        <dd>{doctor.specialty || "--"}</dd>
+                      </div>
+                      <div>
+                        <dt>Clinic</dt>
+                        <dd>{doctor.practice_location || "--"}</dd>
+                      </div>
+                      <div>
+                        <dt>Prize</dt>
+                        <dd>{doctor.prize_label || "Not spun"}</dd>
+                      </div>
+                      <div>
+                        <dt>Registered</dt>
+                        <dd>{formatAdminDate(doctor.created_at)}</dd>
+                      </div>
+                    </dl>
+                    <div className="admin-doctor-row-actions">
+                      <button type="button" onClick={() => openDoctorEditor(doctor)}>
+                        Edit
+                      </button>
                     </div>
-                    <div>
-                      <dt>Specialty</dt>
-                      <dd>{doctor.specialty || "--"}</dd>
-                    </div>
-                    <div>
-                      <dt>Clinic</dt>
-                      <dd>{doctor.practice_location || "--"}</dd>
-                    </div>
-                    <div>
-                      <dt>Prize</dt>
-                      <dd>{doctor.prize_label || "Not spun"}</dd>
-                    </div>
-                    <div>
-                      <dt>Registered</dt>
-                      <dd>{formatAdminDate(doctor.created_at)}</dd>
-                    </div>
-                  </dl>
-                  <div className="admin-doctor-row-actions">
-                    <button type="button" onClick={() => openDoctorEditor(doctor)}>
-                      Edit
-                    </button>
-                  </div>
-                </article>
-              ))
+                  </article>
+                );
+              })
             ) : (
               <div className="admin-wheel-empty">
                 <p>{doctors.length > 0 ? "No doctors match that search." : "No doctor registrations found."}</p>
@@ -1299,6 +1355,19 @@ export default function AdminWheelPage() {
                   required
                   value={editingDoctor.tiktok_username}
                   onChange={(event) => setEditingDoctor({ ...editingDoctor, tiktok_username: event.target.value })}
+                />
+              </label>
+              <label>
+                Routing slug
+                <input value={editingDoctor.routing_slug || ""} readOnly />
+              </label>
+              <label className="admin-edit-wide">
+                Redirect link
+                <input
+                  type="url"
+                  value={editingDoctor.redirect_url || ""}
+                  placeholder="https://www.tiktok.com/@gutguardph"
+                  onChange={(event) => setEditingDoctor({ ...editingDoctor, redirect_url: event.target.value })}
                 />
               </label>
               <label>

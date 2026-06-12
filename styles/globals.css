@@ -1451,6 +1451,53 @@
   overflow-wrap: anywhere;
 }
 
+.admin-doctor-qr {
+  display: grid;
+  grid-template-columns: 108px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.admin-doctor-qr svg {
+  width: 108px;
+  height: 108px;
+  background: #fff;
+  border: 1px solid var(--rule);
+}
+
+.admin-doctor-qr small,
+.admin-doctor-qr-missing {
+  display: block;
+  color: var(--ink-3);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.admin-doctor-qr code {
+  display: block;
+  margin: 6px 0 8px;
+  color: var(--ink-2);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.admin-doctor-qr button {
+  min-height: 32px;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+.admin-doctor-qr-missing {
+  margin-top: 8px;
+  text-transform: none;
+}
+
 .admin-doctor-details {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1885,6 +1932,10 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+
+.admin-edit-wide {
+  grid-column: 1 / -1;
 }
 
 .admin-modal-actions {
