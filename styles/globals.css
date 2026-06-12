@@ -1800,6 +1800,123 @@
   color: var(--ink);
 }
 
+.admin-registration-email-status {
+  display: grid;
+  gap: 4px;
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.admin-registration-email-status span {
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.admin-registration-email-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+  gap: 18px;
+}
+
+.admin-registration-email-main {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-registration-email-main > label,
+.admin-registration-email-actions label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--ink-3);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.registration-email-toggle {
+  border: 1px solid var(--rule);
+  background: rgba(244, 241, 234, 0.54);
+  padding: 14px 16px;
+}
+
+.registration-email-upload {
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto;
+  margin-bottom: 0;
+}
+
+.admin-registration-email-actions {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  border: 1px solid var(--rule);
+  background: rgba(244, 241, 234, 0.54);
+  padding: 16px;
+}
+
+.admin-registration-email-side {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+}
+
+.admin-registration-attachments {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--rule);
+  background: rgba(244, 241, 234, 0.54);
+  padding: 16px;
+}
+
+.admin-registration-attachments > span {
+  color: var(--ink-3);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.admin-registration-attachments article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--rule-soft);
+  padding-top: 10px;
+}
+
+.admin-registration-attachments strong,
+.admin-registration-attachments small,
+.admin-registration-attachments p {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.admin-registration-attachments strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.admin-registration-attachments small,
+.admin-registration-attachments p {
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-registration-attachments button {
+  min-height: 32px;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
 .admin-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -2013,8 +2130,14 @@
   }
 
   .admin-newsletter-upload,
+  .admin-registration-email-grid,
+  .admin-registration-email-actions,
   .admin-edit-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-registration-email-status {
+    text-align: left;
   }
 }
 

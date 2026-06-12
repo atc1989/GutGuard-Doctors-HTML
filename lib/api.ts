@@ -89,6 +89,34 @@ type NewsletterResponse = {
   results: NewsletterSendResult[];
 };
 
+export type RegistrationEmailAttachment = {
+  id?: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  path?: string;
+  base64Content?: string;
+};
+
+export type RegistrationEmailSettings = {
+  enabled: boolean;
+  subject: string;
+  replyTo: string;
+  html: string;
+  attachments: RegistrationEmailAttachment[];
+  updatedAt?: string;
+  fromLabel?: string;
+};
+
+type RegistrationEmailSettingsResponse = {
+  settings: RegistrationEmailSettings;
+};
+
+type RegistrationEmailTestResponse = {
+  sent: boolean;
+  resendId?: string;
+};
+
 export async function registerDoctor(payload: RegistrationPayload) {
   if (isSupabaseConfigured && supabase) {
     const { data, error } = await supabase.rpc("register_doctor", {
@@ -289,6 +317,45 @@ export async function sendNewsletter(
 
   if (error) throw error;
   return data as NewsletterResponse;
+}
+
+export async function getRegistrationEmailSettings(adminPassword: string): Promise<RegistrationEmailSettings> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
+    body: { action: "get", adminPassword },
+  });
+
+  if (error) throw error;
+  return (data as RegistrationEmailSettingsResponse).settings;
+}
+
+export async function saveRegistrationEmailSettings(
+  adminPassword: string,
+  settings: RegistrationEmailSettings,
+): Promise<RegistrationEmailSettings> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
+    body: { action: "save", adminPassword, settings },
+  });
+
+  if (error) throw error;
+  return (data as RegistrationEmailSettingsResponse).settings;
+}
+
+export async function sendRegistrationEmailTest(
+  adminPassword: string,
+  testEmail: string,
+): Promise<RegistrationEmailTestResponse> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
+    body: { action: "test", adminPassword, testEmail },
+  });
+
+  if (error) throw error;
+  return data as RegistrationEmailTestResponse;
 }
 
 function mapClaimedPrize(row: PrizeRow | null | undefined): Prize {

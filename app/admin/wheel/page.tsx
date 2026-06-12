@@ -54,6 +54,25 @@ type NewsletterSendResult = {
   error?: string | null;
 };
 
+type RegistrationEmailAttachment = {
+  id?: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  path?: string;
+  base64Content?: string;
+};
+
+type RegistrationEmailSettings = {
+  enabled: boolean;
+  subject: string;
+  replyTo: string;
+  html: string;
+  attachments: RegistrationEmailAttachment[];
+  updatedAt?: string;
+  fromLabel?: string;
+};
+
 type WheelApi = {
   getWheelPrizes?: (adminPassword: string) => Promise<AdminWheelPrize[]>;
   saveWheelPrize?: (adminPassword: string, prize: AdminWheelPrize) => Promise<AdminWheelPrize>;
@@ -88,6 +107,12 @@ type WheelApi = {
     skipped: number;
     results: NewsletterSendResult[];
   }>;
+  getRegistrationEmailSettings?: (adminPassword: string) => Promise<RegistrationEmailSettings>;
+  saveRegistrationEmailSettings?: (
+    adminPassword: string,
+    settings: RegistrationEmailSettings,
+  ) => Promise<RegistrationEmailSettings>;
+  sendRegistrationEmailTest?: (adminPassword: string, testEmail: string) => Promise<{ sent: boolean; resendId?: string }>;
 };
 
 const emptyPrize: AdminWheelPrize = {
@@ -116,6 +141,24 @@ const PLACEHOLDER_TOKENS = [
   "{{registered_at}}",
   "{{prize_label}}",
 ];
+const REGISTRATION_EMAIL_TOKENS = [
+  "{{doctor_name}}",
+  "{{doctor_email}}",
+  "{{doctor_mobile}}",
+  "{{tiktok_username}}",
+  "{{specialty}}",
+  "{{clinic_location}}",
+  "{{routing_url}}",
+  "{{redirect_url}}",
+  "{{registered_at}}",
+];
+const emptyRegistrationEmailSettings: RegistrationEmailSettings = {
+  enabled: false,
+  subject: "",
+  replyTo: "",
+  html: "",
+  attachments: [],
+};
 
 async function loadWheelApi(): Promise<WheelApi> {
   const api = (await import("@/lib/api")) as WheelApi;
@@ -145,7 +188,7 @@ function getDoctorQrElementId(doctorId: string) {
 }
 
 export default function AdminWheelPage() {
-  const [activeTab, setActiveTab] = useState<"wheel" | "doctors" | "newsletter">("wheel");
+  const [activeTab, setActiveTab] = useState<"wheel" | "doctors" | "newsletter" | "registrationEmail">("wheel");
   const [password, setPassword] = useState("");
   const [prizes, setPrizes] = useState<AdminWheelPrize[]>([]);
   const [doctors, setDoctors] = useState<AdminDoctorRegistration[]>([]);
@@ -165,6 +208,16 @@ export default function AdminWheelPage() {
   const [newsletterFileName, setNewsletterFileName] = useState("");
   const [newsletterFileError, setNewsletterFileError] = useState<string | null>(null);
   const [showNewsletterPreview, setShowNewsletterPreview] = useState(false);
+  const [registrationEmail, setRegistrationEmail] = useState<RegistrationEmailSettings>(emptyRegistrationEmailSettings);
+  const [registrationEmailFileName, setRegistrationEmailFileName] = useState("");
+  const [registrationEmailFileError, setRegistrationEmailFileError] = useState<string | null>(null);
+  const [registrationAttachmentError, setRegistrationAttachmentError] = useState<string | null>(null);
+  const [showRegistrationEmailPreview, setShowRegistrationEmailPreview] = useState(false);
+  const [showRegistrationEmailToggleConfirm, setShowRegistrationEmailToggleConfirm] = useState(false);
+  const [pendingRegistrationEmailEnabled, setPendingRegistrationEmailEnabled] = useState(false);
+  const [registrationEmailTestAddress, setRegistrationEmailTestAddress] = useState("");
+  const [isRegistrationEmailSaving, setIsRegistrationEmailSaving] = useState(false);
+  const [isRegistrationEmailTesting, setIsRegistrationEmailTesting] = useState(false);
   const [historyDoctorId, setHistoryDoctorId] = useState<string | null>(null);
   const [editingDoctor, setEditingDoctor] = useState<AdminDoctorRegistration | null>(null);
   const [isDoctorSaving, setIsDoctorSaving] = useState(false);
@@ -279,6 +332,22 @@ export default function AdminWheelPage() {
   const canSendNewsletter =
     selectedDoctorIds.length > 0 && newsletterSubject.trim().length > 0 && newsletterHtml.trim().length > 0;
   const previewHtml = useMemo(() => renderNewsletterPreview(newsletterHtml), [newsletterHtml]);
+  const detectedRegistrationEmailPlaceholders = useMemo(() => {
+    return Array.from(new Set(registrationEmail.html.match(/\{\{\s*[a-zA-Z0-9_]+\s*\}\}/g) ?? [])).map((token) =>
+      token.replace(/\s+/g, ""),
+    );
+  }, [registrationEmail.html]);
+  const registrationEmailPreviewHtml = useMemo(
+    () => renderRegistrationEmailPreview(registrationEmail.html),
+    [registrationEmail.html],
+  );
+  const canSaveRegistrationEmail =
+    !registrationEmail.enabled ||
+    (registrationEmail.subject.trim().length > 0 && registrationEmail.html.trim().length > 0);
+  const canTestRegistrationEmail =
+    registrationEmail.subject.trim().length > 0 &&
+    registrationEmail.html.trim().length > 0 &&
+    registrationEmailTestAddress.trim().length > 0;
 
   useEffect(() => {
     if (!newsletterToast) return;
@@ -302,14 +371,19 @@ export default function AdminWheelPage() {
         throw new Error("Missing getWheelPrizes helper in lib/api.ts.");
       }
 
-      const [loadedPrizes, loadedDoctors, loadedNewsletterHistory] = await Promise.all([
+      const [loadedPrizes, loadedDoctors, loadedNewsletterHistory, loadedRegistrationEmail] = await Promise.all([
         api.getWheelPrizes(password),
         api.getDoctorRegistrations ? api.getDoctorRegistrations(password) : Promise.resolve([]),
         api.getNewsletterSendHistory ? api.getNewsletterSendHistory(password) : Promise.resolve([]),
+        api.getRegistrationEmailSettings
+          ? api.getRegistrationEmailSettings(password)
+          : Promise.resolve(emptyRegistrationEmailSettings),
       ]);
       setPrizes(loadedPrizes.sort((a, b) => a.sort_order - b.sort_order));
       setDoctors(loadedDoctors);
       setNewsletterHistory(loadedNewsletterHistory);
+      setRegistrationEmail(loadedRegistrationEmail);
+      setRegistrationEmailFileName(loadedRegistrationEmail.html ? "Saved registration email HTML" : "");
       setDoctorPage(1);
       setNewsletterPage(1);
       setIsUnlocked(true);
@@ -400,6 +474,171 @@ export default function AdminWheelPage() {
 
     if (!newsletterSubject.trim()) {
       setNewsletterSubject(file.name.replace(/\.html?$/i, "").replace(/[-_]+/g, " "));
+    }
+  }
+
+  async function handleRegistrationEmailUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    setRegistrationEmailFileError(null);
+
+    if (!file) {
+      setRegistrationEmailFileName("");
+      setRegistrationEmail((current) => ({ ...current, html: "" }));
+      return;
+    }
+
+    if (!file.name.toLowerCase().endsWith(".html") && file.type !== "text/html") {
+      setRegistrationEmailFileName("");
+      setRegistrationEmailFileError("Please upload a .html email template.");
+      return;
+    }
+
+    if (file.size > 250_000) {
+      setRegistrationEmailFileName("");
+      setRegistrationEmailFileError("Please keep the HTML file under 250 KB.");
+      return;
+    }
+
+    const content = await file.text();
+    setRegistrationEmailFileName(file.name);
+    setRegistrationEmail((current) => ({
+      ...current,
+      html: content,
+      subject: current.subject || file.name.replace(/\.html?$/i, "").replace(/[-_]+/g, " "),
+    }));
+  }
+
+  async function handleRegistrationAttachmentUpload(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    setRegistrationAttachmentError(null);
+    event.target.value = "";
+
+    if (files.length === 0) return;
+
+    const currentAttachments = registrationEmail.attachments;
+    if (currentAttachments.length + files.length > 5) {
+      setRegistrationAttachmentError("Upload up to 5 attachments only.");
+      return;
+    }
+
+    const nextFiles: RegistrationEmailAttachment[] = [];
+    let totalBytes = currentAttachments.reduce((sum, item) => sum + item.size, 0);
+
+    for (const file of files) {
+      if (!["application/pdf", "image/png", "image/jpeg"].includes(file.type)) {
+        setRegistrationAttachmentError(`${file.name} must be a PDF, PNG, or JPG.`);
+        return;
+      }
+
+      if (file.size > 10 * 1024 * 1024) {
+        setRegistrationAttachmentError(`${file.name} must be 10 MB or smaller.`);
+        return;
+      }
+
+      totalBytes += file.size;
+      if (totalBytes > 20 * 1024 * 1024) {
+        setRegistrationAttachmentError("Total attachments must be 20 MB or smaller.");
+        return;
+      }
+
+      nextFiles.push({
+        id: `local-${crypto.randomUUID()}`,
+        filename: file.name,
+        contentType: file.type,
+        size: file.size,
+        base64Content: await fileToBase64(file),
+      });
+    }
+
+    setRegistrationEmail((current) => ({
+      ...current,
+      attachments: [...current.attachments, ...nextFiles],
+    }));
+  }
+
+  function removeRegistrationAttachment(index: number) {
+    setRegistrationAttachmentError(null);
+    setRegistrationEmail((current) => ({
+      ...current,
+      attachments: current.attachments.filter((_, currentIndex) => currentIndex !== index),
+    }));
+  }
+
+  function requestRegistrationEmailToggle(enabled: boolean) {
+    setPendingRegistrationEmailEnabled(enabled);
+    setShowRegistrationEmailToggleConfirm(true);
+  }
+
+  function confirmRegistrationEmailToggle() {
+    setRegistrationEmail((current) => ({ ...current, enabled: pendingRegistrationEmailEnabled }));
+    setShowRegistrationEmailToggleConfirm(false);
+    setNotice(pendingRegistrationEmailEnabled ? "Registration email enabled. Save settings to apply." : "Registration email disabled. Save settings to apply.");
+  }
+
+  async function saveRegistrationEmailSettings() {
+    if (registrationEmail.enabled && (!registrationEmail.subject.trim() || !registrationEmail.html.trim())) {
+      setError("Add a subject and HTML template before enabling the registration email.");
+      return;
+    }
+
+    setError(null);
+    setNotice(null);
+    setIsRegistrationEmailSaving(true);
+
+    try {
+      const api = await loadWheelApi();
+      if (!api.saveRegistrationEmailSettings) {
+        throw new Error("Missing saveRegistrationEmailSettings helper in lib/api.ts.");
+      }
+
+      const saved = await api.saveRegistrationEmailSettings(password, {
+        ...registrationEmail,
+        subject: registrationEmail.subject.trim(),
+        replyTo: registrationEmail.replyTo.trim(),
+        html: registrationEmail.html.trim(),
+      });
+      setRegistrationEmail(saved);
+      setRegistrationEmailFileName(saved.html ? "Saved registration email HTML" : "");
+      setNotice("Registration email settings saved.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to save registration email settings.");
+    } finally {
+      setIsRegistrationEmailSaving(false);
+    }
+  }
+
+  async function sendRegistrationEmailTest() {
+    if (!canTestRegistrationEmail) {
+      setError("Enter a subject, upload an HTML template, and add a test email.");
+      return;
+    }
+
+    setError(null);
+    setNotice(null);
+    setIsRegistrationEmailTesting(true);
+
+    try {
+      const api = await loadWheelApi();
+      if (!api.saveRegistrationEmailSettings) {
+        throw new Error("Missing saveRegistrationEmailSettings helper in lib/api.ts.");
+      }
+      if (!api.sendRegistrationEmailTest) {
+        throw new Error("Missing sendRegistrationEmailTest helper in lib/api.ts.");
+      }
+
+      const saved = await api.saveRegistrationEmailSettings(password, {
+        ...registrationEmail,
+        subject: registrationEmail.subject.trim(),
+        replyTo: registrationEmail.replyTo.trim(),
+        html: registrationEmail.html.trim(),
+      });
+      setRegistrationEmail(saved);
+      await api.sendRegistrationEmailTest(password, registrationEmailTestAddress.trim());
+      setNotice(`Test registration email sent to ${registrationEmailTestAddress.trim()}.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to send test registration email.");
+    } finally {
+      setIsRegistrationEmailTesting(false);
     }
   }
 
@@ -623,21 +862,29 @@ export default function AdminWheelPage() {
               ? `${prizes.length} prizes`
               : activeTab === "doctors"
                 ? `${doctors.length} doctors`
-                : `${selectedDoctorIds.length} selected`}
+                : activeTab === "newsletter"
+                  ? `${selectedDoctorIds.length} selected`
+                  : registrationEmail.enabled
+                    ? "enabled"
+                    : "disabled"}
           </span>
           <strong>
             {activeTab === "wheel"
               ? activeWeightTotal
               : activeTab === "doctors"
                 ? doctors.length
-                : selectedDoctorIds.length}
+                : activeTab === "newsletter"
+                  ? selectedDoctorIds.length
+                  : registrationEmail.attachments.length}
           </strong>
           <span>
             {activeTab === "wheel"
               ? "active weight"
               : activeTab === "doctors"
                 ? "registrations"
-                : "newsletter recipients"}
+                : activeTab === "newsletter"
+                  ? "newsletter recipients"
+                  : "attachments"}
           </span>
         </div>
       </section>
@@ -663,6 +910,13 @@ export default function AdminWheelPage() {
           type="button"
         >
           Newsletter
+        </button>
+        <button
+          className={activeTab === "registrationEmail" ? "active" : ""}
+          onClick={() => setActiveTab("registrationEmail")}
+          type="button"
+        >
+          Registration Email
         </button>
       </nav>
 
@@ -1269,6 +1523,227 @@ export default function AdminWheelPage() {
         </section>
       ) : null}
 
+      {isUnlocked && activeTab === "registrationEmail" ? (
+        <section className="admin-wheel-panel">
+          <div className="admin-wheel-panel-head">
+            <div>
+              <p className="admin-wheel-kicker">Automatic Email</p>
+              <h2>Registration Email</h2>
+            </div>
+            <div className="admin-registration-email-status">
+              <span>{registrationEmail.enabled ? "Enabled" : "Disabled"}</span>
+              {registrationEmail.updatedAt ? <small>Updated {formatAdminDate(registrationEmail.updatedAt)}</small> : null}
+            </div>
+          </div>
+
+          <div className="admin-registration-email-grid">
+            <div className="admin-registration-email-main">
+              <label className="admin-wheel-toggle registration-email-toggle">
+                <input
+                  type="checkbox"
+                  checked={registrationEmail.enabled}
+                  onChange={(event) => requestRegistrationEmailToggle(event.target.checked)}
+                />
+                Send automatically after registration
+              </label>
+
+              <label htmlFor="registration-email-subject">
+                Subject
+                <input
+                  id="registration-email-subject"
+                  value={registrationEmail.subject}
+                  placeholder="Welcome to GutGuard Doctors"
+                  onChange={(event) => setRegistrationEmail({ ...registrationEmail, subject: event.target.value })}
+                />
+              </label>
+
+              <label htmlFor="registration-email-reply-to">
+                Reply-to email
+                <input
+                  id="registration-email-reply-to"
+                  type="email"
+                  value={registrationEmail.replyTo}
+                  placeholder="hello@gutguard.ph"
+                  onChange={(event) => setRegistrationEmail({ ...registrationEmail, replyTo: event.target.value })}
+                />
+              </label>
+
+              <label htmlFor="registration-email-from">
+                From label
+                <input id="registration-email-from" value={registrationEmail.fromLabel ?? "Configured in Edge Function"} readOnly />
+              </label>
+
+              <div className="admin-newsletter-upload registration-email-upload">
+                <label htmlFor="registration-email-html-file">
+                  Upload HTML template
+                  <input
+                    id="registration-email-html-file"
+                    type="file"
+                    accept=".html,text/html"
+                    onChange={handleRegistrationEmailUpload}
+                  />
+                </label>
+                <label htmlFor="registration-email-attachments">
+                  Upload attachments
+                  <input
+                    id="registration-email-attachments"
+                    type="file"
+                    accept=".pdf,application/pdf,.png,image/png,.jpg,.jpeg,image/jpeg"
+                    multiple
+                    onChange={handleRegistrationAttachmentUpload}
+                  />
+                </label>
+                <button
+                  className="admin-newsletter-upload-action"
+                  type="button"
+                  onClick={() => setShowRegistrationEmailPreview(true)}
+                  disabled={registrationEmail.html.trim().length === 0}
+                >
+                  Preview HTML
+                </button>
+              </div>
+
+              <div className="admin-registration-email-actions">
+                <button
+                  type="button"
+                  onClick={saveRegistrationEmailSettings}
+                  disabled={isRegistrationEmailSaving || !canSaveRegistrationEmail}
+                >
+                  {isRegistrationEmailSaving ? "Saving" : "Save settings"}
+                </button>
+                <label htmlFor="registration-email-test">
+                  Test email
+                  <input
+                    id="registration-email-test"
+                    type="email"
+                    value={registrationEmailTestAddress}
+                    placeholder="you@example.com"
+                    onChange={(event) => setRegistrationEmailTestAddress(event.target.value)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={sendRegistrationEmailTest}
+                  disabled={isRegistrationEmailTesting || !canTestRegistrationEmail}
+                >
+                  {isRegistrationEmailTesting ? "Sending" : "Send test"}
+                </button>
+              </div>
+            </div>
+
+            <aside className="admin-registration-email-side">
+              <div className="admin-newsletter-placeholder-box">
+                <p>{registrationEmailFileName || "No registration HTML uploaded yet."}</p>
+                {registrationEmailFileError ? <strong>{registrationEmailFileError}</strong> : null}
+                {registrationAttachmentError ? <strong>{registrationAttachmentError}</strong> : null}
+                <span>Available placeholders</span>
+                <div>
+                  {REGISTRATION_EMAIL_TOKENS.map((token) => (
+                    <code key={token}>{token}</code>
+                  ))}
+                </div>
+                {detectedRegistrationEmailPlaceholders.length > 0 ? (
+                  <>
+                    <span>Detected in uploaded HTML</span>
+                    <div>
+                      {detectedRegistrationEmailPlaceholders.map((token) => (
+                        <code key={token}>{token}</code>
+                      ))}
+                    </div>
+                  </>
+                ) : null}
+              </div>
+
+              <div className="admin-registration-attachments">
+                <span>Attachments</span>
+                {registrationEmail.attachments.length > 0 ? (
+                  registrationEmail.attachments.map((attachment, index) => (
+                    <article key={attachment.path ?? attachment.id ?? `${attachment.filename}-${index}`}>
+                      <div>
+                        <strong>{attachment.filename}</strong>
+                        <small>
+                          {attachment.contentType} - {formatFileSize(attachment.size)}
+                        </small>
+                      </div>
+                      <button type="button" onClick={() => removeRegistrationAttachment(index)}>
+                        Remove
+                      </button>
+                    </article>
+                  ))
+                ) : (
+                  <p>No attachments uploaded.</p>
+                )}
+              </div>
+            </aside>
+          </div>
+        </section>
+      ) : null}
+
+      {showRegistrationEmailPreview ? (
+        <div className="admin-modal-backdrop" role="presentation">
+          <section
+            className="admin-modal admin-newsletter-preview-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="registration-email-preview-title"
+          >
+            <div className="admin-modal-head">
+              <div>
+                <p className="admin-wheel-kicker">Registration Email Preview</p>
+                <h2 id="registration-email-preview-title">{registrationEmail.subject || "Uploaded HTML"}</h2>
+              </div>
+              <button type="button" onClick={() => setShowRegistrationEmailPreview(false)}>
+                Close
+              </button>
+            </div>
+            <iframe
+              className="admin-newsletter-preview-frame"
+              title="Registration email HTML preview"
+              sandbox=""
+              srcDoc={registrationEmailPreviewHtml}
+            />
+          </section>
+        </div>
+      ) : null}
+
+      {showRegistrationEmailToggleConfirm ? (
+        <div className="admin-modal-backdrop" role="presentation">
+          <section
+            className="admin-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="registration-email-toggle-title"
+          >
+            <div className="admin-modal-head">
+              <div>
+                <p className="admin-wheel-kicker">Confirm Change</p>
+                <h2 id="registration-email-toggle-title">
+                  {pendingRegistrationEmailEnabled ? "Enable registration email?" : "Disable registration email?"}
+                </h2>
+              </div>
+              <button type="button" onClick={() => setShowRegistrationEmailToggleConfirm(false)}>
+                Close
+              </button>
+            </div>
+            <div className="admin-modal-body">
+              <p>
+                {pendingRegistrationEmailEnabled
+                  ? "New doctor registrations will receive this saved email automatically."
+                  : "New doctor registrations will no longer receive the automatic registration email."}
+              </p>
+            </div>
+            <div className="admin-modal-actions">
+              <button type="button" onClick={() => setShowRegistrationEmailToggleConfirm(false)}>
+                Cancel
+              </button>
+              <button type="button" onClick={confirmRegistrationEmailToggle}>
+                Confirm
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       {showNewsletterPreview ? (
         <div className="admin-modal-backdrop" role="presentation">
           <section
@@ -1494,6 +1969,43 @@ function renderNewsletterPreview(html: string) {
   return html.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, key: string) => {
     if (!(key in replacements)) return match;
     return escapeHtml(replacements[key]);
+  });
+}
+
+function renderRegistrationEmailPreview(html: string) {
+  const replacements: Record<string, string> = {
+    doctor_name: "Dr. Maria Santos",
+    doctor_email: "doctor@example.com",
+    doctor_mobile: "09171234567",
+    tiktok_username: "gutguarddoctor",
+    specialty: "Internal Medicine",
+    clinic_location: "Makati City",
+    routing_url: "https://gut-guard-doctors-html.vercel.app/dr/maria-santos",
+    redirect_url: "https://www.tiktok.com/@gutguarddoctor",
+    registered_at: "Jun 12, 2026",
+  };
+
+  return html.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, key: string) => {
+    if (!(key in replacements)) return match;
+    return escapeHtml(replacements[key]);
+  });
+}
+
+function formatFileSize(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 KB";
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${Math.ceil(bytes / 1024)} KB`;
+}
+
+function fileToBase64(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result ?? "");
+      resolve(result.includes(",") ? result.split(",")[1] : result);
+    };
+    reader.onerror = () => reject(new Error(`${file.name} could not be read.`));
+    reader.readAsDataURL(file);
   });
 }
 

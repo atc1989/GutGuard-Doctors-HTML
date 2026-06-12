@@ -1,5 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.106.2";
 
+const BUCKET = "registration-email-assets";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -10,39 +12,26 @@ type ProposalRequest = {
   registrationId?: string;
 };
 
-type AttachmentConfig = {
-  filename: string;
-  path: string;
-  required?: boolean;
+type DoctorRegistration = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  mobile: string | null;
+  tiktok_username: string | null;
+  specialty: string | null;
+  practice_location: string | null;
+  routing_slug: string | null;
+  redirect_url: string | null;
+  created_at: string | null;
 };
 
-const ATTACHMENTS: AttachmentConfig[] = [
-  {
-    filename: "01_TikTok_Affiliate_Onboarding.pdf",
-    path: "/01_TikTok_Affiliate_Onboarding.pdf",
-  },
-  {
-    filename: "02_LCA_Compensation_Program.pdf",
-    path: "/02_LCA_Compensation_Program.pdf",
-  },
-  {
-    filename: "03_LCA_Short_Form_Consent.pdf",
-    path: "/03_LCA_Short_Form_Consent.pdf",
-  },
-  {
-    filename: "04_LCA_Detailed_Terms_Annex.pdf",
-    path: "/04_LCA_Detailed_Terms_Annex.pdf",
-  },
-  {
-    filename: "05_LCA_Announcements_and_FAQ.pdf",
-    path: "/05_LCA_Announcements_and_FAQ.pdf",
-  },
-  {
-    filename: "06_LCA_Clinical_Dosing_Guide.pdf",
-    path: "/06_LCA_Clinical_Dosing_Guide.pdf",
-    required: false,
-  },
-];
+type AttachmentRecord = {
+  id: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  path: string;
+};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -55,14 +44,13 @@ Deno.serve(async (req) => {
 
   try {
     const { registrationId } = (await req.json()) as ProposalRequest;
-    if (!registrationId) {
-      return jsonResponse({ error: "Missing registrationId" }, 400);
-    }
+    if (!registrationId) return jsonResponse({ error: "Missing registrationId" }, 400);
 
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
     const fromEmail =
-      Deno.env.get("PROPOSAL_FROM_EMAIL") ?? "GutGuard Doctors <onboarding@resend.dev>";
-    const attachmentBaseUrl = getAttachmentBaseUrl();
+      Deno.env.get("REGISTRATION_FROM_EMAIL") ??
+      Deno.env.get("PROPOSAL_FROM_EMAIL") ??
+      "GutGuard Doctors <onboarding@resend.dev>";
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -73,7 +61,9 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const { data: registration, error: registrationError } = await supabase
       .from("doctor_registrations")
-      .select("full_name, email")
+      .select(
+        "id, full_name, email, mobile, tiktok_username, specialty, practice_location, routing_slug, redirect_url, created_at",
+      )
       .eq("id", registrationId)
       .single();
 
@@ -81,21 +71,38 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Registration not found" }, 404);
     }
 
-    const { count: registeredCount, error: countError } = await supabase
-      .from("doctor_registrations")
-      .select("id", { count: "exact", head: true });
-
-    if (countError) {
-      return jsonResponse({ error: "Registration count could not be fetched" }, 500);
+    const doctor = registration as DoctorRegistration;
+    const email = (doctor.email ?? "").trim().toLowerCase();
+    if (!isValidEmail(email)) {
+      await recordSendAttempt(supabase, {
+        registrationId,
+        email,
+        subject: "",
+        status: "skipped",
+        errorMessage: "Missing or invalid email address",
+      });
+      return jsonResponse({ sent: false, skipped: true, reason: "Missing or invalid email address" });
     }
 
-    const attachmentResults = await Promise.all(
-      ATTACHMENTS.map((attachment) => fetchAttachment(attachmentBaseUrl, attachment)),
-    );
-    const attachments = attachmentResults
-      .filter((item): item is { filename: string; content: string } => item !== null);
+    const { data: settings, error: settingsError } = await supabase
+      .from("registration_email_settings")
+      .select("enabled, subject, reply_to, html_template, attachments")
+      .eq("id", 1)
+      .single();
 
+    if (settingsError || !settings?.enabled || !settings.subject || !settings.html_template) {
+      await recordSendAttempt(supabase, {
+        registrationId,
+        email,
+        subject: String(settings?.subject ?? ""),
+        status: "skipped",
+        errorMessage: "Registration email is disabled or incomplete",
+      });
+      return jsonResponse({ sent: false, skipped: true, reason: "Registration email is disabled or incomplete" });
+    }
 
+    const attachments = await fetchAttachments(supabase, parseAttachments(settings.attachments));
+    const subject = String(settings.subject).trim();
     const resendResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -104,98 +111,148 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         from: fromEmail,
-        to: [registration.email],
-        subject: "Gutguard Doctors TikTok Proposal",
-        html: proposalEmailHtml(registration.full_name, Math.min(registeredCount ?? 1, 100)),
+        to: [email],
+        subject,
+        html: renderDoctorTemplate(String(settings.html_template), doctor),
+        reply_to: String(settings.reply_to ?? "").trim() || undefined,
         attachments,
       }),
     });
 
     const resendBody = await resendResponse.json();
     if (!resendResponse.ok) {
+      const message = stringifyError(resendBody);
+      await recordSendAttempt(supabase, {
+        registrationId,
+        email,
+        subject,
+        status: "failed",
+        errorMessage: message,
+      });
       return jsonResponse({ error: "Email send failed", details: resendBody }, 502);
     }
 
+    await recordSendAttempt(supabase, {
+      registrationId,
+      email,
+      subject,
+      status: "sent",
+      resendId: resendBody.id,
+    });
     return jsonResponse({ sent: true, resendId: resendBody.id });
   } catch (error) {
-    return jsonResponse(
-      { error: error instanceof Error ? error.message : "Unexpected error" },
-      500,
-    );
+    return jsonResponse({ error: error instanceof Error ? error.message : "Unexpected error" }, 500);
   }
 });
 
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      ...corsHeaders,
-      "Content-Type": "application/json",
-    },
+async function fetchAttachments(supabase: ReturnType<typeof createClient>, attachments: AttachmentRecord[]) {
+  const results = [];
+
+  for (const attachment of attachments) {
+    const { data, error } = await supabase.storage.from(BUCKET).download(attachment.path);
+    if (error || !data) throw new Error(`${attachment.filename} could not be read from storage.`);
+
+    results.push({
+      filename: attachment.filename,
+      content: toBase64(new Uint8Array(await data.arrayBuffer())),
+    });
+  }
+
+  return results;
+}
+
+async function recordSendAttempt(
+  supabase: ReturnType<typeof createClient>,
+  input: {
+    registrationId?: string | null;
+    email: string;
+    subject: string;
+    status: "sent" | "failed" | "skipped" | "test";
+    resendId?: string | null;
+    errorMessage?: string | null;
+  },
+) {
+  await supabase.from("registration_email_sends").insert({
+    registration_id: input.registrationId ?? null,
+    email: input.email,
+    subject: input.subject,
+    status: input.status,
+    resend_id: input.resendId ?? null,
+    error_message: input.errorMessage ?? null,
   });
+}
+
+function renderDoctorTemplate(html: string, doctor: DoctorRegistration) {
+  const routingSlug = doctor.routing_slug || slugifyDoctorRoute(doctor.full_name);
+  const tiktokUsername = (doctor.tiktok_username ?? "").trim().replace(/^@+/, "").toLowerCase();
+  const routingUrl = `${getSiteOrigin()}/dr/${routingSlug}`;
+  const replacements: Record<string, string> = {
+    doctor_name: doctor.full_name ?? "",
+    doctor_email: doctor.email ?? "",
+    doctor_mobile: doctor.mobile ?? "",
+    tiktok_username: tiktokUsername,
+    specialty: doctor.specialty ?? "",
+    clinic_location: doctor.practice_location ?? "",
+    routing_url: routingUrl,
+    redirect_url: doctor.redirect_url ?? (tiktokUsername ? `https://www.tiktok.com/@${tiktokUsername}` : ""),
+    registered_at: formatDate(doctor.created_at),
+  };
+
+  return stripScriptTags(html).replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, key: string) => {
+    if (!(key in replacements)) return match;
+    return escapeHtml(replacements[key]);
+  });
+}
+
+function parseAttachments(value: unknown): AttachmentRecord[] {
+  return Array.isArray(value) ? (value as AttachmentRecord[]) : [];
 }
 
 function toBase64(bytes: Uint8Array) {
   let binary = "";
   const chunkSize = 0x8000;
-
   for (let index = 0; index < bytes.length; index += chunkSize) {
-    const chunk = bytes.subarray(index, index + chunkSize);
-    binary += String.fromCharCode(...chunk);
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
   }
-
   return btoa(binary);
 }
 
-function getAttachmentBaseUrl() {
-  const explicitBaseUrl = Deno.env.get("ATTACHMENT_BASE_URL") ?? Deno.env.get("PUBLIC_SITE_URL");
-  if (explicitBaseUrl) return explicitBaseUrl.replace(/\/$/, "");
-
-  const legacyPdfUrl = Deno.env.get("PROPOSAL_PDF_URL");
-  if (legacyPdfUrl) return new URL(legacyPdfUrl).origin;
-
-  return "https://gut-guard-doctors-html.vercel.app";
+function getSiteOrigin() {
+  return (Deno.env.get("PUBLIC_SITE_URL") ?? "https://gut-guard-doctors-html.vercel.app").replace(/\/$/, "");
 }
 
-async function fetchAttachment(baseUrl: string, attachment: AttachmentConfig) {
-  const response = await fetch(`${baseUrl}${attachment.path}`);
-  if (!response.ok) {
-    if (attachment.required === false) {
-      console.warn(`Optional attachment skipped: ${attachment.filename}`);
-      return null;
-    }
+function slugifyDoctorRoute(value: string | null | undefined) {
+  const slug = (value ?? "doctor")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 
-    throw new Error(`${attachment.filename} could not be fetched`);
+  return slug || "doctor";
+}
+
+function formatDate(value: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
+
+function stripScriptTags(value: string) {
+  return value.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function stringifyError(value: unknown) {
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "Email send failed";
   }
-
-  const bytes = new Uint8Array(await response.arrayBuffer());
-
-  return {
-    filename: attachment.filename,
-    content: toBase64(bytes),
-  };
-}
-
-function proposalEmailHtml(fullName: string, registeredCount: number) {
-  const safeName = escapeHtml(fullName);
-
-  return `
-    <div style="font-family:Arial,sans-serif;color:#0F0F18;line-height:1.6">
-      <p>&#127807; Welcome, Doctor ${safeName}.</p>
-      <p>
-        You're now part of the GutGuard Lead Clinical Adopter (LCA)<br/>
-        community. Read this pinned message first &mdash; it saves<br/>
-        you (and us) repeat questions later.
-      </p>
-      <p>
-        &bull; Founding cohort: 100 physicians, lifetime designation<br/>
-        &bull; Active pilot: First 20 LCAs, 90-day program<br/>
-        &bull; Waitlist: Positions 21&ndash;100, activated post-pilot
-      </p>
-      <p>Current slot count: ${registeredCount} of 100 confirmed.</p>
-      <p>Please see attached email for your perusal.</p>
-    </div>
-  `;
 }
 
 function escapeHtml(value: string) {
@@ -205,4 +262,14 @@ function escapeHtml(value: string) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "application/json",
+    },
+  });
 }
