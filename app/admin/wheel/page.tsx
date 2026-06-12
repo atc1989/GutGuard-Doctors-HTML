@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import Header from "@/components/Header";
 
 type AdminWheelPrize = {
@@ -152,6 +152,7 @@ export default function AdminWheelPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [newsletterToast, setNewsletterToast] = useState<string | null>(null);
 
   const activeWeightTotal = useMemo(
     () =>
@@ -261,6 +262,16 @@ export default function AdminWheelPage() {
     newsletterHtml,
     previewDoctor,
   ]);
+
+  useEffect(() => {
+    if (!newsletterToast) return;
+
+    const timeout = window.setTimeout(() => {
+      setNewsletterToast(null);
+    }, 5200);
+
+    return () => window.clearTimeout(timeout);
+  }, [newsletterToast]);
 
   async function handleUnlock(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -405,6 +416,9 @@ export default function AdminWheelPage() {
         newsletterHtml,
       );
       setNewsletterResults(response.results);
+      setNewsletterToast(
+        `Newsletter sent: ${response.sent} sent, ${response.failed} failed, ${response.skipped} skipped.`,
+      );
       setNotice(
         `Newsletter complete: ${response.sent} sent, ${response.failed} failed, ${response.skipped} skipped.`,
       );
@@ -613,6 +627,17 @@ export default function AdminWheelPage() {
 
       {error ? <div className="admin-wheel-alert error">{error}</div> : null}
       {notice ? <div className="admin-wheel-alert">{notice}</div> : null}
+      {newsletterToast ? (
+        <div className="admin-toast" role="status" aria-live="polite">
+          <div>
+            <strong>Newsletter send complete</strong>
+            <span>{newsletterToast}</span>
+          </div>
+          <button type="button" onClick={() => setNewsletterToast(null)} aria-label="Dismiss notification">
+            Close
+          </button>
+        </div>
+      ) : null}
 
       {isUnlocked && activeTab === "wheel" ? (
         <>
