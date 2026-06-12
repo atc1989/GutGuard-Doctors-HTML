@@ -214,9 +214,11 @@ export default function AdminWheelPage() {
   const [registrationAttachmentError, setRegistrationAttachmentError] = useState<string | null>(null);
   const [showRegistrationEmailPreview, setShowRegistrationEmailPreview] = useState(false);
   const [showRegistrationEmailToggleConfirm, setShowRegistrationEmailToggleConfirm] = useState(false);
+  const [showRegistrationEmailRemoveHtmlConfirm, setShowRegistrationEmailRemoveHtmlConfirm] = useState(false);
   const [pendingRegistrationEmailEnabled, setPendingRegistrationEmailEnabled] = useState(false);
   const [registrationEmailTestAddress, setRegistrationEmailTestAddress] = useState("");
   const [isRegistrationEmailSaving, setIsRegistrationEmailSaving] = useState(false);
+  const [isRegistrationEmailRemovingHtml, setIsRegistrationEmailRemovingHtml] = useState(false);
   const [isRegistrationEmailTesting, setIsRegistrationEmailTesting] = useState(false);
   const [historyDoctorId, setHistoryDoctorId] = useState<string | null>(null);
   const [editingDoctor, setEditingDoctor] = useState<AdminDoctorRegistration | null>(null);
@@ -604,6 +606,34 @@ export default function AdminWheelPage() {
       setError(caught instanceof Error ? caught.message : "Unable to save registration email settings.");
     } finally {
       setIsRegistrationEmailSaving(false);
+    }
+  }
+
+  async function removeRegistrationEmailHtml() {
+    setError(null);
+    setNotice(null);
+    setIsRegistrationEmailRemovingHtml(true);
+
+    try {
+      const api = await loadWheelApi();
+      if (!api.saveRegistrationEmailSettings) {
+        throw new Error("Missing saveRegistrationEmailSettings helper in lib/api.ts.");
+      }
+
+      const saved = await api.saveRegistrationEmailSettings(password, {
+        ...registrationEmail,
+        enabled: false,
+        html: "",
+      });
+      setRegistrationEmail(saved);
+      setRegistrationEmailFileName("");
+      setRegistrationEmailFileError(null);
+      setShowRegistrationEmailRemoveHtmlConfirm(false);
+      setNotice("Registration email HTML removed and automatic sending disabled.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to remove registration email HTML.");
+    } finally {
+      setIsRegistrationEmailRemovingHtml(false);
     }
   }
 
@@ -1633,7 +1663,18 @@ export default function AdminWheelPage() {
 
             <aside className="admin-registration-email-side">
               <div className="admin-newsletter-placeholder-box">
-                <p>{registrationEmailFileName || "No registration HTML uploaded yet."}</p>
+                <div className="admin-registration-html-status">
+                  <p>{registrationEmailFileName || "No registration HTML uploaded yet."}</p>
+                  {registrationEmail.html.trim() ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowRegistrationEmailRemoveHtmlConfirm(true)}
+                      disabled={isRegistrationEmailRemovingHtml}
+                    >
+                      Remove HTML
+                    </button>
+                  ) : null}
+                </div>
                 {registrationEmailFileError ? <strong>{registrationEmailFileError}</strong> : null}
                 {registrationAttachmentError ? <strong>{registrationAttachmentError}</strong> : null}
                 <span>Available placeholders</span>
@@ -1738,6 +1779,49 @@ export default function AdminWheelPage() {
               </button>
               <button type="button" onClick={confirmRegistrationEmailToggle}>
                 Confirm
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {showRegistrationEmailRemoveHtmlConfirm ? (
+        <div className="admin-modal-backdrop" role="presentation">
+          <section
+            className="admin-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="registration-email-remove-html-title"
+          >
+            <div className="admin-modal-head">
+              <div>
+                <p className="admin-wheel-kicker">Remove Template</p>
+                <h2 id="registration-email-remove-html-title">Remove saved HTML?</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRegistrationEmailRemoveHtmlConfirm(false)}
+                disabled={isRegistrationEmailRemovingHtml}
+              >
+                Close
+              </button>
+            </div>
+            <div className="admin-modal-body">
+              <p>
+                This will remove the saved registration email HTML and disable automatic registration emails until a
+                new template is uploaded and enabled.
+              </p>
+            </div>
+            <div className="admin-modal-actions">
+              <button
+                type="button"
+                onClick={() => setShowRegistrationEmailRemoveHtmlConfirm(false)}
+                disabled={isRegistrationEmailRemovingHtml}
+              >
+                Cancel
+              </button>
+              <button type="button" onClick={removeRegistrationEmailHtml} disabled={isRegistrationEmailRemovingHtml}>
+                {isRegistrationEmailRemovingHtml ? "Removing" : "Remove HTML"}
               </button>
             </div>
           </section>

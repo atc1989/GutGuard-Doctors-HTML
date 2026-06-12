@@ -1867,6 +1867,24 @@
   gap: 16px;
 }
 
+.admin-registration-html-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-registration-html-status p {
+  min-width: 0;
+}
+
+.admin-registration-html-status button {
+  min-height: 32px;
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
 .admin-registration-attachments {
   display: grid;
   gap: 10px;
