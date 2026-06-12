@@ -102,6 +102,7 @@ export type RegistrationEmailSettings = {
   enabled: boolean;
   subject: string;
   replyTo: string;
+  bodyText: string;
   html: string;
   attachments: RegistrationEmailAttachment[];
   updatedAt?: string;

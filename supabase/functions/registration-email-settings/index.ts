@@ -33,6 +33,7 @@ type SettingsPayload = {
   enabled?: boolean;
   subject?: string;
   replyTo?: string;
+  bodyText?: string;
   html?: string;
   attachments?: AttachmentInput[];
 };
@@ -95,7 +96,7 @@ Deno.serve(async (req) => {
 async function getSettings(supabase: ReturnType<typeof createClient>) {
   const { data, error } = await supabase
     .from("registration_email_settings")
-    .select("id, enabled, subject, reply_to, html_template, attachments, updated_at")
+    .select("id, enabled, subject, reply_to, body_text, html_template, attachments, updated_at")
     .eq("id", 1)
     .single();
 
@@ -125,11 +126,12 @@ async function saveSettings(supabase: ReturnType<typeof createClient>, settings:
       enabled: Boolean(settings.enabled),
       subject: (settings.subject ?? "").trim(),
       reply_to: (settings.replyTo ?? "").trim(),
+      body_text: (settings.bodyText ?? "").trim(),
       html_template: stripScriptTags(settings.html ?? "").trim(),
       attachments: nextAttachments,
       updated_at: new Date().toISOString(),
     })
-    .select("id, enabled, subject, reply_to, html_template, attachments, updated_at")
+    .select("id, enabled, subject, reply_to, body_text, html_template, attachments, updated_at")
     .single();
 
   if (error) throw new Error(`Registration email settings could not be saved: ${error.message}`);
@@ -192,9 +194,10 @@ async function sendTestEmail(supabase: ReturnType<typeof createClient>, settings
   if (!resendApiKey) throw new Error("Missing RESEND_API_KEY.");
 
   const subject = String(settings.subject ?? "").trim();
-  const html = String(settings.html_template ?? "").trim();
+  const bodyText = String(settings.body_text ?? "").trim();
+  const html = String(settings.html_template ?? "").trim() || renderBodyText(bodyText);
   if (!subject) throw new Error("Save a subject before sending a test email.");
-  if (!html) throw new Error("Save an HTML template before sending a test email.");
+  if (!html) throw new Error("Save an HTML template or body text before sending a test email.");
 
   const attachments = await fetchAttachments(supabase, parseAttachments(settings.attachments));
   const resendResponse = await fetch("https://api.resend.com/emails", {
@@ -250,6 +253,7 @@ function mapSettings(settings: Record<string, unknown>) {
     enabled: Boolean(settings.enabled),
     subject: String(settings.subject ?? ""),
     replyTo: String(settings.reply_to ?? ""),
+    bodyText: String(settings.body_text ?? ""),
     html: String(settings.html_template ?? ""),
     attachments: parseAttachments(settings.attachments),
     updatedAt: String(settings.updated_at ?? ""),
@@ -296,6 +300,17 @@ function renderTemplate(html: string, doctor: Record<string, string>) {
     if (!(key in replacements)) return match;
     return escapeHtml(replacements[key]);
   });
+}
+
+function renderBodyText(value: string) {
+  if (!value.trim()) return "";
+
+  const body = escapeHtml(value)
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${paragraph.replace(/\n/g, "<br/>")}</p>`)
+    .join("");
+
+  return `<div style="font-family:Arial,sans-serif;color:#0F0F18;line-height:1.6">${body}</div>`;
 }
 
 function getSiteOrigin() {

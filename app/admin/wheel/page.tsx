@@ -67,6 +67,7 @@ type RegistrationEmailSettings = {
   enabled: boolean;
   subject: string;
   replyTo: string;
+  bodyText: string;
   html: string;
   attachments: RegistrationEmailAttachment[];
   updatedAt?: string;
@@ -156,6 +157,7 @@ const emptyRegistrationEmailSettings: RegistrationEmailSettings = {
   enabled: false,
   subject: "",
   replyTo: "",
+  bodyText: "",
   html: "",
   attachments: [],
 };
@@ -335,20 +337,23 @@ export default function AdminWheelPage() {
     selectedDoctorIds.length > 0 && newsletterSubject.trim().length > 0 && newsletterHtml.trim().length > 0;
   const previewHtml = useMemo(() => renderNewsletterPreview(newsletterHtml), [newsletterHtml]);
   const detectedRegistrationEmailPlaceholders = useMemo(() => {
-    return Array.from(new Set(registrationEmail.html.match(/\{\{\s*[a-zA-Z0-9_]+\s*\}\}/g) ?? [])).map((token) =>
+    const source = `${registrationEmail.html}\n${registrationEmail.bodyText}`;
+    return Array.from(new Set(source.match(/\{\{\s*[a-zA-Z0-9_]+\s*\}\}/g) ?? [])).map((token) =>
       token.replace(/\s+/g, ""),
     );
-  }, [registrationEmail.html]);
+  }, [registrationEmail.bodyText, registrationEmail.html]);
   const registrationEmailPreviewHtml = useMemo(
-    () => renderRegistrationEmailPreview(registrationEmail.html),
-    [registrationEmail.html],
+    () => renderRegistrationEmailPreview(registrationEmail.html || renderBodyTextPreview(registrationEmail.bodyText)),
+    [registrationEmail.bodyText, registrationEmail.html],
   );
+  const registrationEmailHasBody =
+    registrationEmail.html.trim().length > 0 || registrationEmail.bodyText.trim().length > 0;
   const canSaveRegistrationEmail =
     !registrationEmail.enabled ||
-    (registrationEmail.subject.trim().length > 0 && registrationEmail.html.trim().length > 0);
+    (registrationEmail.subject.trim().length > 0 && registrationEmailHasBody);
   const canTestRegistrationEmail =
     registrationEmail.subject.trim().length > 0 &&
-    registrationEmail.html.trim().length > 0 &&
+    registrationEmailHasBody &&
     registrationEmailTestAddress.trim().length > 0;
 
   useEffect(() => {
@@ -578,8 +583,8 @@ export default function AdminWheelPage() {
   }
 
   async function saveRegistrationEmailSettings() {
-    if (registrationEmail.enabled && (!registrationEmail.subject.trim() || !registrationEmail.html.trim())) {
-      setError("Add a subject and HTML template before enabling the registration email.");
+    if (registrationEmail.enabled && (!registrationEmail.subject.trim() || !registrationEmailHasBody)) {
+      setError("Add a subject and either body text or an HTML template before enabling the registration email.");
       return;
     }
 
@@ -597,6 +602,7 @@ export default function AdminWheelPage() {
         ...registrationEmail,
         subject: registrationEmail.subject.trim(),
         replyTo: registrationEmail.replyTo.trim(),
+        bodyText: registrationEmail.bodyText.trim(),
         html: registrationEmail.html.trim(),
       });
       setRegistrationEmail(saved);
@@ -622,14 +628,18 @@ export default function AdminWheelPage() {
 
       const saved = await api.saveRegistrationEmailSettings(password, {
         ...registrationEmail,
-        enabled: false,
+        enabled: registrationEmail.bodyText.trim().length > 0 ? registrationEmail.enabled : false,
         html: "",
       });
       setRegistrationEmail(saved);
       setRegistrationEmailFileName("");
       setRegistrationEmailFileError(null);
       setShowRegistrationEmailRemoveHtmlConfirm(false);
-      setNotice("Registration email HTML removed and automatic sending disabled.");
+      setNotice(
+        registrationEmail.bodyText.trim().length > 0
+          ? "Registration email HTML removed. Body text will be used for automatic sends."
+          : "Registration email HTML removed and automatic sending disabled.",
+      );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to remove registration email HTML.");
     } finally {
@@ -639,7 +649,7 @@ export default function AdminWheelPage() {
 
   async function sendRegistrationEmailTest() {
     if (!canTestRegistrationEmail) {
-      setError("Enter a subject, upload an HTML template, and add a test email.");
+      setError("Enter a subject, add body text or upload an HTML template, and add a test email.");
       return;
     }
 
@@ -660,6 +670,7 @@ export default function AdminWheelPage() {
         ...registrationEmail,
         subject: registrationEmail.subject.trim(),
         replyTo: registrationEmail.replyTo.trim(),
+        bodyText: registrationEmail.bodyText.trim(),
         html: registrationEmail.html.trim(),
       });
       setRegistrationEmail(saved);
@@ -1603,6 +1614,16 @@ export default function AdminWheelPage() {
                 <input id="registration-email-from" value={registrationEmail.fromLabel ?? "Configured in Edge Function"} readOnly />
               </label>
 
+              <label htmlFor="registration-email-body-text">
+                Body text
+                <textarea
+                  id="registration-email-body-text"
+                  value={registrationEmail.bodyText}
+                  placeholder="Write the email message here if you do not want to upload an HTML template."
+                  onChange={(event) => setRegistrationEmail({ ...registrationEmail, bodyText: event.target.value })}
+                />
+              </label>
+
               <div className="admin-newsletter-upload registration-email-upload">
                 <label htmlFor="registration-email-html-file">
                   Upload HTML template
@@ -1623,22 +1644,24 @@ export default function AdminWheelPage() {
                     onChange={handleRegistrationAttachmentUpload}
                   />
                 </label>
-                <button
-                  className="admin-newsletter-upload-action"
-                  type="button"
-                  onClick={() => setShowRegistrationEmailPreview(true)}
-                  disabled={registrationEmail.html.trim().length === 0}
-                >
-                  Preview HTML
-                </button>
-                <button
-                  className="admin-newsletter-upload-action"
-                  type="button"
-                  onClick={() => setShowRegistrationEmailRemoveHtmlConfirm(true)}
-                  disabled={registrationEmail.html.trim().length === 0 || isRegistrationEmailRemovingHtml}
-                >
-                  Remove HTML
-                </button>
+                <div className="registration-email-template-actions">
+                  <button
+                    className="admin-newsletter-upload-action"
+                    type="button"
+                    onClick={() => setShowRegistrationEmailPreview(true)}
+                    disabled={registrationEmail.html.trim().length === 0}
+                  >
+                    Preview HTML
+                  </button>
+                  <button
+                    className="admin-newsletter-upload-action"
+                    type="button"
+                    onClick={() => setShowRegistrationEmailRemoveHtmlConfirm(true)}
+                    disabled={registrationEmail.html.trim().length === 0 || isRegistrationEmailRemovingHtml}
+                  >
+                    Remove HTML
+                  </button>
+                </div>
               </div>
 
               <div className="admin-registration-email-actions">
@@ -1807,8 +1830,9 @@ export default function AdminWheelPage() {
             </div>
             <div className="admin-modal-body">
               <p>
-                This will remove the saved registration email HTML and disable automatic registration emails until a
-                new template is uploaded and enabled.
+                This will remove the uploaded registration email HTML. If body text is filled in, automatic emails
+                can still send using that text. If body text is empty, automatic sending will be disabled until a new
+                body or HTML template is added.
               </p>
             </div>
             <div className="admin-modal-actions">
@@ -2072,6 +2096,17 @@ function renderRegistrationEmailPreview(html: string) {
     if (!(key in replacements)) return match;
     return escapeHtml(replacements[key]);
   });
+}
+
+function renderBodyTextPreview(value: string) {
+  if (!value.trim()) return "";
+
+  const body = escapeHtml(value)
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${paragraph.replace(/\n/g, "<br/>")}</p>`)
+    .join("");
+
+  return `<div style="font-family:Arial,sans-serif;color:#0F0F18;line-height:1.6">${body}</div>`;
 }
 
 function formatFileSize(bytes: number) {

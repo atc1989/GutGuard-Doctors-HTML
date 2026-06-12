@@ -1840,6 +1840,11 @@
   text-transform: uppercase;
 }
 
+.admin-registration-email-main textarea {
+  min-height: 130px;
+  resize: vertical;
+}
+
 .registration-email-toggle {
   border: 1px solid var(--rule);
   background: rgba(244, 241, 234, 0.54);
@@ -1847,8 +1852,20 @@
 }
 
 .registration-email-upload {
-  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto auto;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) minmax(116px, auto);
   margin-bottom: 0;
+}
+
+.registration-email-template-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.registration-email-template-actions .admin-newsletter-upload-action {
+  min-height: 34px;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.1;
 }
 
 .admin-registration-email-actions {

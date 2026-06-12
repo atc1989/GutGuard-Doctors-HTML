@@ -86,19 +86,22 @@ Deno.serve(async (req) => {
 
     const { data: settings, error: settingsError } = await supabase
       .from("registration_email_settings")
-      .select("enabled, subject, reply_to, html_template, attachments")
+      .select("enabled, subject, reply_to, body_text, html_template, attachments")
       .eq("id", 1)
       .single();
 
-    if (settingsError || !settings?.enabled || !settings.subject || !settings.html_template) {
+    const bodyText = String(settings?.body_text ?? "").trim();
+    const htmlTemplate = String(settings?.html_template ?? "").trim() || renderBodyText(bodyText);
+
+    if (settingsError || !settings?.enabled || !settings.subject || !htmlTemplate) {
       await recordSendAttempt(supabase, {
         registrationId,
         email,
         subject: String(settings?.subject ?? ""),
         status: "skipped",
-        errorMessage: "Registration email is disabled or incomplete",
+        errorMessage: "Registration email is disabled or missing a body",
       });
-      return jsonResponse({ sent: false, skipped: true, reason: "Registration email is disabled or incomplete" });
+      return jsonResponse({ sent: false, skipped: true, reason: "Registration email is disabled or missing a body" });
     }
 
     const attachments = await fetchAttachments(supabase, parseAttachments(settings.attachments));
@@ -113,7 +116,7 @@ Deno.serve(async (req) => {
         from: fromEmail,
         to: [email],
         subject,
-        html: renderDoctorTemplate(String(settings.html_template), doctor),
+        html: renderDoctorTemplate(htmlTemplate, doctor),
         reply_to: String(settings.reply_to ?? "").trim() || undefined,
         attachments,
       }),
@@ -202,6 +205,17 @@ function renderDoctorTemplate(html: string, doctor: DoctorRegistration) {
     if (!(key in replacements)) return match;
     return escapeHtml(replacements[key]);
   });
+}
+
+function renderBodyText(value: string) {
+  if (!value.trim()) return "";
+
+  const body = escapeHtml(value)
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${paragraph.replace(/\n/g, "<br/>")}</p>`)
+    .join("");
+
+  return `<div style="font-family:Arial,sans-serif;color:#0F0F18;line-height:1.6">${body}</div>`;
 }
 
 function parseAttachments(value: unknown): AttachmentRecord[] {
