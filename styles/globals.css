@@ -1134,6 +1134,16 @@
   gap: 12px;
 }
 
+.admin-hidden-username {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .admin-wheel-shell input,
 .admin-wheel-shell textarea {
   width: 100%;
@@ -1485,6 +1495,7 @@
 }
 
 .admin-newsletter-upload label,
+.admin-newsletter-preview-actions label,
 .admin-edit-grid label {
   display: flex;
   flex-direction: column;
@@ -1494,6 +1505,19 @@
   font-weight: 800;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+}
+
+.admin-newsletter-preview-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.admin-newsletter-preview-actions button {
+  min-height: 44px;
+  padding: 12px 16px;
 }
 
 .admin-newsletter-placeholder-box {
@@ -1665,6 +1689,18 @@
   background: var(--bone);
   padding: 24px;
   box-shadow: 0 20px 70px rgba(15, 15, 24, 0.34);
+}
+
+.admin-newsletter-preview-modal {
+  width: min(880px, 100%);
+}
+
+.admin-newsletter-preview-frame {
+  display: block;
+  width: 100%;
+  min-height: min(680px, calc(100vh - 190px));
+  border: 1px solid var(--rule);
+  background: #ffffff;
 }
 
 .admin-modal-head {
@@ -1843,6 +1879,7 @@
   }
 
   .admin-newsletter-upload,
+  .admin-newsletter-preview-actions,
   .admin-edit-grid {
     grid-template-columns: 1fr;
   }

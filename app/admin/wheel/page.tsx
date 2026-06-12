@@ -140,6 +140,8 @@ export default function AdminWheelPage() {
   const [newsletterHtml, setNewsletterHtml] = useState("");
   const [newsletterFileName, setNewsletterFileName] = useState("");
   const [newsletterFileError, setNewsletterFileError] = useState<string | null>(null);
+  const [showNewsletterPreview, setShowNewsletterPreview] = useState(false);
+  const [previewDoctorId, setPreviewDoctorId] = useState("");
   const [historyDoctorId, setHistoryDoctorId] = useState<string | null>(null);
   const [editingDoctor, setEditingDoctor] = useState<AdminDoctorRegistration | null>(null);
   const [isDoctorSaving, setIsDoctorSaving] = useState(false);
@@ -246,6 +248,19 @@ export default function AdminWheelPage() {
     visibleNewsletterDoctors.length > 0 && visibleSelectedCount === visibleNewsletterDoctors.length;
   const canSendNewsletter =
     selectedDoctorIds.length > 0 && newsletterSubject.trim().length > 0 && newsletterHtml.trim().length > 0;
+  const previewDoctor = useMemo(() => {
+    return (
+      doctors.find((doctor) => doctor.id === previewDoctorId) ??
+      selectedDoctors[0] ??
+      filteredNewsletterDoctors[0] ??
+      doctors[0] ??
+      null
+    );
+  }, [doctors, filteredNewsletterDoctors, previewDoctorId, selectedDoctors]);
+  const previewHtml = useMemo(() => renderNewsletterPreview(newsletterHtml, previewDoctor), [
+    newsletterHtml,
+    previewDoctor,
+  ]);
 
   async function handleUnlock(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -573,9 +588,19 @@ export default function AdminWheelPage() {
         <label htmlFor="admin-password">Admin password</label>
         <div className="admin-wheel-auth-row">
           <input
+            className="admin-hidden-username"
+            type="text"
+            name="username"
+            autoComplete="username"
+            value="gutguard-admin"
+            readOnly
+            aria-hidden="true"
+            tabIndex={-1}
+          />
+          <input
             id="admin-password"
             type="password"
-            autoComplete="new-password"
+            autoComplete="current-password"
             value={password}
             placeholder="Enter password"
             onChange={(event) => setPassword(event.target.value)}
@@ -790,23 +815,6 @@ export default function AdminWheelPage() {
                   }}
                 />
               </label>
-              <label htmlFor="doctor-page-size">
-                Show
-                <select
-                  id="doctor-page-size"
-                  value={doctorPageSize}
-                  onChange={(event) => {
-                    setDoctorPageSize(Number(event.target.value));
-                    setDoctorPage(1);
-                  }}
-                >
-                  {PAGE_SIZE_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
               <button type="button" onClick={refreshDoctors} disabled={isLoading}>
                 {isLoading ? "Refreshing" : "Refresh"}
               </button>
@@ -868,6 +876,23 @@ export default function AdminWheelPage() {
               {Math.min(doctorPage * doctorPageSize, filteredDoctors.length)} of {filteredDoctors.length}
             </p>
             <div className="admin-pagination-controls">
+              <label htmlFor="doctor-page-size">
+                Show
+                <select
+                  id="doctor-page-size"
+                  value={doctorPageSize}
+                  onChange={(event) => {
+                    setDoctorPageSize(Number(event.target.value));
+                    setDoctorPage(1);
+                  }}
+                >
+                  {PAGE_SIZE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <button
                 type="button"
                 onClick={() => setDoctorPage((current) => Math.max(1, current - 1))}
@@ -934,6 +959,30 @@ export default function AdminWheelPage() {
               Upload HTML file
               <input id="newsletter-html-file" type="file" accept=".html,text/html" onChange={handleNewsletterUpload} />
             </label>
+            <div className="admin-newsletter-preview-actions">
+              <label htmlFor="newsletter-preview-doctor">
+                Preview as
+                <select
+                  id="newsletter-preview-doctor"
+                  value={previewDoctor?.id ?? ""}
+                  onChange={(event) => setPreviewDoctorId(event.target.value)}
+                >
+                  {doctors.length === 0 ? <option value="">Sample doctor</option> : null}
+                  {doctors.map((doctor) => (
+                    <option key={doctor.id} value={doctor.id}>
+                      {doctor.full_name || doctor.email || "Unnamed doctor"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowNewsletterPreview(true)}
+                disabled={newsletterHtml.trim().length === 0}
+              >
+                Preview HTML
+              </button>
+            </div>
             <div className="admin-newsletter-placeholder-box">
               <p>{newsletterFileName ? `Loaded ${newsletterFileName}` : "No newsletter uploaded yet."}</p>
               {newsletterFileError ? <strong>{newsletterFileError}</strong> : null}
@@ -1095,6 +1144,33 @@ export default function AdminWheelPage() {
             </div>
           </div>
         </section>
+      ) : null}
+
+      {showNewsletterPreview ? (
+        <div className="admin-modal-backdrop" role="presentation">
+          <section
+            className="admin-modal admin-newsletter-preview-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="newsletter-preview-title"
+          >
+            <div className="admin-modal-head">
+              <div>
+                <p className="admin-wheel-kicker">Newsletter Preview</p>
+                <h2 id="newsletter-preview-title">{newsletterSubject || "Uploaded HTML"}</h2>
+              </div>
+              <button type="button" onClick={() => setShowNewsletterPreview(false)}>
+                Close
+              </button>
+            </div>
+            <iframe
+              className="admin-newsletter-preview-frame"
+              title="Newsletter HTML preview"
+              sandbox=""
+              srcDoc={previewHtml}
+            />
+          </section>
+        </div>
       ) : null}
 
       {showNewsletterConfirm ? (
@@ -1265,4 +1341,31 @@ function formatSendResult(result: NewsletterSendResult) {
   if (result.status === "sent") return "Sent";
   if (result.status === "skipped") return `Skipped${result.error ? ` - ${result.error}` : ""}`;
   return `Failed${result.error ? ` - ${result.error}` : ""}`;
+}
+
+function renderNewsletterPreview(html: string, doctor: AdminDoctorRegistration | null) {
+  const replacements: Record<string, string> = {
+    doctor_name: doctor?.full_name || "Dr. Maria Santos",
+    doctor_email: doctor?.email || "doctor@example.com",
+    doctor_mobile: doctor?.mobile || "09171234567",
+    tiktok_username: doctor?.tiktok_username || "gutguarddoctor",
+    specialty: doctor?.specialty || "Internal Medicine",
+    clinic_location: doctor?.practice_location || "Makati City",
+    registered_at: doctor ? formatAdminDate(doctor.created_at) : "Jun 12, 2026, 10:00 AM",
+    prize_label: doctor?.prize_label || "GutGuard Tote",
+  };
+
+  return html.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, key: string) => {
+    if (!(key in replacements)) return match;
+    return escapeHtml(replacements[key]);
+  });
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
