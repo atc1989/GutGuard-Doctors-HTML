@@ -239,7 +239,7 @@ export async function getDoctorRegistrations(adminPassword: string): Promise<Adm
   });
 
   if (error) throw error;
-  return (data ?? []) as AdminDoctorRegistration[];
+  return ((data ?? []) as AdminDoctorRegistration[]).map(normalizeAdminDoctorRegistration);
 }
 
 export async function updateDoctorRegistration(
@@ -261,7 +261,7 @@ export async function updateDoctorRegistration(
   });
 
   if (error) throw error;
-  return (Array.isArray(data) ? data[0] : data) as AdminDoctorRegistration;
+  return normalizeAdminDoctorRegistration((Array.isArray(data) ? data[0] : data) as AdminDoctorRegistration);
 }
 
 export async function getNewsletterSendHistory(adminPassword: string): Promise<NewsletterSendHistory[]> {
@@ -361,4 +361,27 @@ function mapAdminWheelPrize(prize: WheelPrize): AdminWheelPrize {
     sort_order: prize.sortOrder,
     claim_count: prize.claimCount,
   };
+}
+
+function normalizeAdminDoctorRegistration(doctor: AdminDoctorRegistration): AdminDoctorRegistration {
+  const tiktokUsername = (doctor.tiktok_username ?? "").trim().replace(/^@+/, "").toLowerCase();
+  const routingSlug = (doctor.routing_slug ?? "").trim() || slugifyDoctorRoute(doctor.full_name);
+
+  return {
+    ...doctor,
+    tiktok_username: tiktokUsername,
+    routing_slug: routingSlug,
+    redirect_url:
+      (doctor.redirect_url ?? "").trim() || (tiktokUsername ? `https://www.tiktok.com/@${tiktokUsername}` : ""),
+  };
+}
+
+function slugifyDoctorRoute(value: string | null | undefined) {
+  const slug = (value ?? "doctor")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return slug || "doctor";
 }
