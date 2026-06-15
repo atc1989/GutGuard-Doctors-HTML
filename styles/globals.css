@@ -1659,8 +1659,12 @@
 }
 
 .admin-sms-recipient-actions {
-  grid-template-columns: minmax(280px, 1fr) auto auto;
+  grid-template-columns: minmax(520px, 1fr) max-content max-content;
   margin-bottom: 16px;
+}
+
+.admin-sms-recipient-actions button {
+  white-space: nowrap;
 }
 
 .admin-sms-compliance {
