@@ -1615,6 +1615,51 @@
   margin-bottom: 16px;
 }
 
+.admin-sms-composer {
+  grid-template-columns: minmax(220px, 0.8fr) minmax(320px, 1.4fr) minmax(160px, auto);
+}
+
+.admin-sms-message {
+  grid-row: span 2;
+}
+
+.admin-sms-message textarea {
+  min-height: 132px;
+  resize: vertical;
+}
+
+.admin-sms-metrics {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 4px 8px;
+  border: 1px solid var(--rule);
+  background: var(--bone);
+  padding: 12px;
+}
+
+.admin-sms-metrics strong {
+  color: var(--blue);
+  font-family: var(--serif);
+  font-size: 26px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.admin-sms-metrics span,
+.admin-sms-compliance {
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-sms-compliance {
+  border: 1px solid rgba(176, 32, 46, 0.28);
+  background: rgba(176, 32, 46, 0.06);
+  color: #8F1824;
+  padding: 12px;
+}
+
 .admin-newsletter-upload label,
 .admin-edit-grid label {
   display: flex;

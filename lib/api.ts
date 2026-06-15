@@ -82,11 +82,39 @@ type NewsletterSendResult = {
   error?: string | null;
 };
 
+type SmsSendHistory = {
+  id: string;
+  doctor_id: string;
+  sms_campaign_id?: string | null;
+  sms_campaign_title?: string | null;
+  mobile: string;
+  message: string;
+  status: "sent" | "failed" | "skipped";
+  provider_message_id?: string | null;
+  error_message?: string | null;
+  sent_at: string;
+};
+
+type SmsSendResult = {
+  doctorId: string;
+  mobile: string;
+  status: "sent" | "failed" | "skipped";
+  providerMessageId?: string | null;
+  error?: string | null;
+};
+
 type NewsletterResponse = {
   sent: number;
   failed: number;
   skipped: number;
   results: NewsletterSendResult[];
+};
+
+type SmsBlastResponse = {
+  sent: number;
+  failed: number;
+  skipped: number;
+  results: SmsSendResult[];
 };
 
 export type RegistrationEmailAttachment = {
@@ -320,6 +348,33 @@ export async function sendNewsletter(
   return data as NewsletterResponse;
 }
 
+export async function getSmsBlastHistory(adminPassword: string): Promise<SmsSendHistory[]> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.rpc("admin_list_sms_sends", {
+    p_admin_password: adminPassword,
+  });
+
+  if (error) throw error;
+  return (data ?? []) as SmsSendHistory[];
+}
+
+export async function sendSmsBlast(
+  adminPassword: string,
+  doctorIds: string[],
+  title: string,
+  message: string,
+): Promise<SmsBlastResponse> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.functions.invoke("send-sms-blast", {
+    body: { adminPassword, doctorIds, title, message },
+  });
+
+  if (error) throw new Error(await getSupabaseFunctionErrorMessage(error));
+  return data as SmsBlastResponse;
+}
+
 export async function getRegistrationEmailSettings(adminPassword: string): Promise<RegistrationEmailSettings> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
 
@@ -452,4 +507,31 @@ function slugifyDoctorRoute(value: string | null | undefined) {
     .replace(/^-|-$/g, "");
 
   return slug || "doctor";
+}
+
+async function getSupabaseFunctionErrorMessage(error: unknown) {
+  const fallback = error instanceof Error ? error.message : "Supabase function request failed.";
+  const maybeError = error as {
+    context?: {
+      json?: () => Promise<unknown>;
+      text?: () => Promise<string>;
+    };
+  };
+
+  try {
+    const body = maybeError.context?.json ? await maybeError.context.json() : null;
+    if (body && typeof body === "object" && "error" in body) {
+      const message = (body as { error?: unknown }).error;
+      if (typeof message === "string" && message.trim()) return message;
+    }
+  } catch {
+    try {
+      const text = maybeError.context?.text ? await maybeError.context.text() : "";
+      if (text.trim()) return text;
+    } catch {
+      return fallback;
+    }
+  }
+
+  return fallback;
 }
