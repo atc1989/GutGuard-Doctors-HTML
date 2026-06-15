@@ -1782,82 +1782,105 @@ export default function AdminWheelPage() {
               <p className="admin-wheel-kicker">Bulk SMS</p>
               <h2>SMS Blast</h2>
             </div>
-            <div className="admin-doctor-actions">
-              <label htmlFor="sms-search">
-                Search recipients
-                <input
-                  id="sms-search"
-                  type="search"
-                  value={smsSearch}
-                  placeholder="Name, mobile, TikTok, clinic..."
-                  onChange={(event) => {
-                    setSmsSearch(event.target.value);
-                    setSmsPage(1);
-                  }}
-                />
-              </label>
-              <button type="button" onClick={refreshSmsHistory} disabled={isLoading}>
-                Refresh history
-              </button>
+            <div className="admin-registration-email-status">
+              <span>Provider ready</span>
+              <p>
+                {selectedSmsDoctorIds.length} selected / {smsSegmentInfo.segments} estimated segment
+                {smsSegmentInfo.segments === 1 ? "" : "s"}
+              </p>
             </div>
           </div>
 
-          <div className="admin-newsletter-upload admin-sms-composer">
-            <label htmlFor="sms-title">
-              Campaign title
-              <input
-                id="sms-title"
-                value={smsTitle}
-                placeholder="GutGuard Doctors SMS"
-                onChange={(event) => {
-                  setSmsTitle(event.target.value);
-                  setShowSmsConfirm(false);
-                }}
-              />
-            </label>
-            <label className="admin-sms-message" htmlFor="sms-message">
-              SMS message
-              <textarea
-                id="sms-message"
-                value={smsMessage}
-                placeholder="Hi {{doctor_name}}, your GutGuard update..."
-                onChange={(event) => {
-                  setSmsMessage(event.target.value);
-                  setShowSmsConfirm(false);
-                }}
-              />
-            </label>
-            <div className="admin-sms-metrics" aria-live="polite">
-              <strong>{smsSegmentInfo.characters}</strong>
-              <span>characters</span>
-              <strong>{smsSegmentInfo.segments}</strong>
-              <span>estimated SMS segment{smsSegmentInfo.segments === 1 ? "" : "s"}</span>
+          <div className="admin-registration-email-grid admin-sms-grid">
+            <div className="admin-registration-email-main">
+              <label htmlFor="sms-title">
+                Campaign title
+                <input
+                  id="sms-title"
+                  value={smsTitle}
+                  placeholder="GutGuard Doctors SMS"
+                  onChange={(event) => {
+                    setSmsTitle(event.target.value);
+                    setShowSmsConfirm(false);
+                  }}
+                />
+              </label>
+              <label htmlFor="sms-message">
+                SMS message
+                <textarea
+                  id="sms-message"
+                  value={smsMessage}
+                  placeholder="Hi {{doctor_name}}, your GutGuard update..."
+                  onChange={(event) => {
+                    setSmsMessage(event.target.value);
+                    setShowSmsConfirm(false);
+                  }}
+                />
+              </label>
+              <p className="admin-sms-provider-note">
+                Provider-ready only. Configure an SMS gateway before live sending.
+              </p>
             </div>
-            <div className="admin-newsletter-placeholder-box">
-              <p>Provider-ready only. Configure an SMS gateway before live sending.</p>
-              <span>Available placeholders</span>
-              <div>
-                {SMS_PLACEHOLDER_TOKENS.map((token) => (
-                  <code key={token}>{token}</code>
-                ))}
+
+            <aside className="admin-registration-email-side">
+              <div className="admin-newsletter-placeholder-box admin-sms-side-box">
+                <p>SMS provider is not configured yet.</p>
+                <div className="admin-sms-metrics" aria-live="polite">
+                  <strong>{smsSegmentInfo.characters}</strong>
+                  <span>characters</span>
+                  <strong>{smsSegmentInfo.segments}</strong>
+                  <span>estimated SMS segment{smsSegmentInfo.segments === 1 ? "" : "s"}</span>
+                </div>
+                <span>Available placeholders</span>
+                <div>
+                  {SMS_PLACEHOLDER_TOKENS.map((token) => (
+                    <code key={token}>{token}</code>
+                  ))}
+                </div>
+                {detectedSmsPlaceholders.length > 0 ? (
+                  <>
+                    <span>Detected in message</span>
+                    <div>
+                      {detectedSmsPlaceholders.map((token) => (
+                        <code key={token}>{token}</code>
+                      ))}
+                    </div>
+                  </>
+                ) : null}
+                {smsMessage.trim().length > 0 ? (
+                  <>
+                    <span>Preview</span>
+                    <p>{smsPreview}</p>
+                  </>
+                ) : null}
               </div>
-              {detectedSmsPlaceholders.length > 0 ? (
-                <>
-                  <span>Detected in message</span>
-                  <div>
-                    {detectedSmsPlaceholders.map((token) => (
-                      <code key={token}>{token}</code>
-                    ))}
-                  </div>
-                </>
-              ) : null}
-              {smsMessage.trim().length > 0 ? (
-                <>
-                  <span>Preview</span>
-                  <p>{smsPreview}</p>
-                </>
-              ) : null}
-            </div>
+            </aside>
+          </div>
+
+          <div className="admin-registration-email-actions admin-sms-recipient-actions">
+            <label htmlFor="sms-search">
+              Search recipients
+              <input
+                id="sms-search"
+                type="search"
+                value={smsSearch}
+                placeholder="Name, mobile, TikTok, clinic..."
+                onChange={(event) => {
+                  setSmsSearch(event.target.value);
+                  setSmsPage(1);
+                }}
+              />
+            </label>
+            <button type="button" onClick={refreshSmsHistory} disabled={isLoading}>
+              Refresh history
+            </button>
+            <button
+              type="button"
+              onClick={handleSmsSend}
+              disabled={isSmsSending || !canSendSms}
+            >
+              {isSmsSending ? "Sending" : "Review and send"}
+            </button>
           </div>
 
           <div className="admin-newsletter-toolbar">
@@ -1871,13 +1894,6 @@ export default function AdminWheelPage() {
             </label>
             <div className="admin-newsletter-sendbox">
               <p>{selectedSmsDoctorIds.length} selected</p>
-              <button
-                type="button"
-                onClick={handleSmsSend}
-                disabled={isSmsSending || !canSendSms}
-              >
-                {isSmsSending ? "Sending" : "Review and send"}
-              </button>
             </div>
           </div>
 

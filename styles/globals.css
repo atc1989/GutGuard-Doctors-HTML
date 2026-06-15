@@ -1615,17 +1615,8 @@
   margin-bottom: 16px;
 }
 
-.admin-sms-composer {
-  grid-template-columns: minmax(220px, 0.8fr) minmax(320px, 1.4fr) minmax(160px, auto);
-}
-
-.admin-sms-message {
-  grid-row: span 2;
-}
-
-.admin-sms-message textarea {
-  min-height: 132px;
-  resize: vertical;
+.admin-sms-grid {
+  margin-bottom: 16px;
 }
 
 .admin-sms-metrics {
@@ -1638,6 +1629,13 @@
   padding: 12px;
 }
 
+.admin-sms-side-box {
+  grid-column: auto;
+  border: 1px solid var(--rule);
+  background: rgba(244, 241, 234, 0.54);
+  padding: 16px;
+}
+
 .admin-sms-metrics strong {
   color: var(--blue);
   font-family: var(--serif);
@@ -1647,10 +1645,22 @@
 }
 
 .admin-sms-metrics span,
-.admin-sms-compliance {
+.admin-sms-compliance,
+.admin-sms-provider-note {
   color: var(--ink-3);
   font-size: 12px;
   font-weight: 700;
+}
+
+.admin-sms-provider-note {
+  border: 1px solid var(--rule);
+  background: rgba(244, 241, 234, 0.54);
+  padding: 14px 16px;
+}
+
+.admin-sms-recipient-actions {
+  grid-template-columns: minmax(280px, 1fr) auto auto;
+  margin-bottom: 16px;
 }
 
 .admin-sms-compliance {
