@@ -355,7 +355,10 @@ export async function getSmsBlastHistory(adminPassword: string): Promise<SmsSend
     p_admin_password: adminPassword,
   });
 
-  if (error) throw error;
+  if (error) {
+    if (isMissingSupabaseFunctionError(error)) return [];
+    throw error;
+  }
   return (data ?? []) as SmsSendHistory[];
 }
 
@@ -534,4 +537,12 @@ async function getSupabaseFunctionErrorMessage(error: unknown) {
   }
 
   return fallback;
+}
+
+function isMissingSupabaseFunctionError(error: unknown) {
+  const maybeError = error as { code?: unknown; message?: unknown };
+  return (
+    maybeError.code === "PGRST202" ||
+    (typeof maybeError.message === "string" && maybeError.message.includes("Could not find the function"))
+  );
 }
