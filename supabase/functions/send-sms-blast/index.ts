@@ -26,6 +26,11 @@ type DoctorRegistration = {
 
 type SendStatus = "sent" | "failed" | "skipped";
 
+type SmsProvider = {
+  name: string;
+  send: (input: { to: string; message: string }) => Promise<string | null>;
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -191,16 +196,120 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-function getSmsProvider() {
+function getSmsProvider(): SmsProvider | null {
   const providerName = (Deno.env.get("SMS_PROVIDER") ?? "").trim().toLowerCase();
   if (!providerName) return null;
 
+  if (["itexmo", "itexmo.com"].includes(providerName)) return getItexmoProvider();
+
   return {
     name: providerName,
-    async send(_: { to: string; message: string }) {
+    async send() {
       throw new Error(`SMS provider adapter "${providerName}" is not implemented yet.`);
     },
   };
+}
+
+function getItexmoProvider(): SmsProvider {
+  const email = (Deno.env.get("ITEXMO_EMAIL") ?? "").trim();
+  const password = (Deno.env.get("ITEXMO_PASSWORD") ?? "").trim();
+  const apiCode = (Deno.env.get("ITEXMO_API_CODE") ?? "").trim();
+  const senderId = (Deno.env.get("ITEXMO_SENDER_ID") ?? "").trim();
+  const endpoint = (Deno.env.get("ITEXMO_SMS_ENDPOINT") ?? "https://api.itexmo.com/api/broadcast").trim();
+
+  return {
+    name: "itexmo",
+    async send({ to, message }) {
+      if (!email) throw new Error("ITEXMO_EMAIL is not configured.");
+      if (!password) throw new Error("ITEXMO_PASSWORD is not configured.");
+      if (!apiCode) throw new Error("ITEXMO_API_CODE is not configured.");
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${btoa(`${email}:${password}`)}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ApiCode: apiCode,
+          Recipients: [formatItexmoMobile(to)],
+          Message: message,
+          ...(senderId ? { SenderId: senderId } : {}),
+          ClientId: createItexmoClientId(),
+        }),
+      });
+      const responseBody = await readResponseBody(response);
+
+      if (!response.ok || isProviderErrorBody(responseBody)) {
+        throw new Error(getProviderErrorMessage(responseBody) || `iTexMo SMS request failed with HTTP ${response.status}.`);
+      }
+
+      return getProviderMessageId(responseBody);
+    },
+  };
+}
+
+async function readResponseBody(response: Response) {
+  const text = await response.text();
+  if (!text.trim()) return null;
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
+}
+
+function isProviderErrorBody(body: unknown) {
+  if (!body || typeof body !== "object") return false;
+  const value = body as Record<string, unknown>;
+  const status = String(value.status ?? value.code ?? value.result ?? "").toLowerCase();
+  const failed = Number(value.Failed ?? value.failed ?? 0);
+  return (
+    status === "error" ||
+    status === "failed" ||
+    value.success === false ||
+    value.Error === true ||
+    value.error === true ||
+    typeof value.error === "string" ||
+    failed > 0
+  );
+}
+
+function getProviderErrorMessage(body: unknown) {
+  if (typeof body === "string") return body;
+  if (!body || typeof body !== "object") return "";
+
+  const value = body as Record<string, unknown>;
+  for (const key of ["error", "ErrorMessage", "Message", "message", "error_message", "description"]) {
+    if (typeof value[key] === "string" && value[key]) return value[key];
+  }
+
+  return "";
+}
+
+function getProviderMessageId(body: unknown) {
+  if (Array.isArray(body)) return getProviderMessageId(body[0]);
+  if (!body || typeof body !== "object") return null;
+
+  const value = body as Record<string, unknown>;
+  for (const key of ["ReferenceId", "ReferenceID", "referenceId", "reference_id", "id", "message_id", "messageId"]) {
+    const messageId = value[key];
+    if (typeof messageId === "string" || typeof messageId === "number") return String(messageId);
+  }
+
+  return null;
+}
+
+function formatItexmoMobile(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (/^639\d{9}$/.test(digits)) return `0${digits.slice(2)}`;
+  if (/^9\d{9}$/.test(digits)) return `0${digits}`;
+  return digits;
+}
+
+function createItexmoClientId() {
+  return `GG-${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`.slice(0, 50);
 }
 
 async function recordSendAttempt(
@@ -263,9 +372,9 @@ function renderDoctorTemplate(message: string, doctor: DoctorRegistration) {
 
 function normalizeSmsMobile(value: string | null | undefined) {
   const digits = (value ?? "").replace(/\D/g, "");
-  if (/^09\d{9}$/.test(digits)) return `+63${digits.slice(1)}`;
-  if (/^639\d{9}$/.test(digits)) return `+${digits}`;
-  if (/^9\d{9}$/.test(digits)) return `+63${digits}`;
+  if (/^09\d{9}$/.test(digits)) return digits;
+  if (/^639\d{9}$/.test(digits)) return `0${digits.slice(2)}`;
+  if (/^9\d{9}$/.test(digits)) return `0${digits}`;
   return "";
 }
 
