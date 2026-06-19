@@ -147,6 +147,30 @@ type WheelApi = {
     settings: RegistrationEmailSettings,
   ) => Promise<RegistrationEmailSettings>;
   sendRegistrationEmailTest?: (adminPassword: string, testEmail: string) => Promise<{ sent: boolean; resendId?: string }>;
+  getSequenceSteps?: (adminPassword: string) => Promise<SequenceStep[]>;
+  upsertSequenceStep?: (adminPassword: string, step: { id?: string; stepNumber: number; subject: string; htmlBody: string }) => Promise<SequenceStep>;
+  deleteSequenceStep?: (adminPassword: string, stepId: string) => Promise<void>;
+  reorderSequenceSteps?: (adminPassword: string, stepIds: string[]) => Promise<void>;
+  getSequenceProgress?: (adminPassword: string) => Promise<{ progress: SequenceProgress[]; totalSteps: number }>;
+};
+
+type SequenceStep = {
+  id: string;
+  step_number: number;
+  subject: string;
+  html_body: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type SequenceProgress = {
+  id: string;
+  doctor_id: string;
+  current_step: number;
+  enrolled_at: string;
+  status: "active" | "completed";
+  doctor_registrations: { full_name: string | null; email: string | null } | null;
+  email_sequence_sends: { sent_at: string; clicked_at: string | null; status: string; step_id: string }[];
 };
 
 const emptyPrize: AdminWheelPrize = {
@@ -232,7 +256,7 @@ function getDoctorQrElementId(doctorId: string) {
 }
 
 export default function AdminWheelPage() {
-  const [activeTab, setActiveTab] = useState<"wheel" | "doctors" | "newsletter" | "sms" | "registrationEmail">("wheel");
+  const [activeTab, setActiveTab] = useState<"wheel" | "doctors" | "newsletter" | "sms" | "registrationEmail" | "sequence">("wheel");
   const [password, setPassword] = useState("");
   const [prizes, setPrizes] = useState<AdminWheelPrize[]>([]);
   const [doctors, setDoctors] = useState<AdminDoctorRegistration[]>([]);
@@ -276,6 +300,14 @@ export default function AdminWheelPage() {
   const [isRegistrationEmailRemovingHtml, setIsRegistrationEmailRemovingHtml] = useState(false);
   const [isRegistrationEmailTesting, setIsRegistrationEmailTesting] = useState(false);
   const [historyDoctorId, setHistoryDoctorId] = useState<string | null>(null);
+  const [sequenceSteps, setSequenceSteps] = useState<SequenceStep[]>([]);
+  const [sequenceProgress, setSequenceProgress] = useState<SequenceProgress[]>([]);
+  const [sequenceTotalSteps, setSequenceTotalSteps] = useState(0);
+  const [editingStep, setEditingStep] = useState<Partial<SequenceStep> | null>(null);
+  const [isSavingStep, setIsSavingStep] = useState(false);
+  const [isDeletingStepId, setIsDeletingStepId] = useState<string | null>(null);
+  const [isSequenceLoading, setIsSequenceLoading] = useState(false);
+  const [sequenceStepFileName, setSequenceStepFileName] = useState("");
   const [editingDoctor, setEditingDoctor] = useState<AdminDoctorRegistration | null>(null);
   const [isDoctorSaving, setIsDoctorSaving] = useState(false);
   const [newPrize, setNewPrize] = useState<AdminWheelPrize>(emptyPrize);
@@ -493,7 +525,7 @@ export default function AdminWheelPage() {
         throw new Error("Missing getWheelPrizes helper in lib/api.ts.");
       }
 
-      const [loadedPrizes, loadedDoctors, loadedNewsletterHistory, loadedSmsHistory, loadedRegistrationEmail] = await Promise.all([
+      const [loadedPrizes, loadedDoctors, loadedNewsletterHistory, loadedSmsHistory, loadedRegistrationEmail, loadedSequence] = await Promise.all([
         api.getWheelPrizes(password),
         api.getDoctorRegistrations ? api.getDoctorRegistrations(password) : Promise.resolve([]),
         api.getNewsletterSendHistory ? api.getNewsletterSendHistory(password) : Promise.resolve([]),
@@ -501,6 +533,7 @@ export default function AdminWheelPage() {
         api.getRegistrationEmailSettings
           ? api.getRegistrationEmailSettings(password)
           : Promise.resolve(emptyRegistrationEmailSettings),
+        api.getSequenceSteps ? api.getSequenceSteps(password) : Promise.resolve([]),
       ]);
       setPrizes(loadedPrizes.sort((a, b) => a.sort_order - b.sort_order));
       setDoctors(loadedDoctors);
@@ -508,6 +541,7 @@ export default function AdminWheelPage() {
       setSmsHistory(loadedSmsHistory);
       setRegistrationEmail(loadedRegistrationEmail);
       setRegistrationEmailFileName(loadedRegistrationEmail.html ? "Saved registration email HTML" : "");
+      setSequenceSteps(loadedSequence.sort((a, b) => a.step_number - b.step_number));
       setDoctorPage(1);
       setNewsletterPage(1);
       setSmsPage(1);
@@ -1082,6 +1116,89 @@ export default function AdminWheelPage() {
     }
   }
 
+  async function refreshSequence() {
+    setIsSequenceLoading(true);
+    try {
+      const api = await loadWheelApi();
+      const [steps, prog] = await Promise.all([
+        api.getSequenceSteps ? api.getSequenceSteps(password) : Promise.resolve([]),
+        api.getSequenceProgress ? api.getSequenceProgress(password) : Promise.resolve({ progress: [], totalSteps: 0 }),
+      ]);
+      setSequenceSteps(steps.sort((a, b) => a.step_number - b.step_number));
+      setSequenceProgress(prog.progress);
+      setSequenceTotalSteps(prog.totalSteps);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to load sequence.");
+    } finally {
+      setIsSequenceLoading(false);
+    }
+  }
+
+  async function handleSaveSequenceStep() {
+    if (!editingStep) return;
+    if (!editingStep.subject?.trim()) { setError("Step subject is required."); return; }
+    if (!editingStep.html_body?.trim()) { setError("Step HTML is required."); return; }
+    setError(null);
+    setIsSavingStep(true);
+    try {
+      const api = await loadWheelApi();
+      if (!api.upsertSequenceStep) throw new Error("Missing upsertSequenceStep helper.");
+      const saved = await api.upsertSequenceStep(password, {
+        id: editingStep.id,
+        stepNumber: editingStep.step_number ?? sequenceSteps.length + 1,
+        subject: editingStep.subject.trim(),
+        htmlBody: editingStep.html_body.trim(),
+      });
+      setSequenceSteps((current) => {
+        const existing = current.find((s) => s.id === saved.id);
+        const updated = existing
+          ? current.map((s) => (s.id === saved.id ? saved : s))
+          : [...current, saved];
+        return updated.sort((a, b) => a.step_number - b.step_number);
+      });
+      setEditingStep(null);
+      setSequenceStepFileName("");
+      setNotice(`Step ${saved.step_number} saved.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to save step.");
+    } finally {
+      setIsSavingStep(false);
+    }
+  }
+
+  async function handleDeleteSequenceStep(stepId: string) {
+    setError(null);
+    setIsDeletingStepId(stepId);
+    try {
+      const api = await loadWheelApi();
+      if (!api.deleteSequenceStep) throw new Error("Missing deleteSequenceStep helper.");
+      await api.deleteSequenceStep(password, stepId);
+      setSequenceSteps((current) => current.filter((s) => s.id !== stepId).map((s, i) => ({ ...s, step_number: i + 1 })));
+      setNotice("Step removed and sequence renumbered.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to delete step.");
+    } finally {
+      setIsDeletingStepId(null);
+    }
+  }
+
+  async function handleSequenceStepHtmlUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) { setSequenceStepFileName(""); return; }
+    if (!file.name.toLowerCase().endsWith(".html") && file.type !== "text/html") {
+      setError("Please upload a .html file for the step template.");
+      return;
+    }
+    if (file.size > 250_000) { setError("HTML file must be under 250 KB."); return; }
+    const content = await file.text();
+    setSequenceStepFileName(file.name);
+    setEditingStep((current) => current ? ({
+      ...current,
+      html_body: content,
+      subject: current.subject || file.name.replace(/\.html?$/i, "").replace(/[-_]+/g, " "),
+    }) : current);
+  }
+
   return (
     <main className="admin-wheel-shell">
       <Header dateLabel="Admin Wheel" />
@@ -1105,9 +1222,11 @@ export default function AdminWheelPage() {
                   ? `${selectedDoctorIds.length} selected`
                   : activeTab === "sms"
                     ? `${selectedSmsDoctorIds.length} selected`
-                    : registrationEmail.enabled
-                      ? "enabled"
-                      : "disabled"}
+                    : activeTab === "sequence"
+                      ? `${sequenceSteps.length} steps`
+                      : registrationEmail.enabled
+                        ? "enabled"
+                        : "disabled"}
           </span>
           <strong>
             {activeTab === "wheel"
@@ -1118,7 +1237,9 @@ export default function AdminWheelPage() {
                   ? selectedDoctorIds.length
                   : activeTab === "sms"
                     ? selectedSmsDoctorIds.length
-                    : registrationEmail.attachments.length}
+                    : activeTab === "sequence"
+                      ? sequenceProgress.length
+                      : registrationEmail.attachments.length}
           </strong>
           <span>
             {activeTab === "wheel"
@@ -1129,7 +1250,9 @@ export default function AdminWheelPage() {
                   ? "newsletter recipients"
                   : activeTab === "sms"
                     ? "SMS recipients"
-                    : "attachments"}
+                    : activeTab === "sequence"
+                      ? "enrolled doctors"
+                      : "attachments"}
           </span>
         </div>
       </section>
@@ -1164,8 +1287,16 @@ export default function AdminWheelPage() {
           SMS Blast
         </button>
         <button
-          className={activeTab === "registrationEmail" ? "active" : ""}
-          onClick={() => setActiveTab("registrationEmail")}
+          className={activeTab === "sequence" ? "active" : ""}
+          onClick={() => setActiveTab("sequence")}
+          type="button"
+        >
+          Email Sequence
+        </button>
+        <button
+          disabled
+          title="Replaced by Email Sequence"
+          style={{ opacity: 0.4, cursor: "not-allowed" }}
           type="button"
         >
           Registration Email
@@ -2191,6 +2322,165 @@ export default function AdminWheelPage() {
               </div>
             </aside>
           </div>
+        </section>
+      ) : null}
+
+      {isUnlocked && activeTab === "sequence" ? (
+        <section className="admin-wheel-panel">
+          <div className="admin-wheel-panel-head">
+            <div>
+              <p className="admin-wheel-kicker">Drip Campaign</p>
+              <h2>Email Sequence</h2>
+            </div>
+            <div className="admin-wheel-panel-actions">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingStep({ id: undefined, step_number: sequenceSteps.length + 1, subject: "", html_body: "" });
+                  setSequenceStepFileName("");
+                }}
+                disabled={!!editingStep}
+              >
+                + Add Step
+              </button>
+              <button type="button" onClick={refreshSequence} disabled={isSequenceLoading}>
+                {isSequenceLoading ? "Loading…" : "Refresh"}
+              </button>
+            </div>
+          </div>
+
+          {/* Step list */}
+          <div className="admin-sequence-steps">
+            <h3>Steps ({sequenceSteps.length})</h3>
+            {sequenceSteps.length === 0 && !isSequenceLoading ? (
+              <p style={{ color: "#888", fontSize: 14 }}>No steps yet. Click &quot;+ Add Step&quot; to create the first email in the sequence.</p>
+            ) : null}
+            {sequenceSteps.map((step) => (
+              <article key={step.id} className="admin-sequence-step-row" style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid #eee" }}>
+                <span style={{ fontWeight: 700, fontSize: 13, color: "#0608a9", minWidth: 28 }}>#{step.step_number}</span>
+                <div style={{ flex: 1 }}>
+                  <strong style={{ fontSize: 15 }}>{step.subject}</strong>
+                  <br />
+                  <small style={{ color: "#888" }}>{step.html_body ? `${step.html_body.length.toLocaleString()} chars` : "No HTML"}</small>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingStep(step);
+                    setSequenceStepFileName("");
+                  }}
+                  disabled={!!editingStep}
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => step.id && handleDeleteSequenceStep(step.id)}
+                  disabled={!!editingStep || isDeletingStepId === step.id}
+                  style={{ color: "#c0392b" }}
+                >
+                  {isDeletingStepId === step.id ? "Removing…" : "Remove"}
+                </button>
+              </article>
+            ))}
+          </div>
+
+          {/* Inline step editor */}
+          {editingStep ? (
+            <div className="admin-sequence-editor" style={{ marginTop: 24, padding: 20, background: "#f9f8f5", border: "1px solid #ddd6c8" }}>
+              <h3 style={{ marginTop: 0 }}>{editingStep.id ? `Editing Step #${editingStep.step_number}` : `New Step #${editingStep.step_number}`}</h3>
+              <label style={{ display: "block", marginBottom: 12 }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Subject line</span>
+                <input
+                  type="text"
+                  value={editingStep.subject ?? ""}
+                  onChange={(e) => setEditingStep((current) => current ? { ...current, subject: e.target.value } : current)}
+                  placeholder="Email subject…"
+                  style={{ display: "block", width: "100%", marginTop: 4, padding: "8px 10px", fontSize: 14, border: "1px solid #ccc", borderRadius: 4 }}
+                />
+              </label>
+              <label style={{ display: "block", marginBottom: 12 }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>HTML template (.html file)</span>
+                <br />
+                <small style={{ color: "#888" }}>
+                  Use <code>{"{{sequence_click_url}}"}</code> for the click-tracking button URL. Download the{" "}
+                  <a href="/sample-upload-newsletter.html" download>sample template</a> for reference.
+                </small>
+                <input
+                  type="file"
+                  accept=".html,text/html"
+                  onChange={handleSequenceStepHtmlUpload}
+                  style={{ display: "block", marginTop: 8 }}
+                />
+                {sequenceStepFileName ? (
+                  <small style={{ color: "#0608a9" }}>Loaded: {sequenceStepFileName}</small>
+                ) : editingStep.html_body ? (
+                  <small style={{ color: "#888" }}>{editingStep.html_body.length.toLocaleString()} chars loaded (upload a new file to replace)</small>
+                ) : null}
+              </label>
+              <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+                <button type="button" onClick={handleSaveSequenceStep} disabled={isSavingStep}>
+                  {isSavingStep ? "Saving…" : "Save Step"}
+                </button>
+                <button type="button" onClick={() => { setEditingStep(null); setSequenceStepFileName(""); }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Doctor progress */}
+          {sequenceProgress.length > 0 ? (
+            <div className="admin-sequence-progress" style={{ marginTop: 32 }}>
+              <h3>Enrolled Doctors ({sequenceProgress.length})</h3>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                <thead>
+                  <tr style={{ borderBottom: "2px solid #eee", textAlign: "left" }}>
+                    <th style={{ padding: "6px 8px" }}>Doctor</th>
+                    <th style={{ padding: "6px 8px" }}>Current Step</th>
+                    <th style={{ padding: "6px 8px" }}>Status</th>
+                    <th style={{ padding: "6px 8px" }}>Last Clicked</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sequenceProgress.map((row) => {
+                    const lastClick = row.email_sequence_sends
+                      .map((s) => s.clicked_at)
+                      .filter(Boolean)
+                      .sort()
+                      .at(-1);
+                    return (
+                      <tr key={row.id} style={{ borderBottom: "1px solid #f0f0f0" }}>
+                        <td style={{ padding: "8px 8px" }}>
+                          <strong>{row.doctor_registrations?.full_name ?? row.doctor_id}</strong>
+                          <br />
+                          <small style={{ color: "#888" }}>{row.doctor_registrations?.email ?? ""}</small>
+                        </td>
+                        <td style={{ padding: "8px 8px" }}>
+                          Step {row.current_step} of {sequenceTotalSteps}
+                        </td>
+                        <td style={{ padding: "8px 8px" }}>
+                          <span style={{
+                            padding: "2px 8px",
+                            borderRadius: 99,
+                            fontSize: 12,
+                            fontWeight: 700,
+                            background: row.status === "completed" ? "#d4edda" : "#cce5ff",
+                            color: row.status === "completed" ? "#155724" : "#004085",
+                          }}>
+                            {row.status}
+                          </span>
+                        </td>
+                        <td style={{ padding: "8px 8px", color: "#888" }}>
+                          {lastClick ? formatAdminDate(lastClick) : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
         </section>
       ) : null}
 

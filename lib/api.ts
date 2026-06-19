@@ -378,6 +378,85 @@ export async function sendSmsBlast(
   return data as SmsBlastResponse;
 }
 
+// ─── Email Sequence ────────────────────────────────────────────────────────
+
+export type SequenceStep = {
+  id: string;
+  step_number: number;
+  subject: string;
+  html_body: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SequenceProgress = {
+  id: string;
+  doctor_id: string;
+  current_step: number;
+  enrolled_at: string;
+  status: "active" | "completed";
+  doctor_registrations: { full_name: string | null; email: string | null } | null;
+  email_sequence_sends: { sent_at: string; clicked_at: string | null; status: string; step_id: string }[];
+};
+
+export async function getSequenceSteps(adminPassword: string): Promise<SequenceStep[]> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  const { data, error } = await supabase.functions.invoke("manage-sequence", {
+    body: { action: "get-steps", adminPassword },
+  });
+  if (error) throw error;
+  return (data as { steps: SequenceStep[] }).steps;
+}
+
+export async function upsertSequenceStep(
+  adminPassword: string,
+  step: { id?: string; stepNumber: number; subject: string; htmlBody: string },
+): Promise<SequenceStep> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  const { data, error } = await supabase.functions.invoke("manage-sequence", {
+    body: { action: "upsert-step", adminPassword, step },
+  });
+  if (error) throw error;
+  return (data as { step: SequenceStep }).step;
+}
+
+export async function deleteSequenceStep(adminPassword: string, stepId: string): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  const { error } = await supabase.functions.invoke("manage-sequence", {
+    body: { action: "delete-step", adminPassword, stepId },
+  });
+  if (error) throw error;
+}
+
+export async function reorderSequenceSteps(adminPassword: string, stepIds: string[]): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  const { error } = await supabase.functions.invoke("manage-sequence", {
+    body: { action: "reorder-steps", adminPassword, stepIds },
+  });
+  if (error) throw error;
+}
+
+export async function getSequenceProgress(
+  adminPassword: string,
+): Promise<{ progress: SequenceProgress[]; totalSteps: number }> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  const { data, error } = await supabase.functions.invoke("manage-sequence", {
+    body: { action: "get-progress", adminPassword },
+  });
+  if (error) throw error;
+  return data as { progress: SequenceProgress[]; totalSteps: number };
+}
+
+export async function enrollDoctorInSequence(doctorId: string): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  const { error } = await supabase.functions.invoke("send-sequence-step", {
+    body: { doctorId, stepNumber: 1 },
+  });
+  if (error) throw error;
+}
+
+// ─── Registration Email Settings ───────────────────────────────────────────
+
 export async function getRegistrationEmailSettings(adminPassword: string): Promise<RegistrationEmailSettings> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
 

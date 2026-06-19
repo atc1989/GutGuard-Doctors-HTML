@@ -7,7 +7,7 @@ import { ArrowRightIcon } from "@/components/Icons";
 import { InputField, SelectField } from "@/components/FormField";
 import SectionLabel from "@/components/SectionLabel";
 import { SPECIALTIES } from "@/lib/constants";
-import { registerDoctor, sendProposalEmail } from "@/lib/api";
+import { enrollDoctorInSequence, registerDoctor } from "@/lib/api";
 import type { FieldErrors, FieldName, FormValues } from "@/lib/validation";
 import {
   normalizeMobile,
@@ -98,11 +98,9 @@ export default function RegistrationSection({
       const doctor = await registerDoctor(pendingPayload);
       if (pendingPayload.email) {
         try {
-          await sendProposalEmail(doctor.id);
+          await enrollDoctorInSequence(doctor.id);
         } catch {
-          window.alert(
-            "Registration saved, but the proposal email could not be sent. Please ask the booth coordinator to resend it.",
-          );
+          // Fire-and-forget — registration is saved even if step 1 email fails
         }
       }
       setValues(INITIAL_VALUES);
