@@ -6,10 +6,12 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+type SequenceAttachment = { filename: string; content: string; content_type: string; size: number };
+
 type ManageSequenceRequest = {
   action: "get-steps" | "upsert-step" | "delete-step" | "reorder-steps" | "get-progress";
   adminPassword: string;
-  step?: { id?: string; stepNumber: number; subject: string; htmlBody: string };
+  step?: { id?: string; stepNumber: number; subject: string; htmlBody: string; attachments?: SequenceAttachment[] };
   stepId?: string;
   stepIds?: string[];
 };
@@ -47,10 +49,11 @@ Deno.serve(async (req) => {
       const { step } = body;
       if (!step) return jsonResponse({ error: "Missing step" }, 400);
 
+      const attachments = step.attachments ?? [];
       if (step.id) {
         const { data, error } = await supabase
           .from("email_sequence_steps")
-          .update({ step_number: step.stepNumber, subject: step.subject, html_body: step.htmlBody, updated_at: new Date().toISOString() })
+          .update({ step_number: step.stepNumber, subject: step.subject, html_body: step.htmlBody, attachments, updated_at: new Date().toISOString() })
           .eq("id", step.id)
           .select()
           .single();
@@ -59,7 +62,7 @@ Deno.serve(async (req) => {
       } else {
         const { data, error } = await supabase
           .from("email_sequence_steps")
-          .insert({ step_number: step.stepNumber, subject: step.subject, html_body: step.htmlBody })
+          .insert({ step_number: step.stepNumber, subject: step.subject, html_body: step.htmlBody, attachments })
           .select()
           .single();
         if (error) throw error;

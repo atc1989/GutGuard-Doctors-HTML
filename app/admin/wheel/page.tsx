@@ -148,19 +148,27 @@ type WheelApi = {
   ) => Promise<RegistrationEmailSettings>;
   sendRegistrationEmailTest?: (adminPassword: string, testEmail: string) => Promise<{ sent: boolean; resendId?: string }>;
   getSequenceSteps?: (adminPassword: string) => Promise<SequenceStep[]>;
-  upsertSequenceStep?: (adminPassword: string, step: { id?: string; stepNumber: number; subject: string; htmlBody: string }) => Promise<SequenceStep>;
+  upsertSequenceStep?: (adminPassword: string, step: { id?: string; stepNumber: number; subject: string; htmlBody: string; attachments?: SequenceAttachment[] }) => Promise<SequenceStep>;
   deleteSequenceStep?: (adminPassword: string, stepId: string) => Promise<void>;
   reorderSequenceSteps?: (adminPassword: string, stepIds: string[]) => Promise<void>;
   getSequenceProgress?: (adminPassword: string) => Promise<{ progress: SequenceProgress[]; totalSteps: number }>;
 };
 
+type SequenceAttachment = {
+  filename: string;
+  content: string; // base64
+  content_type: string;
+  size: number;
+};
+
 type SequenceStep = {
-  id: string;
+  id?: string;
   step_number: number;
   subject: string;
   html_body: string;
-  created_at: string;
-  updated_at: string;
+  attachments?: SequenceAttachment[];
+  created_at?: string;
+  updated_at?: string;
 };
 
 type SequenceProgress = {
@@ -309,6 +317,7 @@ export default function AdminWheelPage() {
   const [dragStepId, setDragStepId] = useState<string | null>(null);
   const [dragOverStepId, setDragOverStepId] = useState<string | null>(null);
   const [isReordering, setIsReordering] = useState(false);
+  const [previewStep, setPreviewStep] = useState<SequenceStep | null>(null);
   const [isSequenceLoading, setIsSequenceLoading] = useState(false);
   const [sequenceStepFileName, setSequenceStepFileName] = useState("");
   const [editingDoctor, setEditingDoctor] = useState<AdminDoctorRegistration | null>(null);
@@ -1177,6 +1186,7 @@ export default function AdminWheelPage() {
         stepNumber: editingStep.step_number ?? sequenceSteps.length + 1,
         subject: editingStep.subject.trim(),
         htmlBody: editingStep.html_body.trim(),
+        attachments: editingStep.attachments ?? [],
       });
       setSequenceSteps((current) => {
         const existing = current.find((s) => s.id === saved.id);
@@ -1209,6 +1219,29 @@ export default function AdminWheelPage() {
     } finally {
       setIsDeletingStepId(null);
     }
+  }
+
+  async function handleSequenceAttachmentUpload(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    if (!files.length) return;
+    const loaded: SequenceAttachment[] = await Promise.all(
+      files.map((file) =>
+        new Promise<SequenceAttachment>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const dataUrl = reader.result as string;
+            const base64 = dataUrl.split(",")[1];
+            resolve({ filename: file.name, content: base64, content_type: file.type || "application/octet-stream", size: file.size });
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        })
+      )
+    );
+    setEditingStep((current) =>
+      current ? { ...current, attachments: [...(current.attachments ?? []), ...loaded] } : current
+    );
+    event.target.value = "";
   }
 
   async function handleSequenceStepHtmlUpload(event: ChangeEvent<HTMLInputElement>) {
@@ -2365,7 +2398,7 @@ export default function AdminWheelPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setEditingStep({ id: undefined, step_number: sequenceSteps.length + 1, subject: "", html_body: "" });
+                  setEditingStep({ step_number: sequenceSteps.length + 1, subject: "", html_body: "", attachments: [] });
                   setSequenceStepFileName("");
                 }}
                 disabled={!!editingStep}
@@ -2375,6 +2408,13 @@ export default function AdminWheelPage() {
               <button type="button" onClick={refreshSequence} disabled={isSequenceLoading}>
                 {isSequenceLoading ? "Loading…" : "Refresh"}
               </button>
+              <a
+                href="/sample-upload-newsletter.html"
+                download="sequence-template.html"
+                style={{ fontSize: 13, padding: "6px 14px", border: "1px solid #ccc", borderRadius: 4, textDecoration: "none", color: "#333", background: "#fff" }}
+              >
+                Download Template
+              </a>
             </div>
           </div>
 
@@ -2413,6 +2453,13 @@ export default function AdminWheelPage() {
                   <br />
                   <small style={{ color: "#888" }}>{step.html_body ? `${step.html_body.length.toLocaleString()} chars` : "No HTML"}</small>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setPreviewStep(step)}
+                  disabled={!step.html_body}
+                >
+                  Preview
+                </button>
                 <button
                   type="button"
                   onClick={() => { setEditingStep(step); setSequenceStepFileName(""); }}
@@ -2465,6 +2512,29 @@ export default function AdminWheelPage() {
                   <small style={{ color: "#888" }}>{editingStep.html_body.length.toLocaleString()} chars loaded (upload a new file to replace)</small>
                 ) : null}
               </label>
+              <label style={{ display: "block", marginBottom: 4, marginTop: 16 }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>Attachments</span>
+                <br />
+                <small style={{ color: "#888" }}>Any file type, any number. Doctors receive these as email attachments.</small>
+                <input type="file" multiple onChange={handleSequenceAttachmentUpload} style={{ display: "block", marginTop: 8 }} />
+              </label>
+              {(editingStep.attachments ?? []).length > 0 ? (
+                <ul style={{ margin: "8px 0 0", padding: 0, listStyle: "none" }}>
+                  {(editingStep.attachments ?? []).map((att, i) => (
+                    <li key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: 13 }}>
+                      <span>📎 {att.filename}</span>
+                      <small style={{ color: "#888" }}>({(att.size / 1024).toFixed(0)} KB)</small>
+                      <button
+                        type="button"
+                        onClick={() => setEditingStep((cur) => cur ? { ...cur, attachments: (cur.attachments ?? []).filter((_, j) => j !== i) } : cur)}
+                        style={{ color: "#c0392b", fontSize: 12, padding: "1px 6px" }}
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
               <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
                 <button type="button" onClick={handleSaveSequenceStep} disabled={isSavingStep}>
                   {isSavingStep ? "Saving…" : "Save Step"}
@@ -2903,6 +2973,41 @@ export default function AdminWheelPage() {
         <section className="admin-wheel-empty">
           <p>Enter the admin password to load wheel prizes and doctor registrations.</p>
         </section>
+      ) : null}
+
+      {previewStep ? (
+        <div
+          className="admin-modal-backdrop"
+          role="presentation"
+          onClick={() => setPreviewStep(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: "#fff", borderRadius: 6, width: "100%", maxWidth: 700, maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid #eee" }}>
+              <strong style={{ fontSize: 15 }}>Preview — Step #{previewStep.step_number}: {previewStep.subject}</strong>
+              <button type="button" onClick={() => setPreviewStep(null)} style={{ fontSize: 18, background: "none", border: "none", cursor: "pointer", lineHeight: 1 }}>✕</button>
+            </div>
+            <iframe
+              title="Step preview"
+              style={{ flex: 1, border: "none", minHeight: 500 }}
+              srcDoc={previewStep.html_body
+                .replace(/\{\{\s*doctor_name\s*\}\}/g, "Dr. Sample Doctor")
+                .replace(/\{\{\s*doctor_email\s*\}\}/g, "doctor@clinic.com")
+                .replace(/\{\{\s*doctor_mobile\s*\}\}/g, "09171234567")
+                .replace(/\{\{\s*tiktok_username\s*\}\}/g, "gutguardph")
+                .replace(/\{\{\s*specialty\s*\}\}/g, "Gastroenterology")
+                .replace(/\{\{\s*clinic_location\s*\}\}/g, "Makati City")
+                .replace(/\{\{\s*registered_at\s*\}\}/g, "Jun 20, 2026")
+                .replace(/\{\{\s*prize_label\s*\}\}/g, "Tote Bag")
+                .replace(/\{\{\s*next_step_number\s*\}\}/g, String(previewStep.step_number + 1))
+                .replace(/\{\{\s*sequence_click_url\s*\}\}/g, "#")}
+              sandbox="allow-same-origin"
+            />
+          </div>
+        </div>
       ) : null}
     </main>
   );

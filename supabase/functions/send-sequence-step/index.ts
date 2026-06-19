@@ -24,11 +24,14 @@ type DoctorRegistration = {
   created_at: string | null;
 };
 
+type SequenceAttachment = { filename: string; content: string; content_type: string; size: number };
+
 type SequenceStep = {
   id: string;
   step_number: number;
   subject: string;
   html_body: string;
+  attachments?: SequenceAttachment[];
 };
 
 type Enrollment = {
@@ -100,7 +103,7 @@ Deno.serve(async (req) => {
     // Fetch the target step
     const { data: stepData, error: stepError } = await supabase
       .from("email_sequence_steps")
-      .select("id, step_number, subject, html_body")
+      .select("id, step_number, subject, html_body, attachments")
       .eq("step_number", targetStep)
       .single();
 
@@ -133,18 +136,30 @@ Deno.serve(async (req) => {
     const clickUrl = `${supabaseUrl}/functions/v1/track-sequence-click?send_id=${sendRecord.id}`;
 
     // Render HTML with placeholders
-    const html = renderTemplate(step.html_body, doctor, clickUrl, siteUrl);
+    const html = renderTemplate(step.html_body, doctor, clickUrl, siteUrl, step.step_number);
+
+    // Build Resend payload
+    const resendPayload: Record<string, unknown> = {
+      from: fromEmail,
+      to: [email],
+      subject: renderSubject(step.subject, doctor),
+      html,
+    };
+
+    // Attach files if present
+    const stepAttachments = step.attachments ?? [];
+    if (stepAttachments.length > 0) {
+      resendPayload.attachments = stepAttachments.map((att) => ({
+        filename: att.filename,
+        content: att.content,
+      }));
+    }
 
     // Send via Resend
     const resendRes = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${resendApiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: fromEmail,
-        to: [email],
-        subject: renderSubject(step.subject, doctor),
-        html,
-      }),
+      body: JSON.stringify(resendPayload),
     });
 
     if (!resendRes.ok) {
@@ -169,7 +184,7 @@ Deno.serve(async (req) => {
   }
 });
 
-function renderTemplate(html: string, doctor: DoctorRegistration, clickUrl: string, siteUrl: string) {
+function renderTemplate(html: string, doctor: DoctorRegistration, clickUrl: string, siteUrl: string, currentStep: number) {
   const tiktokUsername = (doctor.tiktok_username ?? "").trim().replace(/^@+/, "").toLowerCase();
   const routingUrl = doctor.routing_slug ? `${siteUrl}/dr/${encodeURIComponent(doctor.routing_slug)}` : "";
 
@@ -184,6 +199,7 @@ function renderTemplate(html: string, doctor: DoctorRegistration, clickUrl: stri
     redirect_url: doctor.redirect_url ?? (tiktokUsername ? `https://www.tiktok.com/@${tiktokUsername}` : ""),
     registered_at: formatDate(doctor.created_at),
     sequence_click_url: clickUrl,
+    next_step_number: String(currentStep + 1),
   };
 
   return stripScriptTags(html).replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_match, key: string) => {

@@ -380,13 +380,21 @@ export async function sendSmsBlast(
 
 // ─── Email Sequence ────────────────────────────────────────────────────────
 
+export type SequenceAttachment = {
+  filename: string;
+  content: string; // base64
+  content_type: string;
+  size: number;
+};
+
 export type SequenceStep = {
-  id: string;
+  id?: string;
   step_number: number;
   subject: string;
   html_body: string;
-  created_at: string;
-  updated_at: string;
+  attachments?: SequenceAttachment[];
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type SequenceProgress = {
@@ -410,7 +418,7 @@ export async function getSequenceSteps(adminPassword: string): Promise<SequenceS
 
 export async function upsertSequenceStep(
   adminPassword: string,
-  step: { id?: string; stepNumber: number; subject: string; htmlBody: string },
+  step: { id?: string; stepNumber: number; subject: string; htmlBody: string; attachments?: SequenceAttachment[] },
 ): Promise<SequenceStep> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
   const { data, error } = await supabase.functions.invoke("manage-sequence", {
