@@ -152,6 +152,7 @@ type WheelApi = {
   deleteSequenceStep?: (adminPassword: string, stepId: string) => Promise<void>;
   reorderSequenceSteps?: (adminPassword: string, stepIds: string[]) => Promise<void>;
   getSequenceProgress?: (adminPassword: string) => Promise<{ progress: SequenceProgress[]; totalSteps: number }>;
+  resendSequenceStep?: (doctorId: string, stepNumber: number) => Promise<void>;
 };
 
 type SequenceAttachment = {
@@ -318,6 +319,7 @@ export default function AdminWheelPage() {
   const [dragOverStepId, setDragOverStepId] = useState<string | null>(null);
   const [isReordering, setIsReordering] = useState(false);
   const [previewStep, setPreviewStep] = useState<SequenceStep | null>(null);
+  const [resendingKey, setResendingKey] = useState<string | null>(null);
   const [isSequenceLoading, setIsSequenceLoading] = useState(false);
   const [sequenceStepFileName, setSequenceStepFileName] = useState("");
   const [editingDoctor, setEditingDoctor] = useState<AdminDoctorRegistration | null>(null);
@@ -1125,6 +1127,22 @@ export default function AdminWheelPage() {
       setError(caught instanceof Error ? caught.message : "Unable to create prize.");
     } finally {
       setIsCreating(false);
+    }
+  }
+
+  async function handleResendStep(doctorId: string, stepNumber: number, key: string) {
+    setError(null);
+    setResendingKey(key);
+    try {
+      const api = await loadWheelApi();
+      if (!api.resendSequenceStep) throw new Error("Missing resendSequenceStep helper.");
+      await api.resendSequenceStep(doctorId, stepNumber);
+      setNotice(`Step ${stepNumber} sent to doctor.`);
+      await refreshSequence();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Failed to send step.");
+    } finally {
+      setResendingKey(null);
     }
   }
 
@@ -2411,7 +2429,8 @@ export default function AdminWheelPage() {
               <a
                 href="/sample-upload-newsletter.html"
                 download="sequence-template.html"
-                style={{ fontSize: 13, padding: "6px 14px", border: "1px solid #ccc", borderRadius: 4, textDecoration: "none", color: "#333", background: "#fff" }}
+                className="admin-wheel-btn"
+                style={{ textDecoration: "none" }}
               >
                 Download Template
               </a>
@@ -2553,10 +2572,11 @@ export default function AdminWheelPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
                 <thead>
                   <tr style={{ borderBottom: "2px solid #eee", textAlign: "left" }}>
-                    <th style={{ padding: "6px 8px" }}>Doctor</th>
-                    <th style={{ padding: "6px 8px" }}>Current Step</th>
-                    <th style={{ padding: "6px 8px" }}>Status</th>
-                    <th style={{ padding: "6px 8px" }}>Last Clicked</th>
+                    <th style={{ padding: "8px 10px" }}>Doctor</th>
+                    <th style={{ padding: "8px 10px" }}>Step</th>
+                    <th style={{ padding: "8px 10px" }}>Status</th>
+                    <th style={{ padding: "8px 10px" }}>Last Clicked</th>
+                    <th style={{ padding: "8px 10px" }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2566,30 +2586,62 @@ export default function AdminWheelPage() {
                       .filter(Boolean)
                       .sort()
                       .at(-1);
+                    const resendKey = `resend-${row.doctor_id}-${row.current_step}`;
+                    const nextKey = `next-${row.doctor_id}-${row.current_step + 1}`;
+                    const isBusy = resendingKey === resendKey || resendingKey === nextKey;
+                    const isCompleted = row.status === "completed";
                     return (
                       <tr key={row.id} style={{ borderBottom: "1px solid #f0f0f0" }}>
-                        <td style={{ padding: "8px 8px" }}>
+                        <td style={{ padding: "10px 10px" }}>
                           <strong>{row.doctor_registrations?.full_name ?? row.doctor_id}</strong>
                           <br />
                           <small style={{ color: "#888" }}>{row.doctor_registrations?.email ?? ""}</small>
                         </td>
-                        <td style={{ padding: "8px 8px" }}>
+                        <td style={{ padding: "10px 10px" }}>
                           Step {row.current_step} of {sequenceTotalSteps}
                         </td>
-                        <td style={{ padding: "8px 8px" }}>
+                        <td style={{ padding: "10px 10px" }}>
                           <span style={{
                             padding: "2px 8px",
                             borderRadius: 99,
                             fontSize: 12,
                             fontWeight: 700,
-                            background: row.status === "completed" ? "#d4edda" : "#cce5ff",
-                            color: row.status === "completed" ? "#155724" : "#004085",
+                            background: isCompleted ? "#d4edda" : "#cce5ff",
+                            color: isCompleted ? "#155724" : "#004085",
                           }}>
                             {row.status}
                           </span>
                         </td>
-                        <td style={{ padding: "8px 8px", color: "#888" }}>
+                        <td style={{ padding: "10px 10px", color: "#888" }}>
                           {lastClick ? formatAdminDate(lastClick) : "—"}
+                        </td>
+                        <td style={{ padding: "10px 10px" }}>
+                          {isCompleted ? (
+                            <span style={{ color: "#888", fontSize: 12 }}>Sequence done</span>
+                          ) : (
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() => handleResendStep(row.doctor_id, row.current_step, resendKey)}
+                                style={{ fontSize: 12, minHeight: 32, padding: "6px 10px" }}
+                                title={`Resend Step ${row.current_step} email`}
+                              >
+                                {resendingKey === resendKey ? "Sending…" : `↺ Resend Step ${row.current_step}`}
+                              </button>
+                              {row.current_step < sequenceTotalSteps ? (
+                                <button
+                                  type="button"
+                                  disabled={isBusy}
+                                  onClick={() => handleResendStep(row.doctor_id, row.current_step + 1, nextKey)}
+                                  style={{ fontSize: 12, minHeight: 32, padding: "6px 10px", background: "#0608a9" }}
+                                  title={`Skip to Step ${row.current_step + 1}`}
+                                >
+                                  {resendingKey === nextKey ? "Sending…" : `→ Send Step ${row.current_step + 1}`}
+                                </button>
+                              ) : null}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );

@@ -1174,7 +1174,8 @@
   box-shadow: 0 0 0 2px rgba(6, 8, 169, 0.08);
 }
 
-.admin-wheel-shell button {
+.admin-wheel-shell button,
+.admin-wheel-shell .admin-wheel-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;

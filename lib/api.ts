@@ -463,6 +463,14 @@ export async function enrollDoctorInSequence(doctorId: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function resendSequenceStep(doctorId: string, stepNumber: number): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  const { error } = await supabase.functions.invoke("send-sequence-step", {
+    body: { doctorId, stepNumber },
+  });
+  if (error) throw error;
+}
+
 // ─── Registration Email Settings ───────────────────────────────────────────
 
 export async function getRegistrationEmailSettings(adminPassword: string): Promise<RegistrationEmailSettings> {
