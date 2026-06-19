@@ -306,6 +306,9 @@ export default function AdminWheelPage() {
   const [editingStep, setEditingStep] = useState<Partial<SequenceStep> | null>(null);
   const [isSavingStep, setIsSavingStep] = useState(false);
   const [isDeletingStepId, setIsDeletingStepId] = useState<string | null>(null);
+  const [dragStepId, setDragStepId] = useState<string | null>(null);
+  const [dragOverStepId, setDragOverStepId] = useState<string | null>(null);
+  const [isReordering, setIsReordering] = useState(false);
   const [isSequenceLoading, setIsSequenceLoading] = useState(false);
   const [sequenceStepFileName, setSequenceStepFileName] = useState("");
   const [editingDoctor, setEditingDoctor] = useState<AdminDoctorRegistration | null>(null);
@@ -1113,6 +1116,32 @@ export default function AdminWheelPage() {
       setError(caught instanceof Error ? caught.message : "Unable to create prize.");
     } finally {
       setIsCreating(false);
+    }
+  }
+
+  async function handleDropStep(targetId: string) {
+    if (!dragStepId || dragStepId === targetId) { setDragStepId(null); setDragOverStepId(null); return; }
+    const reordered = [...sequenceSteps];
+    const fromIndex = reordered.findIndex((s) => s.id === dragStepId);
+    const toIndex = reordered.findIndex((s) => s.id === targetId);
+    if (fromIndex === -1 || toIndex === -1) return;
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+    const renumbered = reordered.map((s, i) => ({ ...s, step_number: i + 1 }));
+    setSequenceSteps(renumbered);
+    setDragStepId(null);
+    setDragOverStepId(null);
+    setIsReordering(true);
+    try {
+      const api = await loadWheelApi();
+      if (!api.reorderSequenceSteps) throw new Error("Missing reorderSequenceSteps helper.");
+      await api.reorderSequenceSteps(password, renumbered.map((s) => s.id!));
+      setNotice("Sequence reordered.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to reorder steps.");
+      await refreshSequence();
+    } finally {
+      setIsReordering(false);
     }
   }
 
@@ -2356,7 +2385,28 @@ export default function AdminWheelPage() {
               <p style={{ color: "#888", fontSize: 14 }}>No steps yet. Click &quot;+ Add Step&quot; to create the first email in the sequence.</p>
             ) : null}
             {sequenceSteps.map((step) => (
-              <article key={step.id} className="admin-sequence-step-row" style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid #eee" }}>
+              <article
+                key={step.id}
+                draggable={!editingStep && !isReordering}
+                onDragStart={() => setDragStepId(step.id ?? null)}
+                onDragOver={(e) => { e.preventDefault(); setDragOverStepId(step.id ?? null); }}
+                onDragLeave={() => setDragOverStepId(null)}
+                onDrop={() => step.id && handleDropStep(step.id)}
+                onDragEnd={() => { setDragStepId(null); setDragOverStepId(null); }}
+                className="admin-sequence-step-row"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "12px 0",
+                  borderBottom: "1px solid #eee",
+                  opacity: dragStepId === step.id ? 0.4 : 1,
+                  borderTop: dragOverStepId === step.id && dragStepId !== step.id ? "2px solid #0608a9" : undefined,
+                  cursor: editingStep || isReordering ? "default" : "grab",
+                  transition: "opacity 0.15s",
+                }}
+              >
+                <span style={{ color: "#bbb", fontSize: 16, userSelect: "none", cursor: "inherit" }}>⠿</span>
                 <span style={{ fontWeight: 700, fontSize: 13, color: "#0608a9", minWidth: 28 }}>#{step.step_number}</span>
                 <div style={{ flex: 1 }}>
                   <strong style={{ fontSize: 15 }}>{step.subject}</strong>
@@ -2365,18 +2415,15 @@ export default function AdminWheelPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    setEditingStep(step);
-                    setSequenceStepFileName("");
-                  }}
-                  disabled={!!editingStep}
+                  onClick={() => { setEditingStep(step); setSequenceStepFileName(""); }}
+                  disabled={!!editingStep || isReordering}
                 >
                   Edit
                 </button>
                 <button
                   type="button"
                   onClick={() => step.id && handleDeleteSequenceStep(step.id)}
-                  disabled={!!editingStep || isDeletingStepId === step.id}
+                  disabled={!!editingStep || isReordering || isDeletingStepId === step.id}
                   style={{ color: "#c0392b" }}
                 >
                   {isDeletingStepId === step.id ? "Removing…" : "Remove"}

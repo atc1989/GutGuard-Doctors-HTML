@@ -51,6 +51,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SEQUENCE_FROM_EMAIL") ??
       Deno.env.get("NEWSLETTER_FROM_EMAIL") ??
       Deno.env.get("REGISTRATION_FROM_EMAIL") ??
+      Deno.env.get("PROPOSAL_FROM_EMAIL") ??
       "GutGuard Doctors <onboarding@resend.dev>";
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");

@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
     .single();
 
   if (enrollError || !enrollment || enrollment.status === "completed") {
-    return htmlResponse(thankYouPage(), 200);
+    return redirectResponse();
   }
 
   // Find the step that was clicked to get its step_number
@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
       .from("doctor_sequence_enrollments")
       .update({ status: "completed" })
       .eq("id", enrollment.id);
-    return htmlResponse(thankYouPage(), 200);
+    return redirectResponse();
   }
 
   // Send the next step by invoking send-sequence-step
@@ -95,27 +95,17 @@ Deno.serve(async (req) => {
     // Fire-and-forget — don't fail the response if the send fails
   }
 
-  return htmlResponse(thankYouPage(), 200);
+  return redirectResponse();
 });
 
-function thankYouPage() {
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>GutGuard Doctors</title>
-  <style>
-    body { margin: 0; padding: 40px 20px; font-family: Arial, sans-serif; background: #f4f1ea; color: #111018; text-align: center; }
-    h1 { font-size: 28px; margin-bottom: 12px; }
-    p { font-size: 16px; color: #444; }
-  </style>
-</head>
-<body>
-  <h1>Thank you!</h1>
-  <p>Your response has been recorded. Watch your inbox for more updates from GutGuard Doctors.</p>
-</body>
-</html>`;
+function redirectResponse() {
+  return new Response(null, {
+    status: 302,
+    headers: {
+      ...corsHeaders,
+      Location: "https://www.gutguard.ph",
+    },
+  });
 }
 
 function htmlResponse(body: string, status = 200) {

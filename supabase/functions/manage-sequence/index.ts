@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     // Validate admin password
-    const { error: authError } = await supabase.rpc("assert_wheel_admin", { p_password: adminPassword });
+    const { error: authError } = await supabase.rpc("assert_wheel_admin", { p_admin_password: adminPassword });
     if (authError) return jsonResponse({ error: "Invalid admin password" }, 403);
 
     if (action === "get-steps") {
