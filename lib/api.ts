@@ -117,6 +117,45 @@ type SmsBlastResponse = {
   results: SmsSendResult[];
 };
 
+export type TikTokOrderTimeMode = "create_time" | "update_time";
+
+export type TikTokOrdersFilters = {
+  timeMode: TikTokOrderTimeMode;
+  startTime?: number;
+  endTime?: number;
+  orderStatus?: string;
+  pageSize: number;
+  pageToken?: string;
+};
+
+export type TikTokOrderSummary = {
+  id: string;
+  status: string;
+  createTime: string;
+  updateTime: string;
+  buyerEmail: string;
+  deliveryOptionName: string;
+  shippingProvider: string;
+  trackingNumber: string;
+  paymentAmount: string;
+  currency: string;
+};
+
+export type TikTokOrdersResponse = {
+  orders: TikTokOrderSummary[];
+  nextPageToken: string;
+  totalCount: number | null;
+  debug: {
+    method: string;
+    path: string;
+    query: Record<string, string>;
+    body: Record<string, unknown>;
+    baseUrl: string;
+    requestedAt: string;
+  };
+  raw: unknown;
+};
+
 export type RegistrationEmailAttachment = {
   id?: string;
   filename: string;
@@ -379,6 +418,20 @@ export async function sendSmsBlast(
 }
 
 // ─── Email Sequence ────────────────────────────────────────────────────────
+
+export async function getTikTokOrders(
+  adminPassword: string,
+  filters: TikTokOrdersFilters,
+): Promise<TikTokOrdersResponse> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.functions.invoke("tiktok-shop-admin", {
+    body: { adminPassword, filters },
+  });
+
+  if (error) throw new Error(await getSupabaseFunctionErrorMessage(error));
+  return data as TikTokOrdersResponse;
+}
 
 export type SequenceAttachment = {
   filename: string;
