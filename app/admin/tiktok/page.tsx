@@ -284,6 +284,18 @@ export default function AdminTikTokPage() {
   const hasPassword = password.trim().length > 0;
   const detailOrder = detailResult?.order;
   const priceDetail = priceResult?.price;
+  const fallbackPriceLineItems =
+    priceDetail &&
+    detailOrder?.summary.id === priceDetail.orderId &&
+    priceDetail.lineItems.every((item) => !item.price) &&
+    detailOrder.lineItems.length > 0
+      ? detailOrder.lineItems
+      : [];
+  const priceLineItems = fallbackPriceLineItems.length > 0 ? fallbackPriceLineItems : (priceDetail?.lineItems ?? []);
+  const priceCurrency =
+    priceDetail?.currency ||
+    priceLineItems.map((item) => item.currency).find((currency): currency is string => Boolean(currency)) ||
+    "";
   const referenceRows = Array.isArray(referenceResult?.references) ? referenceResult.references : [];
 
   return (
@@ -575,20 +587,23 @@ export default function AdminTikTokPage() {
               <SummaryGrid
                 items={[
                   ["Order", priceDetail.orderId],
-                  ["Currency", priceDetail.currency],
-                  ...priceDetail.totals.map((item) => [item.label, formatMoney(item.amount, priceDetail.currency)] as [string, string]),
+                  ["Currency", priceCurrency],
+                  ...priceDetail.totals.map((item) => [item.label, formatMoney(item.amount, priceCurrency)] as [string, string]),
                 ]}
               />
+              {fallbackPriceLineItems.length > 0 ? (
+                <p className="admin-tiktok-muted">Line item prices are shown from Order Detail because Price Detail did not return item amount fields.</p>
+              ) : null}
               <DataTable
                 title="Line item prices"
                 empty="No line item price data returned."
                 headers={["Line item", "Product", "SKU", "Qty", "Price"]}
-                rows={priceDetail.lineItems.map((item) => [
+                rows={priceLineItems.map((item) => [
                   item.id,
                   item.productName ?? "",
                   item.skuName ?? "",
                   String(item.quantity ?? ""),
-                  formatMoney(item.price ?? "", item.currency ?? priceDetail.currency),
+                  formatMoney(item.price ?? "", item.currency ?? priceCurrency),
                 ])}
               />
               <DebugPanel

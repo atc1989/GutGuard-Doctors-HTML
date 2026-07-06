@@ -498,14 +498,30 @@ function normalizeOrderDetail(raw: unknown) {
 function normalizePriceDetail(payload: Record<string, unknown>, raw: unknown) {
   const data = isRecord(raw) && isRecord(raw.data) ? raw.data : raw;
   const source = getRecord(data) ?? {};
-  const payment = getRecord(source.payment) ?? source;
-  const currency = getString(payment.currency) ?? getString(payment.currency_code) ?? "";
+  const detail =
+    getRecord(source.price_detail) ??
+    getRecord(source.price_details) ??
+    getRecord(source.order_price_detail) ??
+    getRecord(source.order_price) ??
+    source;
+  const payment = getRecord(detail.payment) ?? getRecord(source.payment) ?? detail;
+  const lineItems = getArray(detail.line_items) ?? getArray(source.line_items) ?? getArray(detail.sku_price_details) ?? [];
+  const currency =
+    getString(payment.currency) ??
+    getString(payment.currency_code) ??
+    getString(detail.currency) ??
+    getString(source.currency) ??
+    getString(getRecord(lineItems[0])?.currency) ??
+    "";
   const labels = [
     ["Order total", payment.total_amount],
+    ["Original product total", payment.original_total_product_price],
     ["Subtotal", payment.sub_total],
     ["Shipping fee", payment.shipping_fee],
+    ["Original shipping fee", payment.original_shipping_fee],
     ["Seller discount", payment.seller_discount],
     ["Platform discount", payment.platform_discount],
+    ["Tax", payment.tax],
     ["Product tax", payment.product_tax],
     ["Shipping tax", payment.shipping_fee_tax],
   ];
@@ -514,9 +530,9 @@ function normalizePriceDetail(payload: Record<string, unknown>, raw: unknown) {
     orderId: getString(payload.orderId) ?? getString(source.order_id) ?? "",
     currency,
     totals: labels
-      .map(([label, amount]) => ({ label: String(label), amount: getString(amount) ?? "" }))
+      .map(([label, amount]) => ({ label: String(label), amount: getAmountString(amount) }))
       .filter((item) => item.amount),
-    lineItems: Array.isArray(source.line_items) ? source.line_items.map(normalizeLineItem) : [],
+    lineItems: lineItems.map(normalizeLineItem),
   };
 }
 
@@ -544,15 +560,31 @@ function normalizeReferences(raw: unknown) {
 
 function normalizeLineItem(value: unknown) {
   const item = getRecord(value) ?? {};
-  const salePrice = getRecord(item.sale_price) ?? getRecord(item.price) ?? {};
+  const salePrice =
+    getRecord(item.sale_price) ??
+    getRecord(item.price) ??
+    getRecord(item.original_price) ??
+    getRecord(item.sku_price) ??
+    getRecord(item.total_price) ??
+    {};
   return {
     id: getString(item.id) ?? getString(item.line_item_id) ?? "",
     productName: getString(item.product_name) ?? "",
     skuName: getString(item.sku_name) ?? getString(item.seller_sku) ?? "",
     quantity: getNumber(item.quantity) ?? 0,
     displayStatus: getString(item.display_status) ?? "",
-    price: getString(salePrice.amount) ?? getString(item.sale_price) ?? "",
-    currency: getString(salePrice.currency) ?? getString(item.currency) ?? "",
+    price:
+      getAmountString(salePrice.amount) ||
+      getAmountString(item.sale_price) ||
+      getAmountString(item.price) ||
+      getAmountString(item.original_price) ||
+      getAmountString(item.sku_price) ||
+      "",
+    currency:
+      getString(salePrice.currency) ??
+      getString(item.currency) ??
+      getString(item.currency_code) ??
+      "",
   };
 }
 
@@ -677,8 +709,17 @@ function getRecord(value: unknown): Record<string, unknown> | null {
   return isRecord(value) ? value : null;
 }
 
+function getArray(value: unknown): unknown[] | null {
+  return Array.isArray(value) ? value : null;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function getAmountString(value: unknown) {
+  if (isRecord(value)) return getString(value.amount) ?? getString(value.value) ?? "";
+  return getString(value) ?? "";
 }
 
 function getString(value: unknown) {

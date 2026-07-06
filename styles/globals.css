@@ -1038,6 +1038,10 @@
   padding: 28px;
 }
 
+.admin-tiktok-shell {
+  width: min(100%, 1480px);
+}
+
 .admin-wheel-hero {
   display: flex;
   justify-content: space-between;
@@ -2335,7 +2339,7 @@
 }
 
 .admin-tiktok-table.compact {
-  min-width: 760px;
+  min-width: 1120px;
 }
 
 .admin-tiktok-debug-panel {
@@ -2373,6 +2377,22 @@
   text-align: left;
   vertical-align: top;
   overflow-wrap: anywhere;
+}
+
+.admin-tiktok-table th {
+  white-space: nowrap;
+}
+
+.admin-tiktok-table.compact th:nth-last-child(-n + 3),
+.admin-tiktok-table.compact td:nth-last-child(-n + 3) {
+  width: 96px;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+.admin-tiktok-table.compact th:first-child,
+.admin-tiktok-table.compact td:first-child {
+  width: 150px;
 }
 
 .admin-tiktok-table th {
