@@ -154,6 +154,9 @@ export default function AdminTikTokPage() {
 
     try {
       const response = await getTikTokOrderDetail(password, cleanOrderId);
+      if (!response.order?.summary) {
+        throw new Error("Order detail response did not include order data. The Edge Function may need redeploying.");
+      }
       setDetailResult(response);
       setIsUnlocked(true);
       setNotice(`Loaded detail for order ${cleanOrderId}.`);
@@ -177,6 +180,9 @@ export default function AdminTikTokPage() {
 
     try {
       const response = await getTikTokPriceDetail(password, cleanOrderId);
+      if (!response.price) {
+        throw new Error("Price detail response did not include price data. The Edge Function may need redeploying.");
+      }
       setPriceResult(response);
       setIsUnlocked(true);
       setNotice(`Loaded price detail for order ${cleanOrderId}.`);
@@ -223,6 +229,9 @@ export default function AdminTikTokPage() {
 
     try {
       const response = await request();
+      if (!Array.isArray(response.references)) {
+        throw new Error("Reference response did not include reference data. The Edge Function may need redeploying.");
+      }
       setReferenceResult(response);
       setReferenceMode(label);
       setIsUnlocked(true);
@@ -273,6 +282,9 @@ export default function AdminTikTokPage() {
   }
 
   const hasPassword = password.trim().length > 0;
+  const detailOrder = detailResult?.order;
+  const priceDetail = priceResult?.price;
+  const referenceRows = Array.isArray(referenceResult?.references) ? referenceResult.references : [];
 
   return (
     <main className="admin-wheel-shell admin-tiktok-shell">
@@ -494,23 +506,23 @@ export default function AdminTikTokPage() {
               {detailLoading ? "Loading" : "Fetch detail"}
             </button>
           </div>
-          {detailResult ? (
+          {detailOrder ? (
             <>
               <SummaryGrid
                 items={[
-                  ["Order", detailResult.order.summary.id],
-                  ["Status", detailResult.order.summary.status],
-                  ["Created", formatAdminDate(detailResult.order.summary.createTime)],
-                  ["Updated", formatAdminDate(detailResult.order.summary.updateTime)],
-                  ["Delivery", detailResult.order.summary.deliveryOptionName],
-                  ["Fulfillment", detailResult.order.summary.fulfillmentType ?? ""],
+                  ["Order", detailOrder.summary.id],
+                  ["Status", detailOrder.summary.status],
+                  ["Created", formatAdminDate(detailOrder.summary.createTime)],
+                  ["Updated", formatAdminDate(detailOrder.summary.updateTime)],
+                  ["Delivery", detailOrder.summary.deliveryOptionName],
+                  ["Fulfillment", detailOrder.summary.fulfillmentType ?? ""],
                 ]}
               />
               <DataTable
                 title="Line items"
                 empty="No line items returned."
                 headers={["Line item", "Product", "SKU", "Qty", "Status", "Price"]}
-                rows={detailResult.order.lineItems.map((item) => [
+                rows={detailOrder.lineItems.map((item) => [
                   item.id,
                   item.productName ?? "",
                   item.skuName ?? "",
@@ -523,7 +535,7 @@ export default function AdminTikTokPage() {
                 title="Packages"
                 empty="No package data returned."
                 headers={["Package", "Delivery", "Carrier", "Tracking"]}
-                rows={detailResult.order.packages.map((item) => [
+                rows={detailOrder.packages.map((item) => [
                   item.id,
                   item.deliveryOptionName ?? "",
                   item.shippingProvider ?? "",
@@ -558,25 +570,25 @@ export default function AdminTikTokPage() {
               {priceLoading ? "Loading" : "Fetch price detail"}
             </button>
           </div>
-          {priceResult ? (
+          {priceDetail ? (
             <>
               <SummaryGrid
                 items={[
-                  ["Order", priceResult.price.orderId],
-                  ["Currency", priceResult.price.currency],
-                  ...priceResult.price.totals.map((item) => [item.label, formatMoney(item.amount, priceResult.price.currency)] as [string, string]),
+                  ["Order", priceDetail.orderId],
+                  ["Currency", priceDetail.currency],
+                  ...priceDetail.totals.map((item) => [item.label, formatMoney(item.amount, priceDetail.currency)] as [string, string]),
                 ]}
               />
               <DataTable
                 title="Line item prices"
                 empty="No line item price data returned."
                 headers={["Line item", "Product", "SKU", "Qty", "Price"]}
-                rows={priceResult.price.lineItems.map((item) => [
+                rows={priceDetail.lineItems.map((item) => [
                   item.id,
                   item.productName ?? "",
                   item.skuName ?? "",
                   String(item.quantity ?? ""),
-                  formatMoney(item.price ?? "", item.currency ?? priceResult.price.currency),
+                  formatMoney(item.price ?? "", item.currency ?? priceDetail.currency),
                 ])}
               />
               <DebugPanel
@@ -624,7 +636,7 @@ export default function AdminTikTokPage() {
                 title="Reference results"
                 empty="No references returned."
                 headers={["Order", "External reference", "Created", "Updated"]}
-                rows={referenceResult.references.map((item) => [
+                rows={referenceRows.map((item) => [
                   item.orderId ?? "",
                   item.externalReference ?? "",
                   formatAdminDate(item.createdAt ?? ""),

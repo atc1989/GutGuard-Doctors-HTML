@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
     const apiRequest = buildTikTokApiRequest(action, payload, request.filters, config);
     const { raw, debug, status } = await callTikTokApi(config, tokenResult, apiRequest);
 
-    if (status < 200 || status >= 300) {
+    if (status < 200 || status >= 300 || isTikTokApiError(raw)) {
       return jsonResponse(
         {
           error: getTikTokErrorMessage(raw) || `TikTok Shop request failed with HTTP ${status}`,
@@ -140,7 +140,10 @@ function buildTikTokApiRequest(
     const orderId = requireCleanString(payload.orderId, "orderId");
     return {
       method: "GET",
-      path: `/order/${config.apiVersion}/orders/${encodeURIComponent(orderId)}`,
+      path: `/order/${config.apiVersion}/orders`,
+      query: {
+        ids: JSON.stringify([orderId]),
+      },
     };
   }
 
@@ -650,6 +653,12 @@ function getTikTokErrorMessage(raw: unknown) {
   if (!isRecord(raw)) return "";
   const message = raw.message ?? raw.error_msg ?? raw.error;
   return typeof message === "string" ? message : "";
+}
+
+function isTikTokApiError(raw: unknown) {
+  if (!isRecord(raw) || !("code" in raw)) return false;
+  const code = getNumber(raw.code);
+  return code !== null && code !== 0;
 }
 
 function formatUnixTime(value: unknown) {
