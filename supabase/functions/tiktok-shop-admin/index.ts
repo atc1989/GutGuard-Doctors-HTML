@@ -169,9 +169,9 @@ async function getValidAccessToken(
   }
 
   const refreshed = await refreshTikTokToken(config, credentials.refresh_token);
-  const nextExpiresAt = now + refreshed.accessTokenExpireIn;
+  const nextExpiresAt = normalizeTokenExpiry(refreshed.accessTokenExpireIn, now);
   const nextRefreshExpiresAt = refreshed.refreshTokenExpireIn
-    ? now + refreshed.refreshTokenExpireIn
+    ? normalizeTokenExpiry(refreshed.refreshTokenExpireIn, now)
     : credentials.refresh_token_expires_at ?? null;
 
   const { error: updateError } = await supabase
@@ -190,7 +190,7 @@ async function getValidAccessToken(
 }
 
 async function refreshTikTokToken(config: TikTokConfig, refreshToken: string) {
-  const url = new URL("/api/v2/token/get", config.authBaseUrl);
+  const url = new URL("/api/v2/token/refresh", config.authBaseUrl);
   url.searchParams.set("app_key", config.appKey);
   url.searchParams.set("app_secret", config.appSecret);
   url.searchParams.set("refresh_token", refreshToken);
@@ -219,6 +219,11 @@ async function refreshTikTokToken(config: TikTokConfig, refreshToken: string) {
     accessTokenExpireIn,
     refreshTokenExpireIn,
   };
+}
+
+function normalizeTokenExpiry(value: number, now: number) {
+  const oneYearInSeconds = 365 * 24 * 60 * 60;
+  return value > now + oneYearInSeconds ? value : now + value;
 }
 
 function normalizeFilters(filters: TikTokOrdersFilters | undefined): Required<TikTokOrdersFilters> {
