@@ -514,16 +514,26 @@ function normalizePriceDetail(payload: Record<string, unknown>, raw: unknown) {
     getString(getRecord(lineItems[0])?.currency) ??
     "";
   const labels = [
-    ["Order total", payment.total_amount],
+    ["Order total", payment.total_amount ?? payment.total],
+    ["Payment", payment.payment],
     ["Original product total", payment.original_total_product_price],
-    ["Subtotal", payment.sub_total],
+    ["Subtotal", payment.sub_total ?? payment.subtotal],
+    ["SKU list price", payment.sku_list_price],
+    ["SKU sale price", payment.sku_sale_price],
+    ["Shipping list price", payment.shipping_list_price],
+    ["Shipping sale price", payment.shipping_sale_price],
     ["Shipping fee", payment.shipping_fee],
     ["Original shipping fee", payment.original_shipping_fee],
-    ["Seller discount", payment.seller_discount],
-    ["Platform discount", payment.platform_discount],
-    ["Tax", payment.tax],
-    ["Product tax", payment.product_tax],
+    ["Seller discount", payment.seller_discount ?? payment.subtotal_deduction_seller],
+    ["Platform discount", payment.platform_discount ?? payment.subtotal_deduction_platform],
+    ["Voucher seller discount", payment.voucher_deduction_seller],
+    ["Voucher platform discount", payment.voucher_deduction_platform],
+    ["Shipping seller discount", payment.shipping_fee_deduction_seller],
+    ["Shipping platform discount", payment.shipping_fee_deduction_platform],
+    ["Tax", payment.tax ?? payment.tax_amount],
+    ["Product tax", payment.product_tax ?? payment.subtotal_tax_amount],
     ["Shipping tax", payment.shipping_fee_tax],
+    ["Net price", payment.net_price_amount],
   ];
 
   return {
@@ -571,14 +581,19 @@ function normalizeLineItem(value: unknown) {
     id: getString(item.id) ?? getString(item.line_item_id) ?? "",
     productName: getString(item.product_name) ?? "",
     skuName: getString(item.sku_name) ?? getString(item.seller_sku) ?? "",
-    quantity: getNumber(item.quantity) ?? 0,
+    quantity: getNumber(item.quantity) ?? undefined,
     displayStatus: getString(item.display_status) ?? "",
     price:
       getAmountString(salePrice.amount) ||
       getAmountString(item.sale_price) ||
+      getAmountString(item.sku_sale_price) ||
+      getAmountString(item.payment) ||
+      getAmountString(item.subtotal) ||
+      getAmountString(item.total) ||
       getAmountString(item.price) ||
       getAmountString(item.original_price) ||
       getAmountString(item.sku_price) ||
+      getAmountString(item.sku_list_price) ||
       "",
     currency:
       getString(salePrice.currency) ??

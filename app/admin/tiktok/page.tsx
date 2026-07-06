@@ -538,7 +538,7 @@ export default function AdminTikTokPage() {
                   item.id,
                   item.productName ?? "",
                   item.skuName ?? "",
-                  String(item.quantity ?? ""),
+                  formatOptionalNumber(item.quantity),
                   item.displayStatus ?? "",
                   formatMoney(item.price ?? "", item.currency ?? ""),
                 ])}
@@ -602,7 +602,7 @@ export default function AdminTikTokPage() {
                   item.id,
                   item.productName ?? "",
                   item.skuName ?? "",
-                  String(item.quantity ?? ""),
+                  formatOptionalNumber(item.quantity),
                   formatMoney(item.price ?? "", item.currency ?? priceCurrency),
                 ])}
               />
@@ -876,6 +876,10 @@ function formatAdminDate(value: string) {
 function formatMoney(amount: string, currency: string) {
   if (!amount && !currency) return "--";
   return [currency, amount].filter(Boolean).join(" ");
+}
+
+function formatOptionalNumber(value: number | undefined) {
+  return typeof value === "number" ? String(value) : "";
 }
 
 function shorten(value: string) {
