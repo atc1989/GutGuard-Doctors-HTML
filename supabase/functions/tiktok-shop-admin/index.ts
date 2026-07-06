@@ -24,6 +24,23 @@ type TikTokAdminRequest = {
 
 type TikTokOrderRecord = Record<string, unknown>;
 
+type TikTokConfig = {
+  baseUrl: string;
+  authBaseUrl: string;
+  apiVersion: string;
+  appKey: string;
+  appSecret: string;
+  shopCipher: string;
+};
+
+type TikTokCredentialsRow = {
+  id: string;
+  access_token: string | null;
+  refresh_token: string | null;
+  expires_at: number | null;
+  refresh_token_expires_at?: number | null;
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
@@ -43,15 +60,19 @@ Deno.serve(async (req) => {
     if (adminError) return jsonResponse({ error: "Invalid admin password" }, 401);
 
     const config = getTikTokConfig();
+    const tokenResult = await getValidAccessToken(supabase, config);
     const cleanFilters = normalizeFilters(filters);
     const path = `/order/${config.apiVersion}/orders/search`;
     const body = buildRequestBody(cleanFilters);
     const bodyJson = JSON.stringify(body);
-    const query = {
+    const query: Record<string, string> = {
       app_key: config.appKey,
+      page_size: String(cleanFilters.pageSize),
       shop_cipher: config.shopCipher,
       timestamp: Math.floor(Date.now() / 1000).toString(),
     };
+    if (cleanFilters.pageToken) query.page_token = cleanFilters.pageToken;
+
     const sign = await generateTikTokSign({
       appSecret: config.appSecret,
       path,
@@ -60,7 +81,7 @@ Deno.serve(async (req) => {
     });
     const url = new URL(path, config.baseUrl);
 
-    for (const [key, value] of Object.entries({ ...query, sign, access_token: config.accessToken })) {
+    for (const [key, value] of Object.entries({ ...query, sign, access_token: tokenResult.accessToken })) {
       url.searchParams.set(key, value);
     }
 
@@ -68,7 +89,7 @@ Deno.serve(async (req) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-tts-access-token": config.accessToken,
+        "x-tts-access-token": tokenResult.accessToken,
       },
       body: bodyJson,
     });
@@ -79,7 +100,7 @@ Deno.serve(async (req) => {
         {
           error: getTikTokErrorMessage(raw) || `TikTok Shop request failed with HTTP ${response.status}`,
           raw,
-          debug: buildDebug(config.baseUrl, path, query, body),
+          debug: buildDebug(config.baseUrl, path, query, body, tokenResult.refreshed),
         },
         response.status === 401 || response.status === 403 ? 401 : 502,
       );
@@ -88,7 +109,7 @@ Deno.serve(async (req) => {
     const parsed = parseTikTokOrderResponse(raw);
     return jsonResponse({
       ...parsed,
-      debug: buildDebug(config.baseUrl, path, query, body),
+      debug: buildDebug(config.baseUrl, path, query, body, tokenResult.refreshed),
       raw,
     });
   } catch (error) {
@@ -96,18 +117,17 @@ Deno.serve(async (req) => {
   }
 });
 
-function getTikTokConfig() {
+function getTikTokConfig(): TikTokConfig {
   const baseUrl = trimTrailingSlash(Deno.env.get("TIKTOK_SHOP_BASE_URL") ?? "https://open-api.tiktokglobalshop.com");
+  const authBaseUrl = trimTrailingSlash(Deno.env.get("TIKTOK_SHOP_AUTH_BASE_URL") ?? "https://auth.tiktok-shops.com");
   const apiVersion = (Deno.env.get("TIKTOK_SHOP_API_VERSION") ?? "202309").trim();
   const appKey = (Deno.env.get("TIKTOK_SHOP_APP_KEY") ?? "").trim();
   const appSecret = (Deno.env.get("TIKTOK_SHOP_APP_SECRET") ?? "").trim();
-  const accessToken = (Deno.env.get("TIKTOK_SHOP_ACCESS_TOKEN") ?? "").trim();
   const shopCipher = (Deno.env.get("TIKTOK_SHOP_SHOP_CIPHER") ?? "").trim();
 
   const missing = [
     ["TIKTOK_SHOP_APP_KEY", appKey],
     ["TIKTOK_SHOP_APP_SECRET", appSecret],
-    ["TIKTOK_SHOP_ACCESS_TOKEN", accessToken],
     ["TIKTOK_SHOP_SHOP_CIPHER", shopCipher],
   ]
     .filter(([, value]) => !value)
@@ -115,7 +135,86 @@ function getTikTokConfig() {
 
   if (missing.length > 0) throw new Error(`Missing TikTok Shop secrets: ${missing.join(", ")}`);
 
-  return { baseUrl, apiVersion, appKey, appSecret, accessToken, shopCipher };
+  return { baseUrl, authBaseUrl, apiVersion, appKey, appSecret, shopCipher };
+}
+
+async function getValidAccessToken(
+  supabase: ReturnType<typeof createClient>,
+  config: TikTokConfig,
+) {
+  const { data, error } = await supabase
+    .from("tiktok_credentials")
+    .select("id, access_token, refresh_token, expires_at, refresh_token_expires_at")
+    .eq("id", "default")
+    .single();
+
+  if (error || !data) {
+    throw new Error("TikTok credentials are not configured. Run supabase/tiktok-shop-credentials.sql and seed the refresh token.");
+  }
+
+  const credentials = data as TikTokCredentialsRow;
+  const now = Math.floor(Date.now() / 1000);
+  const expiresAt = Number(credentials.expires_at ?? 0);
+
+  if (credentials.access_token && expiresAt - now >= 300) {
+    return { accessToken: credentials.access_token, refreshed: false };
+  }
+
+  if (!credentials.refresh_token) {
+    throw new Error("TikTok refresh token is missing. Re-authorize the TikTok Shop merchant.");
+  }
+
+  const refreshed = await refreshTikTokToken(config, credentials.refresh_token);
+  const nextExpiresAt = now + refreshed.accessTokenExpireIn;
+  const nextRefreshExpiresAt = refreshed.refreshTokenExpireIn
+    ? now + refreshed.refreshTokenExpireIn
+    : credentials.refresh_token_expires_at ?? null;
+
+  const { error: updateError } = await supabase
+    .from("tiktok_credentials")
+    .update({
+      access_token: refreshed.accessToken,
+      refresh_token: refreshed.refreshToken,
+      expires_at: nextExpiresAt,
+      refresh_token_expires_at: nextRefreshExpiresAt,
+    })
+    .eq("id", credentials.id);
+
+  if (updateError) throw new Error(`TikTok token refresh could not be saved: ${updateError.message}`);
+
+  return { accessToken: refreshed.accessToken, refreshed: true };
+}
+
+async function refreshTikTokToken(config: TikTokConfig, refreshToken: string) {
+  const url = new URL("/api/v2/token/get", config.authBaseUrl);
+  url.searchParams.set("app_key", config.appKey);
+  url.searchParams.set("app_secret", config.appSecret);
+  url.searchParams.set("refresh_token", refreshToken);
+  url.searchParams.set("grant_type", "refresh_token");
+
+  const response = await fetch(url, { method: "GET" });
+  const raw = await readResponseBody(response);
+
+  if (!response.ok || !isRecord(raw) || getNumber(raw.code) !== 0 || !isRecord(raw.data)) {
+    throw new Error(getTikTokErrorMessage(raw) || "TikTok Shop re-authorization is required.");
+  }
+
+  const data = raw.data;
+  const accessToken = getString(data.access_token);
+  const nextRefreshToken = getString(data.refresh_token);
+  const accessTokenExpireIn = getNumber(data.access_token_expire_in);
+  const refreshTokenExpireIn = getNumber(data.refresh_token_expire_in);
+
+  if (!accessToken || !nextRefreshToken || !accessTokenExpireIn) {
+    throw new Error("TikTok token refresh response was missing required token fields.");
+  }
+
+  return {
+    accessToken,
+    refreshToken: nextRefreshToken,
+    accessTokenExpireIn,
+    refreshTokenExpireIn,
+  };
 }
 
 function normalizeFilters(filters: TikTokOrdersFilters | undefined): Required<TikTokOrdersFilters> {
@@ -139,9 +238,7 @@ function normalizeFilters(filters: TikTokOrdersFilters | undefined): Required<Ti
 }
 
 function buildRequestBody(filters: Required<TikTokOrdersFilters>) {
-  const body: Record<string, unknown> = {
-    page_size: filters.pageSize,
-  };
+  const body: Record<string, unknown> = {};
 
   if (filters.timeMode === "update_time") {
     body.update_time_ge = filters.startTime;
@@ -152,7 +249,6 @@ function buildRequestBody(filters: Required<TikTokOrdersFilters>) {
   }
 
   if (filters.orderStatus) body.order_status = filters.orderStatus;
-  if (filters.pageToken) body.page_token = filters.pageToken;
   return body;
 }
 
@@ -246,6 +342,7 @@ function buildDebug(
   path: string,
   query: Record<string, string>,
   body: Record<string, unknown>,
+  tokenRefreshed: boolean,
 ) {
   return {
     method: "POST",
@@ -257,6 +354,7 @@ function buildDebug(
     },
     body,
     baseUrl,
+    tokenRefreshed,
     requestedAt: new Date().toISOString(),
   };
 }
