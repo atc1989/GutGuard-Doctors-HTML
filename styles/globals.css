@@ -2200,6 +2200,160 @@
   margin-top: 16px;
 }
 
+.admin-tiktok-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+}
+
+.admin-tiktok-tabs button,
+.admin-tiktok-row-actions button {
+  min-height: 36px;
+  border: 1px solid var(--rule);
+  background: rgba(244, 241, 234, 0.54);
+  padding: 8px 12px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-tiktok-tabs button.active,
+.admin-tiktok-tabs button:hover,
+.admin-tiktok-row-actions button:hover {
+  border-color: var(--blue);
+  background: var(--blue);
+  color: var(--bone);
+}
+
+.admin-tiktok-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-tiktok-inline-form,
+.admin-tiktok-reference-grid,
+.admin-tiktok-console-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto;
+  align-items: end;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.admin-tiktok-reference-grid {
+  grid-template-columns: repeat(2, minmax(220px, 1fr)) repeat(3, auto);
+}
+
+.admin-tiktok-console-grid {
+  grid-template-columns: minmax(140px, 0.3fr) minmax(260px, 1.7fr);
+}
+
+.admin-tiktok-inline-form label,
+.admin-tiktok-reference-grid label,
+.admin-tiktok-console-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--ink-3);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.admin-tiktok-console-grid textarea {
+  min-height: 150px;
+  resize: vertical;
+}
+
+.admin-tiktok-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(176, 32, 46, 0.28);
+  background: rgba(176, 32, 46, 0.06);
+  color: #8F1824;
+  padding: 12px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.admin-tiktok-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--blue);
+}
+
+.admin-tiktok-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 18px;
+}
+
+.admin-tiktok-summary-grid div {
+  min-width: 0;
+  border: 1px solid var(--rule);
+  background: rgba(244, 241, 234, 0.54);
+  padding: 14px;
+}
+
+.admin-tiktok-summary-grid dt {
+  margin-bottom: 5px;
+  color: var(--ink-3);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.admin-tiktok-summary-grid dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.admin-tiktok-subsection {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.admin-tiktok-subsection h3 {
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 26px;
+  font-weight: 400;
+}
+
+.admin-tiktok-table.compact {
+  min-width: 760px;
+}
+
+.admin-tiktok-debug-panel {
+  margin-top: 18px;
+}
+
+.admin-tiktok-muted {
+  margin: 4px 0 16px;
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.admin-wheel-empty.small {
+  min-height: 120px;
+  font-size: 16px;
+}
+
 .admin-tiktok-table-wrap {
   overflow-x: auto;
   border: 1px solid var(--rule);
@@ -2338,6 +2492,10 @@
   .admin-registration-email-actions,
   .admin-edit-grid,
   .admin-tiktok-filter-grid,
+  .admin-tiktok-inline-form,
+  .admin-tiktok-reference-grid,
+  .admin-tiktok-console-grid,
+  .admin-tiktok-summary-grid,
   .admin-tiktok-debug-grid {
     grid-template-columns: 1fr;
   }

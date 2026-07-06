@@ -8,6 +8,16 @@ const corsHeaders = {
 
 type TikTokOrderTimeMode = "create_time" | "update_time";
 
+type TikTokAdminAction =
+  | "get-order-list"
+  | "get-order-detail"
+  | "get-price-detail"
+  | "add-external-order-reference"
+  | "get-external-order-references"
+  | "search-order-by-external-reference"
+  | "update-blind-box-opening-results"
+  | "raw-api-request";
+
 type TikTokOrdersFilters = {
   timeMode?: TikTokOrderTimeMode;
   startTime?: number;
@@ -19,7 +29,16 @@ type TikTokOrdersFilters = {
 
 type TikTokAdminRequest = {
   adminPassword?: string;
+  action?: TikTokAdminAction;
+  payload?: Record<string, unknown>;
   filters?: TikTokOrdersFilters;
+};
+
+type TikTokApiRequest = {
+  method: "GET" | "POST" | "PUT" | "DELETE";
+  path: string;
+  query?: Record<string, string>;
+  body?: Record<string, unknown>;
 };
 
 type TikTokOrderRecord = Record<string, unknown>;
@@ -46,8 +65,8 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
   try {
-    const { adminPassword, filters } = (await req.json()) as TikTokAdminRequest;
-    if (!adminPassword) return jsonResponse({ error: "Missing adminPassword" }, 400);
+    const request = (await req.json()) as TikTokAdminRequest;
+    if (!request.adminPassword) return jsonResponse({ error: "Missing adminPassword" }, 400);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -55,67 +74,167 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const { error: adminError } = await supabase.rpc("assert_wheel_admin", {
-      p_admin_password: adminPassword,
+      p_admin_password: request.adminPassword,
     });
     if (adminError) return jsonResponse({ error: "Invalid admin password" }, 401);
 
+    const action = request.action ?? (request.filters ? "get-order-list" : undefined);
+    if (!action) return jsonResponse({ error: "Missing TikTok admin action" }, 400);
+
     const config = getTikTokConfig();
     const tokenResult = await getValidAccessToken(supabase, config);
-    const cleanFilters = normalizeFilters(filters);
-    const path = `/order/${config.apiVersion}/orders/search`;
-    const body = buildRequestBody(cleanFilters);
-    const bodyJson = JSON.stringify(body);
-    const query: Record<string, string> = {
-      app_key: config.appKey,
-      page_size: String(cleanFilters.pageSize),
-      shop_cipher: config.shopCipher,
-      timestamp: Math.floor(Date.now() / 1000).toString(),
-    };
-    if (cleanFilters.pageToken) query.page_token = cleanFilters.pageToken;
+    const payload = request.payload ?? {};
+    const apiRequest = buildTikTokApiRequest(action, payload, request.filters, config);
+    const { raw, debug, status } = await callTikTokApi(config, tokenResult, apiRequest);
 
-    const sign = await generateTikTokSign({
-      appSecret: config.appSecret,
-      path,
-      query,
-      bodyJson,
-    });
-    const url = new URL(path, config.baseUrl);
-
-    for (const [key, value] of Object.entries({ ...query, sign, access_token: tokenResult.accessToken })) {
-      url.searchParams.set(key, value);
-    }
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-tts-access-token": tokenResult.accessToken,
-      },
-      body: bodyJson,
-    });
-    const raw = await readResponseBody(response);
-
-    if (!response.ok) {
+    if (status < 200 || status >= 300) {
       return jsonResponse(
         {
-          error: getTikTokErrorMessage(raw) || `TikTok Shop request failed with HTTP ${response.status}`,
+          error: getTikTokErrorMessage(raw) || `TikTok Shop request failed with HTTP ${status}`,
           raw,
-          debug: buildDebug(config.baseUrl, path, query, body, tokenResult.refreshed),
+          debug,
         },
-        response.status === 401 || response.status === 403 ? 401 : 502,
+        status === 401 || status === 403 ? 401 : 502,
       );
     }
 
-    const parsed = parseTikTokOrderResponse(raw);
+    if (action === "get-order-list") {
+      return jsonResponse({
+        ...parseTikTokOrderResponse(raw),
+        debug,
+        raw,
+      });
+    }
+
     return jsonResponse({
-      ...parsed,
-      debug: buildDebug(config.baseUrl, path, query, body, tokenResult.refreshed),
+      ...normalizeActionResponse(action, payload, raw),
+      debug,
       raw,
     });
   } catch (error) {
     return jsonResponse({ error: error instanceof Error ? error.message : "Unexpected error" }, 500);
   }
 });
+
+function buildTikTokApiRequest(
+  action: TikTokAdminAction,
+  payload: Record<string, unknown>,
+  legacyFilters: TikTokOrdersFilters | undefined,
+  config: TikTokConfig,
+): TikTokApiRequest {
+  if (action === "get-order-list") {
+    const filterSource = Object.keys(payload).length > 0 ? (payload as TikTokOrdersFilters) : legacyFilters;
+    const cleanFilters = normalizeFilters(filterSource);
+    return {
+      method: "POST",
+      path: `/order/${config.apiVersion}/orders/search`,
+      query: {
+        page_size: String(cleanFilters.pageSize),
+        ...(cleanFilters.pageToken ? { page_token: cleanFilters.pageToken } : {}),
+      },
+      body: buildOrderListBody(cleanFilters),
+    };
+  }
+
+  if (action === "get-order-detail") {
+    const orderId = requireCleanString(payload.orderId, "orderId");
+    return {
+      method: "GET",
+      path: `/order/${config.apiVersion}/orders/${encodeURIComponent(orderId)}`,
+    };
+  }
+
+  if (action === "get-price-detail") {
+    const orderId = requireCleanString(payload.orderId, "orderId");
+    const version = (Deno.env.get("TIKTOK_SHOP_PRICE_API_VERSION") ?? "202407").trim();
+    return {
+      method: "GET",
+      path: `/order/${version}/orders/${encodeURIComponent(orderId)}/price_detail`,
+    };
+  }
+
+  if (action === "add-external-order-reference") {
+    const version = (Deno.env.get("TIKTOK_SHOP_REFERENCE_API_VERSION") ?? "202406").trim();
+    const orderId = requireCleanString(payload.orderId, "orderId");
+    const externalOrderReference = requireCleanString(payload.externalOrderReference, "externalOrderReference");
+    return {
+      method: "POST",
+      path: `/order/${version}/orders/${encodeURIComponent(orderId)}/external_order_references`,
+      body: { external_order_reference: externalOrderReference },
+    };
+  }
+
+  if (action === "get-external-order-references") {
+    const version = (Deno.env.get("TIKTOK_SHOP_REFERENCE_API_VERSION") ?? "202406").trim();
+    const orderId = requireCleanString(payload.orderId, "orderId");
+    return {
+      method: "GET",
+      path: `/order/${version}/orders/${encodeURIComponent(orderId)}/external_order_references`,
+    };
+  }
+
+  if (action === "search-order-by-external-reference") {
+    const version = (Deno.env.get("TIKTOK_SHOP_REFERENCE_API_VERSION") ?? "202406").trim();
+    const externalOrderReference = requireCleanString(payload.externalOrderReference, "externalOrderReference");
+    return {
+      method: "POST",
+      path: `/order/${version}/orders/external_order_references/search`,
+      body: { external_order_reference: externalOrderReference },
+    };
+  }
+
+  if (action === "update-blind-box-opening-results") {
+    const rawRequest = getRawApiRequest(payload);
+    if (!rawRequest.path.includes("blind_box")) {
+      throw new Error("Blind Box updates must use an explicit blind box order endpoint path.");
+    }
+    return rawRequest;
+  }
+
+  return getRawApiRequest(payload);
+}
+
+async function callTikTokApi(
+  config: TikTokConfig,
+  tokenResult: { accessToken: string; refreshed: boolean },
+  request: TikTokApiRequest,
+) {
+  const body = request.body ?? {};
+  const bodyJson = request.method === "GET" || request.method === "DELETE" ? "" : JSON.stringify(body);
+  const query: Record<string, string> = {
+    ...(request.query ?? {}),
+    app_key: config.appKey,
+    shop_cipher: config.shopCipher,
+    timestamp: Math.floor(Date.now() / 1000).toString(),
+  };
+  const sign = await generateTikTokSign({
+    appSecret: config.appSecret,
+    path: request.path,
+    query,
+    bodyJson,
+  });
+  const url = new URL(request.path, config.baseUrl);
+
+  for (const [key, value] of Object.entries({ ...query, sign, access_token: tokenResult.accessToken })) {
+    url.searchParams.set(key, value);
+  }
+
+  const response = await fetch(url, {
+    method: request.method,
+    headers: {
+      "Content-Type": "application/json",
+      "x-tts-access-token": tokenResult.accessToken,
+    },
+    ...(bodyJson ? { body: bodyJson } : {}),
+  });
+  const raw = await readResponseBody(response);
+
+  return {
+    raw,
+    status: response.status,
+    debug: buildDebug(config.baseUrl, request.method, request.path, query, body, tokenResult.refreshed),
+  };
+}
 
 function getTikTokConfig(): TikTokConfig {
   const baseUrl = trimTrailingSlash(Deno.env.get("TIKTOK_SHOP_BASE_URL") ?? "https://open-api.tiktokglobalshop.com");
@@ -246,7 +365,7 @@ function normalizeFilters(filters: TikTokOrdersFilters | undefined): Required<Ti
   };
 }
 
-function buildRequestBody(filters: Required<TikTokOrdersFilters>) {
+function buildOrderListBody(filters: Required<TikTokOrdersFilters>) {
   const body: Record<string, unknown> = {};
 
   if (filters.timeMode === "update_time") {
@@ -303,11 +422,25 @@ function parseTikTokOrderResponse(raw: unknown) {
   };
 }
 
+function normalizeActionResponse(action: TikTokAdminAction, payload: Record<string, unknown>, raw: unknown) {
+  if (action === "get-order-detail") return { order: normalizeOrderDetail(raw) };
+  if (action === "get-price-detail") return { price: normalizePriceDetail(payload, raw) };
+  if (
+    action === "add-external-order-reference" ||
+    action === "get-external-order-references" ||
+    action === "search-order-by-external-reference"
+  ) {
+    return { references: normalizeReferences(raw) };
+  }
+  return {};
+}
+
 function normalizeOrder(order: TikTokOrderRecord) {
   const payment = getRecord(order.payment) ?? getRecord(order.payment_info) ?? {};
   const recipientAddress = getRecord(order.recipient_address) ?? {};
   const packages = Array.isArray(order.packages) ? order.packages : [];
   const firstPackage = getRecord(packages[0]) ?? {};
+  const lineItems = Array.isArray(order.line_items) ? order.line_items : [];
   const totalAmount = getRecord(payment.total_amount) ?? getRecord(payment.order_total) ?? {};
 
   return {
@@ -333,6 +466,109 @@ function normalizeOrder(order: TikTokOrderRecord) {
       getString(payment.currency) ??
       getString(payment.currency_code) ??
       "",
+    buyerMessage: getString(order.buyer_message) ?? "",
+    commercePlatform: getString(order.commerce_platform) ?? "",
+    fulfillmentType: getString(order.fulfillment_type) ?? "",
+    isReplacementOrder: getBoolean(order.is_replacement_order),
+    isSampleOrder: getBoolean(order.is_sample_order),
+    lineItemCount: lineItems.length,
+  };
+}
+
+function normalizeOrderDetail(raw: unknown) {
+  const data = isRecord(raw) && isRecord(raw.data) ? raw.data : raw;
+  const orders = isRecord(data) && Array.isArray(data.orders) ? data.orders : [];
+  const order = getRecord(orders[0]) ?? getRecord(data) ?? {};
+  const summary = normalizeOrder(order);
+  const lineItems = Array.isArray(order.line_items) ? order.line_items.map(normalizeLineItem) : [];
+  const packages = Array.isArray(order.packages) ? order.packages.map(normalizePackage) : [];
+  const payment = getRecord(order.payment) ?? getRecord(order.payment_info) ?? {};
+
+  return {
+    summary,
+    lineItems,
+    packages,
+    payment: normalizePayment(payment),
+  };
+}
+
+function normalizePriceDetail(payload: Record<string, unknown>, raw: unknown) {
+  const data = isRecord(raw) && isRecord(raw.data) ? raw.data : raw;
+  const source = getRecord(data) ?? {};
+  const payment = getRecord(source.payment) ?? source;
+  const currency = getString(payment.currency) ?? getString(payment.currency_code) ?? "";
+  const labels = [
+    ["Order total", payment.total_amount],
+    ["Subtotal", payment.sub_total],
+    ["Shipping fee", payment.shipping_fee],
+    ["Seller discount", payment.seller_discount],
+    ["Platform discount", payment.platform_discount],
+    ["Product tax", payment.product_tax],
+    ["Shipping tax", payment.shipping_fee_tax],
+  ];
+
+  return {
+    orderId: getString(payload.orderId) ?? getString(source.order_id) ?? "",
+    currency,
+    totals: labels
+      .map(([label, amount]) => ({ label: String(label), amount: getString(amount) ?? "" }))
+      .filter((item) => item.amount),
+    lineItems: Array.isArray(source.line_items) ? source.line_items.map(normalizeLineItem) : [],
+  };
+}
+
+function normalizeReferences(raw: unknown) {
+  const data = isRecord(raw) && isRecord(raw.data) ? raw.data : raw;
+  const source = getRecord(data) ?? {};
+  const values = Array.isArray(source.external_order_references)
+    ? source.external_order_references
+    : Array.isArray(source.references)
+      ? source.references
+      : Array.isArray(source.orders)
+        ? source.orders
+        : [];
+
+  return values.map((item) => {
+    const row = getRecord(item) ?? {};
+    return {
+      orderId: getString(row.order_id) ?? getString(row.id) ?? "",
+      externalReference: getString(row.external_order_reference) ?? getString(row.reference) ?? "",
+      createdAt: formatUnixTime(row.create_time),
+      updatedAt: formatUnixTime(row.update_time),
+    };
+  });
+}
+
+function normalizeLineItem(value: unknown) {
+  const item = getRecord(value) ?? {};
+  const salePrice = getRecord(item.sale_price) ?? getRecord(item.price) ?? {};
+  return {
+    id: getString(item.id) ?? getString(item.line_item_id) ?? "",
+    productName: getString(item.product_name) ?? "",
+    skuName: getString(item.sku_name) ?? getString(item.seller_sku) ?? "",
+    quantity: getNumber(item.quantity) ?? 0,
+    displayStatus: getString(item.display_status) ?? "",
+    price: getString(salePrice.amount) ?? getString(item.sale_price) ?? "",
+    currency: getString(salePrice.currency) ?? getString(item.currency) ?? "",
+  };
+}
+
+function normalizePackage(value: unknown) {
+  const item = getRecord(value) ?? {};
+  return {
+    id: getString(item.id) ?? getString(item.package_id) ?? "",
+    deliveryOptionName: getString(item.delivery_option_name) ?? "",
+    shippingProvider: getString(item.shipping_provider_name) ?? "",
+    trackingNumber: getString(item.tracking_number) ?? "",
+  };
+}
+
+function normalizePayment(payment: Record<string, unknown>) {
+  return {
+    currency: getString(payment.currency) ?? getString(payment.currency_code) ?? "",
+    totalAmount: getString(payment.total_amount) ?? "",
+    shippingFee: getString(payment.shipping_fee) ?? "",
+    subTotal: getString(payment.sub_total) ?? "",
   };
 }
 
@@ -348,24 +584,58 @@ async function readResponseBody(response: Response) {
 
 function buildDebug(
   baseUrl: string,
+  method: TikTokApiRequest["method"],
   path: string,
   query: Record<string, string>,
   body: Record<string, unknown>,
   tokenRefreshed: boolean,
 ) {
   return {
-    method: "POST",
+    method,
     path,
-    query: {
-      ...query,
-      app_key: maskValue(query.app_key),
-      shop_cipher: maskValue(query.shop_cipher),
-    },
-    body,
+    query: sanitizeDebugRecord(query),
+    body: sanitizeDebugRecord(body),
     baseUrl,
     tokenRefreshed,
     requestedAt: new Date().toISOString(),
   };
+}
+
+function getRawApiRequest(payload: Record<string, unknown>): TikTokApiRequest {
+  const method = payload.method === "GET" ? "GET" : "POST";
+  const path = requireCleanString(payload.path, "path");
+  if (!path.startsWith("/order/")) throw new Error("Raw API Console only allows /order/ TikTok Shop paths.");
+
+  return {
+    method,
+    path,
+    query: sanitizeStringRecord(payload.query),
+    body: sanitizeBodyRecord(payload.body),
+  };
+}
+
+function sanitizeStringRecord(value: unknown) {
+  if (!isRecord(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([key, rawValue]) => [sanitizeToken(key), sanitizeToken(rawValue)] as const)
+      .filter(([key, rawValue]) => key && rawValue),
+  );
+}
+
+function sanitizeBodyRecord(value: unknown) {
+  if (!isRecord(value)) return {};
+  return value;
+}
+
+function sanitizeDebugRecord(value: Record<string, unknown>) {
+  const sensitive = new Set(["app_key", "shop_cipher", "access_token", "refresh_token", "sign", "app_secret"]);
+  return Object.fromEntries(
+    Object.entries(value).map(([key, rawValue]) => [
+      key,
+      sensitive.has(key.toLowerCase()) && typeof rawValue === "string" ? maskValue(rawValue) : rawValue,
+    ]),
+  );
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -386,6 +656,12 @@ function formatUnixTime(value: unknown) {
   const seconds = getNumber(value);
   if (!seconds) return "";
   return new Date(seconds * 1000).toISOString();
+}
+
+function requireCleanString(value: unknown, label: string) {
+  const clean = sanitizeToken(value);
+  if (!clean) throw new Error(`Missing ${label}`);
+  return clean;
 }
 
 function getRecord(value: unknown): Record<string, unknown> | null {
@@ -409,6 +685,11 @@ function getNumber(value: unknown) {
     if (Number.isFinite(parsed)) return parsed;
   }
   return null;
+}
+
+function getBoolean(value: unknown) {
+  if (typeof value === "boolean") return value;
+  return false;
 }
 
 function normalizeUnixTime(value: unknown) {

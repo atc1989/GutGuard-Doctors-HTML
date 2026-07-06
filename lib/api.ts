@@ -139,22 +139,100 @@ export type TikTokOrderSummary = {
   trackingNumber: string;
   paymentAmount: string;
   currency: string;
+  buyerMessage?: string;
+  commercePlatform?: string;
+  fulfillmentType?: string;
+  isReplacementOrder?: boolean;
+  isSampleOrder?: boolean;
+  lineItemCount?: number;
+};
+
+export type TikTokAdminAction =
+  | "get-order-list"
+  | "get-order-detail"
+  | "get-price-detail"
+  | "add-external-order-reference"
+  | "get-external-order-references"
+  | "search-order-by-external-reference"
+  | "update-blind-box-opening-results"
+  | "raw-api-request";
+
+export type TikTokDebugMetadata = {
+  method: string;
+  path: string;
+  query: Record<string, unknown>;
+  body: Record<string, unknown>;
+  baseUrl: string;
+  tokenRefreshed?: boolean;
+  requestedAt: string;
+};
+
+export type TikTokRawResponse = {
+  debug: TikTokDebugMetadata;
+  raw: unknown;
 };
 
 export type TikTokOrdersResponse = {
   orders: TikTokOrderSummary[];
   nextPageToken: string;
   totalCount: number | null;
-  debug: {
-    method: string;
-    path: string;
-    query: Record<string, string>;
-    body: Record<string, unknown>;
-    baseUrl: string;
-    requestedAt: string;
-  };
+  debug: TikTokDebugMetadata;
   raw: unknown;
 };
+
+export type TikTokOrderDetailResponse = TikTokRawResponse & {
+  order: {
+    summary: TikTokOrderSummary;
+    lineItems: Array<{
+      id: string;
+      productName?: string;
+      skuName?: string;
+      quantity?: number;
+      displayStatus?: string;
+      price?: string;
+      currency?: string;
+    }>;
+    packages: Array<{
+      id: string;
+      deliveryOptionName?: string;
+      shippingProvider?: string;
+      trackingNumber?: string;
+    }>;
+    payment: {
+      currency?: string;
+      totalAmount?: string;
+      shippingFee?: string;
+      subTotal?: string;
+    };
+  };
+};
+
+export type TikTokPriceDetailResponse = TikTokRawResponse & {
+  price: {
+    orderId: string;
+    currency: string;
+    totals: Array<{ label: string; amount: string }>;
+    lineItems: Array<{
+      id: string;
+      skuName?: string;
+      productName?: string;
+      quantity?: number;
+      price?: string;
+      currency?: string;
+    }>;
+  };
+};
+
+export type TikTokReferenceResponse = TikTokRawResponse & {
+  references: Array<{
+    orderId?: string;
+    externalReference?: string;
+    createdAt?: string;
+    updatedAt?: string;
+  }>;
+};
+
+export type TikTokRawApiResponse = TikTokRawResponse;
 
 export type RegistrationEmailAttachment = {
   id?: string;
@@ -423,14 +501,75 @@ export async function getTikTokOrders(
   adminPassword: string,
   filters: TikTokOrdersFilters,
 ): Promise<TikTokOrdersResponse> {
+  return callTikTokAdminApi<TikTokOrdersResponse>(adminPassword, "get-order-list", filters);
+}
+
+export async function getTikTokOrderDetail(
+  adminPassword: string,
+  orderId: string,
+): Promise<TikTokOrderDetailResponse> {
+  return callTikTokAdminApi<TikTokOrderDetailResponse>(adminPassword, "get-order-detail", { orderId });
+}
+
+export async function getTikTokPriceDetail(
+  adminPassword: string,
+  orderId: string,
+): Promise<TikTokPriceDetailResponse> {
+  return callTikTokAdminApi<TikTokPriceDetailResponse>(adminPassword, "get-price-detail", { orderId });
+}
+
+export async function addTikTokExternalOrderReference(
+  adminPassword: string,
+  orderId: string,
+  externalOrderReference: string,
+): Promise<TikTokReferenceResponse> {
+  return callTikTokAdminApi<TikTokReferenceResponse>(adminPassword, "add-external-order-reference", {
+    orderId,
+    externalOrderReference,
+  });
+}
+
+export async function getTikTokExternalOrderReferences(
+  adminPassword: string,
+  orderId: string,
+): Promise<TikTokReferenceResponse> {
+  return callTikTokAdminApi<TikTokReferenceResponse>(adminPassword, "get-external-order-references", { orderId });
+}
+
+export async function searchTikTokOrderByExternalReference(
+  adminPassword: string,
+  externalOrderReference: string,
+): Promise<TikTokReferenceResponse> {
+  return callTikTokAdminApi<TikTokReferenceResponse>(adminPassword, "search-order-by-external-reference", {
+    externalOrderReference,
+  });
+}
+
+export async function sendTikTokRawApiRequest(
+  adminPassword: string,
+  payload: {
+    method: "GET" | "POST";
+    path: string;
+    query?: Record<string, string>;
+    body?: Record<string, unknown>;
+  },
+): Promise<TikTokRawApiResponse> {
+  return callTikTokAdminApi<TikTokRawApiResponse>(adminPassword, "raw-api-request", payload);
+}
+
+export async function callTikTokAdminApi<TResponse>(
+  adminPassword: string,
+  action: TikTokAdminAction,
+  payload: Record<string, unknown>,
+): Promise<TResponse> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
 
   const { data, error } = await supabase.functions.invoke("tiktok-shop-admin", {
-    body: { adminPassword, filters },
+    body: { adminPassword, action, payload },
   });
 
   if (error) throw new Error(await getSupabaseFunctionErrorMessage(error));
-  return data as TikTokOrdersResponse;
+  return data as TResponse;
 }
 
 export type SequenceAttachment = {
