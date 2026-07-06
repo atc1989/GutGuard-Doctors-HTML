@@ -12,6 +12,9 @@ create table if not exists public.tiktok_credentials (
 
 alter table public.tiktok_credentials enable row level security;
 
+grant usage on schema public to service_role;
+grant select, insert, update on public.tiktok_credentials to service_role;
+
 create or replace function public.touch_tiktok_credentials_updated_at()
 returns trigger
 language plpgsql

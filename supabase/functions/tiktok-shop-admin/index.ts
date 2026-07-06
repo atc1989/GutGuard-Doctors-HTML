@@ -148,7 +148,11 @@ async function getValidAccessToken(
     .eq("id", "default")
     .single();
 
-  if (error || !data) {
+  if (error) {
+    throw new Error(`TikTok credentials lookup failed: ${error.message}`);
+  }
+
+  if (!data) {
     throw new Error("TikTok credentials are not configured. Run supabase/tiktok-shop-credentials.sql and seed the refresh token.");
   }
 
