@@ -117,6 +117,66 @@ type SmsBlastResponse = {
   results: SmsSendResult[];
 };
 
+export type ShopOrderStatus =
+  | "pending_payment"
+  | "payment_review"
+  | "paid"
+  | "confirmed"
+  | "cancelled"
+  | "fulfilled";
+
+export type ShopPaymentStatus = "pending" | "review" | "paid" | "failed" | "refunded";
+
+export type ShopOrderItem = {
+  id: string;
+  name: string;
+  caps: number;
+  qty: number;
+  price: number;
+};
+
+export type ShopOrderInput = {
+  customerName: string;
+  email: string;
+  mobile: string;
+  address: string;
+  city: string;
+  province: string;
+  zip: string;
+  items: ShopOrderItem[];
+  subtotal: number;
+  paymentMethod: string;
+};
+
+export type ShopOrder = {
+  id: string;
+  order_code: string;
+  status: ShopOrderStatus;
+  payment_status: ShopPaymentStatus;
+  payment_method: string;
+  maya_reference: string | null;
+  customer_name: string;
+  email: string;
+  mobile: string;
+  address: string;
+  city: string;
+  province: string;
+  zip: string;
+  subtotal: number;
+  items: ShopOrderItem[];
+  admin_notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ShopOrderAdminUpdate = {
+  id: string;
+  status: ShopOrderStatus;
+  paymentStatus: ShopPaymentStatus;
+  mayaReference: string;
+  adminNotes: string;
+};
+
 export type TikTokOrderTimeMode = "create_time" | "update_time";
 
 export type TikTokOrdersFilters = {
@@ -495,6 +555,68 @@ export async function sendSmsBlast(
   return data as SmsBlastResponse;
 }
 
+export async function createShopOrder(payload: ShopOrderInput): Promise<ShopOrder> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.rpc("create_shop_order", {
+    p_customer_name: payload.customerName,
+    p_email: payload.email,
+    p_mobile: payload.mobile,
+    p_address: payload.address,
+    p_city: payload.city,
+    p_province: payload.province,
+    p_zip: payload.zip,
+    p_items: payload.items,
+    p_subtotal: payload.subtotal,
+    p_payment_method: payload.paymentMethod,
+  });
+
+  if (error) throw error;
+  return normalizeShopOrder(Array.isArray(data) ? data[0] : data);
+}
+
+export async function adminListShopOrders(adminPassword: string): Promise<ShopOrder[]> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.rpc("admin_list_shop_orders", {
+    p_admin_password: adminPassword,
+  });
+
+  if (error) throw error;
+  return ((data ?? []) as unknown[]).map(normalizeShopOrder);
+}
+
+export async function adminGetShopOrder(adminPassword: string, orderId: string): Promise<ShopOrder> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.rpc("admin_get_shop_order", {
+    p_admin_password: adminPassword,
+    p_order_id: orderId,
+  });
+
+  if (error) throw error;
+  return normalizeShopOrder(Array.isArray(data) ? data[0] : data);
+}
+
+export async function adminUpdateShopOrder(
+  adminPassword: string,
+  update: ShopOrderAdminUpdate,
+): Promise<ShopOrder> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.rpc("admin_update_shop_order", {
+    p_admin_password: adminPassword,
+    p_order_id: update.id,
+    p_status: update.status,
+    p_payment_status: update.paymentStatus,
+    p_maya_reference: update.mayaReference,
+    p_admin_notes: update.adminNotes,
+  });
+
+  if (error) throw error;
+  return normalizeShopOrder(Array.isArray(data) ? data[0] : data);
+}
+
 // ─── Email Sequence ────────────────────────────────────────────────────────
 
 export async function getTikTokOrders(
@@ -786,6 +908,31 @@ function normalizeAdminDoctorRegistration(doctor: AdminDoctorRegistration): Admi
     routing_slug: routingSlug,
     redirect_url:
       (doctor.redirect_url ?? "").trim() || (tiktokUsername ? `https://www.tiktok.com/@${tiktokUsername}` : ""),
+  };
+}
+
+function normalizeShopOrder(row: unknown): ShopOrder {
+  const order = (row ?? {}) as Record<string, unknown>;
+
+  return {
+    id: String(order.id ?? ""),
+    order_code: String(order.order_code ?? ""),
+    status: (order.status ?? "pending_payment") as ShopOrderStatus,
+    payment_status: (order.payment_status ?? "pending") as ShopPaymentStatus,
+    payment_method: String(order.payment_method ?? "maya"),
+    maya_reference: typeof order.maya_reference === "string" ? order.maya_reference : null,
+    customer_name: String(order.customer_name ?? ""),
+    email: String(order.email ?? ""),
+    mobile: String(order.mobile ?? ""),
+    address: String(order.address ?? ""),
+    city: String(order.city ?? ""),
+    province: String(order.province ?? ""),
+    zip: String(order.zip ?? ""),
+    subtotal: Number(order.subtotal ?? 0),
+    items: Array.isArray(order.items) ? (order.items as ShopOrderItem[]) : [],
+    admin_notes: typeof order.admin_notes === "string" ? order.admin_notes : null,
+    created_at: String(order.created_at ?? ""),
+    updated_at: String(order.updated_at ?? ""),
   };
 }
 
