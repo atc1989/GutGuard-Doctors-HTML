@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRightIcon, CheckIcon } from "@/components/Icons";
-import { createShopOrder, type ShopOrderItem } from "@/lib/api";
+import { createShopOrder, sendShopOrderEmail, type ShopOrderItem } from "@/lib/api";
 
 const MAYA_URL = "https://paymaya.me/GRINDERSGUILD";
 
@@ -20,7 +20,7 @@ const TRIALS = [
 ];
 
 type Mode = "trial" | "protocol";
-type Stage = "shop" | "checkout" | "redirecting";
+type Stage = "shop" | "redirecting";
 type FormState = {
   email: string;
   mobile: string;
@@ -126,6 +126,9 @@ export default function Shoplet() {
         subtotal,
         paymentMethod: "maya",
       });
+      sendShopOrderEmail(order.id).catch((emailError) => {
+        console.error("Shop order email failed", emailError);
+      });
       setCreatedCode(order.order_code);
       setStage("redirecting");
       window.setTimeout(() => {
@@ -165,8 +168,8 @@ export default function Shoplet() {
               <p className="shop-kicker">FDA-registered synbiotic</p>
               <h1>SynBIOTIC+ for daily gut support</h1>
               <p className="shop-lede">
-                Choose a low-risk trial or begin the complete 90-day protocol. Your order details are saved before
-                you continue to Maya for payment.
+                Choose a low-risk trial or begin the complete 90-day protocol. We save your order, email your
+                processing notice, then send you to Maya for payment.
               </p>
               <div className="shop-proof">
                 <span>Free shipping</span>
@@ -301,7 +304,7 @@ export default function Shoplet() {
               <button type="submit" className="shop-primary" disabled={!canCheckout || submitting}>
                 <span>
                   {submitting ? "Saving order" : `Continue to Maya - ${peso(subtotal)}`}
-                  <small>Admin will manually confirm payment.</small>
+                <small>You will receive an order processing email.</small>
                 </span>
                 <ArrowRightIcon />
               </button>

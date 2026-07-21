@@ -29,6 +29,22 @@ create index if not exists shop_orders_status_idx on public.shop_orders (status,
 
 alter table public.shop_orders enable row level security;
 
+create table if not exists public.shop_order_email_sends (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid references public.shop_orders(id) on delete cascade,
+  email text not null,
+  subject text not null,
+  status text not null check (status in ('sent', 'failed', 'skipped')),
+  resend_id text,
+  error_message text,
+  sent_at timestamptz not null default now()
+);
+
+create index if not exists shop_order_email_sends_order_id_idx
+  on public.shop_order_email_sends (order_id, sent_at desc);
+
+alter table public.shop_order_email_sends enable row level security;
+
 create or replace function public.generate_shop_order_code()
 returns text
 language plpgsql

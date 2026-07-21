@@ -2569,12 +2569,12 @@
 }
 
 .shop-hero {
-  padding: 22px clamp(18px, 5vw, 54px) 56px;
+  padding: 22px clamp(18px, 5vw, 54px) 36px;
 }
 
 .shop-nav {
-  max-width: 1180px;
-  margin: 0 auto 42px;
+  max-width: 1080px;
+  margin: 0 auto 28px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2604,23 +2604,23 @@
 }
 
 .shop-hero-grid {
-  max-width: 1180px;
+  max-width: 1080px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(330px, 0.85fr);
-  gap: clamp(22px, 5vw, 54px);
-  align-items: start;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 390px);
+  gap: clamp(20px, 4vw, 42px);
+  align-items: center;
 }
 
 .shop-product {
   display: grid;
-  grid-template-columns: minmax(180px, 0.42fr) minmax(0, 0.58fr);
-  gap: clamp(22px, 5vw, 48px);
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: clamp(20px, 4vw, 38px);
   align-items: center;
 }
 
 .shop-product-visual {
-  min-height: 420px;
+  min-height: 290px;
   display: grid;
   place-items: center;
   border: 1px solid var(--rule);
@@ -2630,7 +2630,7 @@
 }
 
 .shop-bottle {
-  width: min(72%, 260px);
+  width: min(64%, 168px);
   aspect-ratio: 0.56;
   border: 1px solid var(--rule);
   border-radius: 38px 38px 26px 26px;
@@ -2644,22 +2644,22 @@
 .shop-bottle::before {
   content: "";
   position: absolute;
-  top: -52px;
+  top: -34px;
   width: 42%;
-  height: 62px;
+  height: 42px;
   border-radius: 12px 12px 4px 4px;
   background: var(--ink);
 }
 
 .shop-bottle span {
   width: 100%;
-  padding: 30px 14px;
-  border-top: 8px solid #b5431f;
-  border-bottom: 8px solid #1e6fb8;
+  padding: 22px 10px;
+  border-top: 5px solid #b5431f;
+  border-bottom: 5px solid #1e6fb8;
   background: #fcfaf5;
   color: var(--ink);
   font-family: var(--serif);
-  font-size: clamp(22px, 3vw, 36px);
+  font-size: clamp(18px, 2vw, 25px);
   text-align: center;
 }
 
@@ -2672,16 +2672,17 @@
 }
 
 .shop-product h1 {
-  max-width: 9ch;
-  margin: 14px 0 24px;
-  font-size: clamp(54px, 8vw, 92px);
+  max-width: 11ch;
+  margin: 10px 0 18px;
+  font-size: clamp(46px, 5.7vw, 74px);
+  line-height: 0.95;
 }
 
 .shop-lede {
-  max-width: 36ch;
+  max-width: 34ch;
   color: var(--ink-2);
   font-family: var(--serif);
-  font-size: 21px;
+  font-size: 18px;
   line-height: 1.42;
 }
 
@@ -2689,7 +2690,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 28px;
+  margin-top: 20px;
 }
 
 .shop-proof span {
@@ -2704,8 +2705,8 @@
 .shop-cart {
   border: 1px solid var(--rule);
   background: #fcfaf5;
-  padding: clamp(18px, 3vw, 28px);
-  box-shadow: 0 18px 50px rgba(15, 15, 24, 0.08);
+  padding: clamp(16px, 2.4vw, 24px);
+  box-shadow: 0 14px 36px rgba(15, 15, 24, 0.07);
 }
 
 .shop-segment {
@@ -2820,12 +2821,12 @@
 
 .shop-checkout-band {
   border-top: 1px solid var(--rule);
-  padding: 48px clamp(18px, 5vw, 54px) 82px;
+  padding: 34px clamp(18px, 5vw, 54px) 64px;
   background: rgba(235, 231, 222, 0.5);
 }
 
 .shop-cart {
-  max-width: 900px;
+  max-width: 720px;
   margin: 0 auto;
 }
 
@@ -2840,7 +2841,7 @@
 .shop-section-head h2,
 .shop-success h2 {
   font-family: var(--serif);
-  font-size: clamp(34px, 5vw, 54px);
+  font-size: clamp(32px, 4.5vw, 46px);
   font-weight: 400;
 }
 
@@ -2894,7 +2895,7 @@
 .shop-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
 }
 
 .shop-field {
@@ -2915,7 +2916,7 @@
 }
 
 .shop-field input {
-  min-height: 46px;
+  min-height: 42px;
   border: 1px solid var(--rule);
   background: var(--bone);
   padding: 12px 14px;
@@ -3008,7 +3009,7 @@
   }
 
   .shop-product-visual {
-    min-height: 340px;
+    min-height: 280px;
   }
 }
 

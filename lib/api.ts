@@ -575,6 +575,16 @@ export async function createShopOrder(payload: ShopOrderInput): Promise<ShopOrde
   return normalizeShopOrder(Array.isArray(data) ? data[0] : data);
 }
 
+export async function sendShopOrderEmail(orderId: string): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { error } = await supabase.functions.invoke("send-shop-order-email", {
+    body: { orderId },
+  });
+
+  if (error) throw new Error(await getSupabaseFunctionErrorMessage(error));
+}
+
 export async function adminListShopOrders(adminPassword: string): Promise<ShopOrder[]> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
 
