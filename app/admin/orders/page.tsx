@@ -7,7 +7,6 @@ import {
   adminUpdateShopOrder,
   type ShopOrder,
   type ShopOrderStatus,
-  type ShopPaymentStatus,
 } from "@/lib/api";
 
 const ORDER_STATUSES: ShopOrderStatus[] = [
@@ -18,8 +17,6 @@ const ORDER_STATUSES: ShopOrderStatus[] = [
   "cancelled",
   "fulfilled",
 ];
-
-const PAYMENT_STATUSES: ShopPaymentStatus[] = ["pending", "review", "paid", "failed", "refunded"];
 
 export default function AdminOrdersPage() {
   const [password, setPassword] = useState("");
@@ -44,7 +41,6 @@ export default function AdminOrdersPage() {
         order.city,
         order.province,
         order.status,
-        order.payment_status,
         order.maya_reference ?? "",
       ]
         .join(" ")
@@ -56,7 +52,7 @@ export default function AdminOrdersPage() {
   const metrics = useMemo(
     () => ({
       total: orders.length,
-      pending: orders.filter((order) => order.payment_status !== "paid" && order.status !== "cancelled").length,
+      pending: orders.filter((order) => order.status === "pending_payment" || order.status === "payment_review").length,
       confirmed: orders.filter((order) => order.status === "confirmed" || order.status === "fulfilled").length,
     }),
     [orders],
@@ -92,7 +88,7 @@ export default function AdminOrdersPage() {
       const saved = await adminUpdateShopOrder(password, {
         id: selectedOrder.id,
         status: selectedOrder.status,
-        paymentStatus: selectedOrder.payment_status,
+        paymentStatus: mapPaymentStatus(selectedOrder.status),
         mayaReference: selectedOrder.maya_reference ?? "",
         adminNotes: selectedOrder.admin_notes ?? "",
       });
@@ -177,11 +173,10 @@ export default function AdminOrdersPage() {
                       <th>Customer</th>
                       <th>Mobile</th>
                       <th>Status</th>
-                      <th>Payment</th>
                       <th>Maya Ref</th>
                       <th>Total</th>
                       <th>Created</th>
-                      <th>Actions</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -194,14 +189,13 @@ export default function AdminOrdersPage() {
                         </td>
                         <td>{order.mobile}</td>
                         <td>{formatStatus(order.status)}</td>
-                        <td>{formatStatus(order.payment_status)}</td>
                         <td>{order.maya_reference || "--"}</td>
                         <td>{formatPeso(order.subtotal)}</td>
                         <td>{formatAdminDate(order.created_at)}</td>
                         <td>
                           <div className="admin-tiktok-row-actions">
                             <button type="button" onClick={() => setSelectedOrder(order)}>
-                              View / update
+                              View
                             </button>
                           </div>
                         </td>
@@ -251,7 +245,7 @@ export default function AdminOrdersPage() {
               <section className="admin-tiktok-subsection">
                 <h3>Line items</h3>
                 <div className="admin-tiktok-table-wrap">
-                  <table className="admin-tiktok-table compact">
+                  <table className="admin-tiktok-table compact admin-shop-line-items-table">
                     <thead>
                       <tr>
                         <th>Item</th>
@@ -284,21 +278,6 @@ export default function AdminOrdersPage() {
                     onChange={(event) => setSelectedOrder({ ...selectedOrder, status: event.target.value as ShopOrderStatus })}
                   >
                     {ORDER_STATUSES.map((status) => (
-                      <option key={status} value={status}>
-                        {formatStatus(status)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Payment status
-                  <select
-                    value={selectedOrder.payment_status}
-                    onChange={(event) =>
-                      setSelectedOrder({ ...selectedOrder, payment_status: event.target.value as ShopPaymentStatus })
-                    }
-                  >
-                    {PAYMENT_STATUSES.map((status) => (
                       <option key={status} value={status}>
                         {formatStatus(status)}
                       </option>
@@ -361,6 +340,13 @@ function formatStatus(value: string) {
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function mapPaymentStatus(status: ShopOrderStatus) {
+  if (status === "paid" || status === "confirmed" || status === "fulfilled") return "paid";
+  if (status === "payment_review") return "review";
+  if (status === "cancelled") return "failed";
+  return "pending";
 }
 
 function formatAdminDate(value: string) {

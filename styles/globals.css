@@ -2988,6 +2988,87 @@
   font-size: 12px;
 }
 
+.admin-shop-orders-shell .admin-tiktok-table-wrap {
+  overflow-x: visible;
+}
+
+.admin-shop-orders-table,
+.admin-shop-line-items-table {
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.admin-shop-orders-table th,
+.admin-shop-orders-table td,
+.admin-shop-line-items-table th,
+.admin-shop-line-items-table td {
+  padding: 12px 10px;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.admin-shop-orders-table th:nth-child(1),
+.admin-shop-orders-table td:nth-child(1) {
+  width: 15%;
+}
+
+.admin-shop-orders-table th:nth-child(2),
+.admin-shop-orders-table td:nth-child(2) {
+  width: 21%;
+}
+
+.admin-shop-orders-table th:nth-child(3),
+.admin-shop-orders-table td:nth-child(3) {
+  width: 13%;
+}
+
+.admin-shop-orders-table th:nth-child(4),
+.admin-shop-orders-table td:nth-child(4) {
+  width: 13%;
+}
+
+.admin-shop-orders-table th:nth-child(5),
+.admin-shop-orders-table td:nth-child(5) {
+  width: 11%;
+}
+
+.admin-shop-orders-table th:nth-child(6),
+.admin-shop-orders-table td:nth-child(6) {
+  width: 9%;
+}
+
+.admin-shop-orders-table th:nth-child(7),
+.admin-shop-orders-table td:nth-child(7) {
+  width: 13%;
+}
+
+.admin-shop-orders-table th:nth-child(8),
+.admin-shop-orders-table td:nth-child(8) {
+  width: 5%;
+}
+
+.admin-shop-orders-table .admin-tiktok-row-actions button {
+  min-height: 32px;
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+
+.admin-shop-line-items-table.compact {
+  min-width: 0;
+}
+
+.admin-shop-line-items-table.compact th:first-child,
+.admin-shop-line-items-table.compact td:first-child {
+  width: 44%;
+}
+
+.admin-shop-line-items-table.compact th:nth-child(n + 2),
+.admin-shop-line-items-table.compact td:nth-child(n + 2) {
+  width: 14%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .admin-shop-order-modal {
   width: min(980px, 100%);
 }
@@ -3037,18 +3118,18 @@
 }
 
 .shop-product {
-  grid-template-columns: minmax(260px, 0.56fr) minmax(0, 0.44fr);
-  gap: clamp(28px, 5vw, 58px);
+  grid-template-columns: minmax(240px, 0.5fr) minmax(0, 0.5fr);
+  gap: clamp(30px, 5vw, 70px);
 }
 
 .shop-product-visual {
-  min-height: 500px;
+  min-height: 430px;
   border: 0;
   background: transparent;
 }
 
 .shop-product-visual img {
-  width: min(100%, 520px);
+  width: min(82%, 410px);
   height: auto;
   object-fit: contain;
   filter: drop-shadow(0 28px 48px rgba(15, 15, 24, 0.18));
@@ -3341,11 +3422,11 @@
   }
 
   .shop-product-visual {
-    min-height: 360px;
+    min-height: 320px;
   }
 
   .shop-product-visual img {
-    width: min(100%, 360px);
+    width: min(82%, 320px);
   }
 }
 
