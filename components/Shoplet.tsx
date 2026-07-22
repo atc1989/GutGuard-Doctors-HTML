@@ -15,12 +15,35 @@ const TIERS = [
 ];
 
 const TRIALS = [
-  { id: "trial-blister", name: "Blister Trial", caps: 10, price: 1299 },
-  { id: "trial-bottle", name: "Bottle Trial", caps: 30, price: 3799 },
+  { id: "trial-blister", name: "Blister Trial", caps: 10, price: 1299, image: "/shop/blister.png" },
+  { id: "trial-bottle", name: "Bottle Trial", caps: 30, price: 3799, image: "/shop/bottle.png" },
+];
+
+const SCIENCE = [
+  [
+    "Probiotics - survive and seat",
+    "Stable LactoSpore plus nanoshell-coated Lactobacillus and Bifidobacterium strains, selected for gut barrier, immune, and gut-brain support.",
+  ],
+  [
+    "Prebiotics - feed and colonize",
+    "FOS and inulin help feed beneficial colon bacteria so the probiotic strains can take hold.",
+  ],
+  [
+    "Postbiotics - signal and renew",
+    "Urolithin-A and L-Tryptophan support downstream signaling benefits beyond simple digestion.",
+  ],
+];
+
+const PROOF = [
+  ["FDA", "Registered"],
+  ["MSU-IIT", "Co-developed"],
+  ["USAID", "Funded science"],
+  ["LactoSpore", "Spore probiotic"],
 ];
 
 type Mode = "trial" | "protocol";
 type Stage = "shop" | "redirecting";
+type InfoModal = "inside" | "trust" | null;
 type FormState = {
   email: string;
   mobile: string;
@@ -49,6 +72,9 @@ export default function Shoplet() {
   const [trialId, setTrialId] = useState(TRIALS[0].id);
   const [tierId, setTierId] = useState("peak");
   const [basket, setBasket] = useState<ShopOrderItem[]>([]);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [infoModal, setInfoModal] = useState<InfoModal>(null);
   const [stage, setStage] = useState<Stage>("shop");
   const [form, setForm] = useState<FormState>(emptyForm);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
@@ -60,9 +86,9 @@ export default function Shoplet() {
   const selectedTier = TIERS.find((item) => item.id === tierId) ?? TIERS[2];
   const basketCount = basket.reduce((sum, item) => sum + item.qty, 0);
   const subtotal = basket.reduce((sum, item) => sum + item.price * item.qty, 0);
-
   const currentBuyLabel = mode === "trial" ? `Add ${selectedTrial.name}` : `Add ${selectedTier.name}`;
   const currentPrice = mode === "trial" ? selectedTrial.price : selectedTier.price;
+  const savings = Math.max(0, selectedTier.caps * 120 - selectedTier.price);
 
   function addCurrentItem() {
     const source =
@@ -77,6 +103,7 @@ export default function Shoplet() {
       }
       return [...current, { id: source.id, name: source.name, caps: source.caps, price: source.price, qty: 1 }];
     });
+    setDrawerOpen(true);
   }
 
   function setLineQty(id: string, qty: number) {
@@ -141,9 +168,6 @@ export default function Shoplet() {
     }
   }
 
-  const canCheckout = basket.length > 0;
-  const savings = Math.max(0, selectedTier.caps * 120 - selectedTier.price);
-
   return (
     <main className="shop-shell">
       <section className="shop-hero">
@@ -152,34 +176,54 @@ export default function Shoplet() {
             <Image src="/gutguard-logo.png" alt="GutGuard" width={34} height={40} priority />
             <span>GutGuard</span>
           </Link>
-          <a className="shop-nav-link" href="#checkout">
+          <button className="shop-nav-link" type="button" onClick={() => setDrawerOpen(true)}>
             Basket ({basketCount})
-          </a>
+          </button>
         </nav>
 
         <div className="shop-hero-grid">
           <section className="shop-product">
-            <div className="shop-product-visual" aria-hidden="true">
-              <div className="shop-bottle">
-                <span>SynBIOTIC+</span>
-              </div>
+            <div className="shop-product-visual">
+              <Image src="/shop/bottle.png" alt="GutGuard SynBIOTIC+ bottle" width={520} height={720} priority />
             </div>
             <div>
               <p className="shop-kicker">FDA-registered synbiotic</p>
               <h1>SynBIOTIC+ for daily gut support</h1>
               <p className="shop-lede">
-                Choose a low-risk trial or begin the complete 90-day protocol. We save your order, email your
-                processing notice, then send you to Maya for payment.
+                Order details are saved first, then you continue to Maya. After payment, our admin team confirms the
+                order and calls you before fulfillment.
               </p>
               <div className="shop-proof">
                 <span>Free shipping</span>
                 <span>MSU-IIT co-developed</span>
                 <span>Manual payment confirmation</span>
               </div>
+              <div className="shop-info-actions">
+                <button type="button" onClick={() => setInfoModal("inside")}>
+                  What&apos;s inside
+                </button>
+                <button type="button" onClick={() => setInfoModal("trust")}>
+                  Why trust this
+                </button>
+              </div>
             </div>
           </section>
+        </div>
+      </section>
 
-          <aside className="shop-card" aria-label="Product options">
+      <section className="shop-buy-band" aria-label="Product selection">
+        <div className="shop-buy-inner">
+          <div className="shop-section-head">
+            <div>
+              <p className="shop-kicker">Choose your order</p>
+              <h2>Start small or begin the protocol.</h2>
+            </div>
+            <button className="shop-secondary" type="button" onClick={() => setDrawerOpen(true)}>
+              Open basket ({basketCount})
+            </button>
+          </div>
+
+          <div className="shop-card" aria-label="Product options">
             <div className="shop-segment">
               <button type="button" className={mode === "trial" ? "active" : ""} onClick={() => setMode("trial")}>
                 Try first
@@ -190,14 +234,15 @@ export default function Shoplet() {
             </div>
 
             {mode === "trial" ? (
-              <div className="shop-options">
+              <div className="shop-options trial">
                 {TRIALS.map((item) => (
                   <button
                     key={item.id}
                     type="button"
-                    className={trialId === item.id ? "shop-option active" : "shop-option"}
+                    className={trialId === item.id ? "shop-option active has-image" : "shop-option has-image"}
                     onClick={() => setTrialId(item.id)}
                   >
+                    <Image src={item.image} alt={item.name} width={150} height={150} />
                     <span>
                       <strong>{item.name}</strong>
                       <small>{item.caps} capsules</small>
@@ -207,7 +252,7 @@ export default function Shoplet() {
                 ))}
               </div>
             ) : (
-              <div className="shop-options">
+              <div className="shop-options protocol">
                 {TIERS.map((item) => (
                   <button
                     key={item.id}
@@ -238,81 +283,195 @@ export default function Shoplet() {
               </span>
               <ArrowRightIcon />
             </button>
+          </div>
+        </div>
+      </section>
+
+      {drawerOpen ? (
+        <div className="shop-drawer-wrap" role="presentation">
+          <button
+            className="shop-drawer-scrim"
+            type="button"
+            aria-label="Close basket"
+            onClick={() => setDrawerOpen(false)}
+          />
+          <aside className="shop-drawer" aria-label="Basket">
+            <div className="shop-drawer-head">
+              <div>
+                <p className="shop-kicker">Basket</p>
+                <h2>Your order</h2>
+              </div>
+              <button type="button" onClick={() => setDrawerOpen(false)}>
+                Close
+              </button>
+            </div>
+
+            {stage === "redirecting" ? (
+              <section className="shop-success" role="status">
+                <CheckIcon />
+                <h2>Order {createdCode} saved.</h2>
+                <p>Redirecting you to Maya. After payment, our admin team will confirm the order and call you.</p>
+              </section>
+            ) : (
+              <>
+                <CartLines basket={basket} subtotal={subtotal} onQty={setLineQty} />
+                {!checkoutOpen ? (
+                  <button
+                    type="button"
+                    className="shop-primary"
+                    disabled={basket.length === 0}
+                    onClick={() => setCheckoutOpen(true)}
+                  >
+                    <span>
+                      Checkout
+                      <small>{basket.length === 0 ? "Add an item first" : `${basketCount} item(s) - ${peso(subtotal)}`}</small>
+                    </span>
+                    <ArrowRightIcon />
+                  </button>
+                ) : (
+                  <form className="shop-form" onSubmit={submitOrder}>
+                    <div className="shop-form-grid">
+                      <Field id="email" label="Email" type="email" value={form.email} error={errors.email} onChange={setField} />
+                      <Field id="mobile" label="Mobile" type="tel" value={form.mobile} error={errors.mobile} onChange={setField} />
+                      <Field id="name" label="Full name" value={form.name} error={errors.name} onChange={setField} wide />
+                      <Field id="address" label="Street address" value={form.address} error={errors.address} onChange={setField} wide />
+                      <Field id="city" label="City" value={form.city} error={errors.city} onChange={setField} />
+                      <Field id="province" label="Province" value={form.province} error={errors.province} onChange={setField} />
+                      <Field id="zip" label="ZIP" value={form.zip} error={errors.zip} onChange={setField} />
+                    </div>
+                    <div className="shop-payment-note">
+                      Payment method: Maya. Your details are saved first, then you continue to the secure Maya payment link.
+                    </div>
+                    {submitError ? <div className="shop-error">{submitError}</div> : null}
+                    <button type="submit" className="shop-primary" disabled={submitting}>
+                      <span>
+                        {submitting ? "Saving order" : `Continue to Maya - ${peso(subtotal)}`}
+                        <small>You will receive an order processing email.</small>
+                      </span>
+                      <ArrowRightIcon />
+                    </button>
+                  </form>
+                )}
+              </>
+            )}
           </aside>
         </div>
-      </section>
+      ) : null}
 
-      <section className="shop-checkout-band" id="checkout">
-        <div className="shop-cart">
-          <div className="shop-section-head">
-            <p className="shop-kicker">Checkout</p>
-            <h2>Your order</h2>
-          </div>
-
-          {basket.length > 0 ? (
-            <div className="shop-lines">
-              {basket.map((item) => (
-                <article className="shop-line" key={item.id}>
-                  <div>
-                    <strong>{item.name}</strong>
-                    <span>
-                      {item.caps} capsules - {peso(item.price)}
-                    </span>
-                  </div>
-                  <div className="shop-qty">
-                    <button type="button" onClick={() => setLineQty(item.id, item.qty - 1)} aria-label="Decrease quantity">
-                      -
-                    </button>
-                    <span>{item.qty}</span>
-                    <button type="button" onClick={() => setLineQty(item.id, item.qty + 1)} aria-label="Increase quantity">
-                      +
-                    </button>
-                  </div>
-                  <b>{peso(item.price * item.qty)}</b>
-                </article>
-              ))}
-              <div className="shop-total">
-                <span>Total</span>
-                <strong>{peso(subtotal)}</strong>
+      {infoModal ? (
+        <div className="shop-modal-wrap" role="presentation">
+          <button className="shop-drawer-scrim" type="button" aria-label="Close details" onClick={() => setInfoModal(null)} />
+          <section className="shop-modal" role="dialog" aria-modal="true" aria-labelledby="shop-info-title">
+            <div className="shop-drawer-head">
+              <div>
+                <p className="shop-kicker">{infoModal === "inside" ? "Formula" : "Proof"}</p>
+                <h2 id="shop-info-title">{infoModal === "inside" ? "What's inside" : "Why trust this"}</h2>
               </div>
-            </div>
-          ) : (
-            <p className="shop-empty">Your basket is empty. Add a trial or protocol above.</p>
-          )}
-
-          {stage === "redirecting" ? (
-            <section className="shop-success" role="status">
-              <CheckIcon />
-              <h2>Order {createdCode} saved.</h2>
-              <p>Redirecting you to Maya. After payment, our admin team will confirm the order and call you.</p>
-            </section>
-          ) : (
-            <form className="shop-form" onSubmit={submitOrder}>
-              <div className="shop-form-grid">
-                <Field id="email" label="Email" type="email" value={form.email} error={errors.email} onChange={setField} />
-                <Field id="mobile" label="Mobile" type="tel" value={form.mobile} error={errors.mobile} onChange={setField} />
-                <Field id="name" label="Full name" value={form.name} error={errors.name} onChange={setField} wide />
-                <Field id="address" label="Street address" value={form.address} error={errors.address} onChange={setField} wide />
-                <Field id="city" label="City" value={form.city} error={errors.city} onChange={setField} />
-                <Field id="province" label="Province" value={form.province} error={errors.province} onChange={setField} />
-                <Field id="zip" label="ZIP" value={form.zip} error={errors.zip} onChange={setField} />
-              </div>
-              <div className="shop-payment-note">
-                Payment method: Maya. Your details are saved first, then you continue to the secure Maya payment link.
-              </div>
-              {submitError ? <div className="shop-error">{submitError}</div> : null}
-              <button type="submit" className="shop-primary" disabled={!canCheckout || submitting}>
-                <span>
-                  {submitting ? "Saving order" : `Continue to Maya - ${peso(subtotal)}`}
-                <small>You will receive an order processing email.</small>
-                </span>
-                <ArrowRightIcon />
+              <button type="button" onClick={() => setInfoModal(null)}>
+                Close
               </button>
-            </form>
-          )}
+            </div>
+            {infoModal === "inside" ? <InsidePanel /> : <TrustPanel />}
+          </section>
         </div>
-      </section>
+      ) : null}
     </main>
+  );
+}
+
+function CartLines({
+  basket,
+  subtotal,
+  onQty,
+}: {
+  basket: ShopOrderItem[];
+  subtotal: number;
+  onQty: (id: string, qty: number) => void;
+}) {
+  if (basket.length === 0) return <p className="shop-empty">Your basket is empty. Add a trial or protocol first.</p>;
+
+  return (
+    <div className="shop-lines">
+      {basket.map((item) => (
+        <article className="shop-line" key={item.id}>
+          <div>
+            <strong>{item.name}</strong>
+            <span>
+              {item.caps} capsules - {peso(item.price)}
+            </span>
+          </div>
+          <div className="shop-qty">
+            <button type="button" onClick={() => onQty(item.id, item.qty - 1)} aria-label="Decrease quantity">
+              -
+            </button>
+            <span>{item.qty}</span>
+            <button type="button" onClick={() => onQty(item.id, item.qty + 1)} aria-label="Increase quantity">
+              +
+            </button>
+          </div>
+          <b>{peso(item.price * item.qty)}</b>
+        </article>
+      ))}
+      <div className="shop-total">
+        <span>Total</span>
+        <strong>{peso(subtotal)}</strong>
+      </div>
+    </div>
+  );
+}
+
+function InsidePanel() {
+  return (
+    <div className="shop-info-panel">
+      {SCIENCE.map(([title, copy]) => (
+        <article key={title}>
+          <CheckIcon />
+          <div>
+            <strong>{title}</strong>
+            <p>{copy}</p>
+          </div>
+        </article>
+      ))}
+      <div className="shop-facts">
+        <h3>Supplement Facts</h3>
+        <dl>
+          <div>
+            <dt>Serving size</dt>
+            <dd>1 capsule (600 mg)</dd>
+          </div>
+          <div>
+            <dt>L-Tryptophan</dt>
+            <dd>100 mg</dd>
+          </div>
+          <div>
+            <dt>Urolithin-A</dt>
+            <dd>10 mg</dd>
+          </div>
+          <div>
+            <dt>Glutathione</dt>
+            <dd>250 mg</dd>
+          </div>
+          <div>
+            <dt>Lutein</dt>
+            <dd>250 mg</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+  );
+}
+
+function TrustPanel() {
+  return (
+    <div className="shop-trust-grid">
+      {PROOF.map(([title, copy]) => (
+        <article key={title}>
+          <strong>{title}</strong>
+          <span>{copy}</span>
+        </article>
+      ))}
+      <p>GutGuard is currently in a joint clinical study with MSU-IIT. Payment is manually reconciled through Maya so a real person can confirm every order before fulfillment.</p>
+    </div>
   );
 }
 
