@@ -2992,6 +2992,10 @@
   overflow-x: visible;
 }
 
+.admin-shop-orders-shell {
+  max-width: 1360px;
+}
+
 .admin-shop-orders-table,
 .admin-shop-line-items-table {
   min-width: 0;
@@ -3039,18 +3043,23 @@
 
 .admin-shop-orders-table th:nth-child(7),
 .admin-shop-orders-table td:nth-child(7) {
-  width: 13%;
+  width: 12%;
 }
 
 .admin-shop-orders-table th:nth-child(8),
 .admin-shop-orders-table td:nth-child(8) {
-  width: 5%;
+  width: 6%;
+  text-align: right;
 }
 
 .admin-shop-orders-table .admin-tiktok-row-actions button {
   min-height: 32px;
   padding: 8px 10px;
   white-space: nowrap;
+}
+
+.admin-shop-orders-table .admin-tiktok-row-actions {
+  justify-content: flex-end;
 }
 
 .admin-shop-line-items-table.compact {
