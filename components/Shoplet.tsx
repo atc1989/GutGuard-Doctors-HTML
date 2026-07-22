@@ -159,7 +159,7 @@ export default function Shoplet() {
       setCreatedCode(order.order_code);
       setStage("redirecting");
       window.setTimeout(() => {
-        window.location.assign(MAYA_URL);
+        window.location.assign(getMayaPaymentUrl(subtotal));
       }, 900);
     } catch (caught) {
       setSubmitError(caught instanceof Error ? caught.message : "Order could not be saved. Please try again.");
@@ -524,4 +524,10 @@ function formatMobile(value: string) {
   if (digits.length <= 4) return digits;
   if (digits.length <= 7) return `${digits.slice(0, 4)} ${digits.slice(4)}`;
   return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
+}
+
+function getMayaPaymentUrl(amount: number) {
+  const url = new URL(MAYA_URL);
+  url.searchParams.set("amt", String(amount));
+  return url.toString();
 }
