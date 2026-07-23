@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.106.2";
 
-const MAYA_URL = "https://paymaya.me/GRINDERSGUILD";
+const MAYA_URL = "https://paymaya.me/ASIAPAC";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,6 +19,13 @@ type ShopOrder = {
   email: string | null;
   mobile: string | null;
   subtotal: number | string | null;
+  shipping_fee: number | string | null;
+  total_amount: number | string | null;
+  address: string | null;
+  barangay: string | null;
+  city: string | null;
+  province: string | null;
+  zip: string | null;
   items: Array<{ name?: string; qty?: number; price?: number }> | null;
   created_at: string | null;
 };
@@ -44,7 +51,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const { data, error } = await supabase
       .from("shop_orders")
-      .select("id, order_code, customer_name, email, mobile, subtotal, items, created_at")
+      .select("id, order_code, customer_name, email, mobile, address, barangay, city, province, zip, subtotal, shipping_fee, total_amount, items, created_at")
       .eq("id", orderId)
       .single();
 
@@ -149,7 +156,7 @@ function renderEmail(order: ShopOrder) {
           <h1 style="margin:0 0 16px;font-family:Georgia,serif;font-size:34px;font-weight:400;line-height:1.05;">We received your GutGuard order.</h1>
           <p style="margin:0 0 18px;color:#3A3A48;font-size:16px;line-height:1.55;">Hi ${escapeHtml(order.customer_name ?? "there")}, your order <strong>${escapeHtml(order.order_code)}</strong> has been saved and is now being processed.</p>
           <p style="margin:0 0 22px;color:#3A3A48;font-size:16px;line-height:1.55;">Please complete payment through Maya. Once payment is confirmed from Maya, our admin team will call you to confirm your details before fulfillment.</p>
-          <a href="${MAYA_URL}" style="display:inline-block;background:#0608A9;color:#F4F1EA;text-decoration:none;padding:14px 18px;font-weight:800;">Continue to Maya</a>
+          <a href="${getMayaPaymentUrl(Number(order.total_amount ?? order.subtotal ?? 0))}" style="display:inline-block;background:#0608A9;color:#F4F1EA;text-decoration:none;padding:14px 18px;font-weight:800;">Continue to Maya</a>
           <table style="width:100%;border-collapse:collapse;margin-top:26px;font-size:14px;">
             <thead>
               <tr>
@@ -160,7 +167,12 @@ function renderEmail(order: ShopOrder) {
             </thead>
             <tbody>${itemRows}</tbody>
           </table>
-          <p style="margin:18px 0 0;text-align:right;font-family:Georgia,serif;font-size:24px;">Total ${formatPeso(Number(order.subtotal ?? 0))}</p>
+          <div style="margin-top:20px;border-top:1px solid #E5E0D2;padding-top:14px;color:#3A3A48;font-size:14px;line-height:1.6;">
+            <p style="margin:0;text-align:right;">Subtotal ${formatPeso(Number(order.subtotal ?? 0))}</p>
+            <p style="margin:0;text-align:right;">Shipping ${formatPeso(Number(order.shipping_fee ?? 0))}</p>
+            <p style="margin:8px 0 0;text-align:right;font-family:Georgia,serif;font-size:24px;color:#141019;">Total ${formatPeso(Number(order.total_amount ?? order.subtotal ?? 0))}</p>
+          </div>
+          <p style="margin:22px 0 0;color:#3A3A48;font-size:14px;line-height:1.55;"><strong>Delivery address:</strong><br>${escapeHtml(formatDeliveryAddress(order))}</p>
           <p style="margin:26px 0 0;color:#6B6B7A;font-size:13px;line-height:1.5;">If you already paid, you can ignore the Maya button. We will reconcile your payment manually and contact you soon.</p>
         </div>
       </div>
@@ -169,6 +181,16 @@ function renderEmail(order: ShopOrder) {
 
 function formatPeso(value: number) {
   return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value);
+}
+
+function getMayaPaymentUrl(amount: number) {
+  const url = new URL(MAYA_URL);
+  url.searchParams.set("amt", String(amount));
+  return url.toString();
+}
+
+function formatDeliveryAddress(order: ShopOrder) {
+  return [order.address, order.barangay, order.city, order.province, order.zip].filter(Boolean).join(", ");
 }
 
 function isValidEmail(value: string) {

@@ -142,7 +142,15 @@ export type ShopOrderInput = {
   address: string;
   city: string;
   province: string;
+  barangay: string;
   zip: string;
+  provinceCode: string;
+  cityMunicipalityCode: string;
+  barangayCode: string;
+  shippingRegion: string;
+  shippingFee: number;
+  shippingWeightGrams: number;
+  totalAmount: number;
   items: ShopOrderItem[];
   subtotal: number;
   paymentMethod: string;
@@ -161,7 +169,15 @@ export type ShopOrder = {
   address: string;
   city: string;
   province: string;
+  barangay: string;
   zip: string;
+  province_code: string | null;
+  city_municipality_code: string | null;
+  barangay_code: string | null;
+  shipping_region: string | null;
+  shipping_fee: number;
+  shipping_weight_grams: number;
+  total_amount: number;
   subtotal: number;
   items: ShopOrderItem[];
   admin_notes: string | null;
@@ -565,7 +581,15 @@ export async function createShopOrder(payload: ShopOrderInput): Promise<ShopOrde
     p_address: payload.address,
     p_city: payload.city,
     p_province: payload.province,
+    p_barangay: payload.barangay,
     p_zip: payload.zip,
+    p_province_code: payload.provinceCode,
+    p_city_municipality_code: payload.cityMunicipalityCode,
+    p_barangay_code: payload.barangayCode,
+    p_shipping_region: payload.shippingRegion,
+    p_shipping_fee: payload.shippingFee,
+    p_shipping_weight_grams: payload.shippingWeightGrams,
+    p_total_amount: payload.totalAmount,
     p_items: payload.items,
     p_subtotal: payload.subtotal,
     p_payment_method: payload.paymentMethod,
@@ -923,6 +947,9 @@ function normalizeAdminDoctorRegistration(doctor: AdminDoctorRegistration): Admi
 
 function normalizeShopOrder(row: unknown): ShopOrder {
   const order = (row ?? {}) as Record<string, unknown>;
+  const subtotal = Number(order.subtotal ?? 0);
+  const shippingFee = Number(order.shipping_fee ?? 0);
+  const totalAmount = Number(order.total_amount ?? 0) || subtotal + shippingFee;
 
   return {
     id: String(order.id ?? ""),
@@ -937,8 +964,16 @@ function normalizeShopOrder(row: unknown): ShopOrder {
     address: String(order.address ?? ""),
     city: String(order.city ?? ""),
     province: String(order.province ?? ""),
+    barangay: String(order.barangay ?? ""),
     zip: String(order.zip ?? ""),
-    subtotal: Number(order.subtotal ?? 0),
+    province_code: typeof order.province_code === "string" ? order.province_code : null,
+    city_municipality_code: typeof order.city_municipality_code === "string" ? order.city_municipality_code : null,
+    barangay_code: typeof order.barangay_code === "string" ? order.barangay_code : null,
+    shipping_region: typeof order.shipping_region === "string" ? order.shipping_region : null,
+    shipping_fee: shippingFee,
+    shipping_weight_grams: Number(order.shipping_weight_grams ?? 0),
+    total_amount: totalAmount,
+    subtotal,
     items: Array.isArray(order.items) ? (order.items as ShopOrderItem[]) : [],
     admin_notes: typeof order.admin_notes === "string" ? order.admin_notes : null,
     created_at: String(order.created_at ?? ""),

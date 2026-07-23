@@ -1,12 +1,21 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRightIcon, CheckIcon } from "@/components/Icons";
 import { createShopOrder, sendShopOrderEmail, type ShopOrderItem } from "@/lib/api";
+import {
+  fetchBarangays,
+  fetchLocalities,
+  fetchProvinces,
+  type BarangayOption,
+  type LocalityOption,
+  type ProvinceOption,
+} from "@/lib/philippines-address";
+import { getOrderTotal, quoteShipping } from "@/lib/shipping";
 
-const MAYA_URL = "https://paymaya.me/GRINDERSGUILD";
+const MAYA_URL = "https://paymaya.me/ASIAPAC";
 
 const TIERS = [
   { id: "start", name: "Start", phase: "30-day", days: 30, caps: 135, perCap: 120, price: 16200 },
@@ -51,7 +60,11 @@ type FormState = {
   address: string;
   city: string;
   province: string;
+  barangay: string;
   zip: string;
+  provinceCode: string;
+  cityMunicipalityCode: string;
+  barangayCode: string;
 };
 
 const emptyForm: FormState = {
@@ -61,7 +74,11 @@ const emptyForm: FormState = {
   address: "",
   city: "",
   province: "",
+  barangay: "",
   zip: "",
+  provinceCode: "",
+  cityMunicipalityCode: "",
+  barangayCode: "",
 };
 
 const peso = (value: number) =>
@@ -81,14 +98,93 @@ export default function Shoplet() {
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [createdCode, setCreatedCode] = useState("");
+  const [provinces, setProvinces] = useState<ProvinceOption[]>([]);
+  const [localities, setLocalities] = useState<LocalityOption[]>([]);
+  const [barangays, setBarangays] = useState<BarangayOption[]>([]);
+  const [addressMode, setAddressMode] = useState<"api" | "manual">("api");
+  const [addressNotice, setAddressNotice] = useState("");
+  const [isLoadingProvinces, setIsLoadingProvinces] = useState(false);
+  const [isLoadingLocalities, setIsLoadingLocalities] = useState(false);
+  const [isLoadingBarangays, setIsLoadingBarangays] = useState(false);
 
   const selectedTrial = TRIALS.find((item) => item.id === trialId) ?? TRIALS[0];
   const selectedTier = TIERS.find((item) => item.id === tierId) ?? TIERS[2];
   const basketCount = basket.reduce((sum, item) => sum + item.qty, 0);
   const subtotal = basket.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const shippingQuote = quoteShipping(basket, {
+    province: form.province,
+    regionCode: getSelectedRegionCode(form, provinces),
+    manualAddress: addressMode === "manual",
+  });
+  const totalAmount = getOrderTotal(subtotal, shippingQuote.fee);
   const currentBuyLabel = mode === "trial" ? `Add ${selectedTrial.name}` : `Add ${selectedTier.name}`;
   const currentPrice = mode === "trial" ? selectedTrial.price : selectedTier.price;
   const savings = Math.max(0, selectedTier.caps * 120 - selectedTier.price);
+
+  useEffect(() => {
+    let ignore = false;
+    setIsLoadingProvinces(true);
+    fetchProvinces()
+      .then((items) => {
+        if (!ignore) setProvinces(items);
+      })
+      .catch(() => {
+        if (!ignore) {
+          setAddressMode("manual");
+          setAddressNotice("Address dropdowns are unavailable right now. Enter the delivery address manually and admin will review shipping.");
+        }
+      })
+      .finally(() => {
+        if (!ignore) setIsLoadingProvinces(false);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (addressMode !== "api" || !form.provinceCode) return;
+    let ignore = false;
+    setIsLoadingLocalities(true);
+    fetchLocalities(form.provinceCode)
+      .then((items) => {
+        if (!ignore) setLocalities(items);
+      })
+      .catch(() => {
+        if (!ignore) {
+          setAddressMode("manual");
+          setAddressNotice("City and barangay lists could not be loaded. Enter the delivery address manually and admin will review shipping.");
+        }
+      })
+      .finally(() => {
+        if (!ignore) setIsLoadingLocalities(false);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [addressMode, form.provinceCode]);
+
+  useEffect(() => {
+    if (addressMode !== "api" || !form.cityMunicipalityCode) return;
+    let ignore = false;
+    setIsLoadingBarangays(true);
+    fetchBarangays(form.cityMunicipalityCode)
+      .then((items) => {
+        if (!ignore) setBarangays(items);
+      })
+      .catch(() => {
+        if (!ignore) {
+          setAddressMode("manual");
+          setAddressNotice("Barangay list could not be loaded. Enter the delivery address manually and admin will review shipping.");
+        }
+      })
+      .finally(() => {
+        if (!ignore) setIsLoadingBarangays(false);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [addressMode, form.cityMunicipalityCode]);
 
   function addCurrentItem() {
     const source =
@@ -126,6 +222,55 @@ export default function Shoplet() {
     if (errors[key]) setErrors((current) => ({ ...current, [key]: validateField(key, nextValue) }));
   }
 
+  function chooseProvince(provinceCode: string) {
+    const province = provinces.find((item) => item.code === provinceCode);
+    setLocalities([]);
+    setBarangays([]);
+    setForm((current) => ({
+      ...current,
+      province: province?.name ?? "",
+      provinceCode,
+      city: "",
+      cityMunicipalityCode: "",
+      barangay: "",
+      barangayCode: "",
+      zip: "",
+    }));
+    setErrors((current) => ({ ...current, province: validateField("province", province?.name ?? "") }));
+  }
+
+  function chooseLocality(localityCode: string) {
+    const locality = localities.find((item) => item.code === localityCode);
+    setBarangays([]);
+    setForm((current) => ({
+      ...current,
+      city: locality?.name ?? "",
+      cityMunicipalityCode: localityCode,
+      barangay: "",
+      barangayCode: "",
+      zip: locality?.zipCode || current.zip,
+    }));
+    setErrors((current) => ({
+      ...current,
+      city: validateField("city", locality?.name ?? ""),
+      zip: locality?.zipCode ? "" : current.zip ? validateField("zip", current.zip) : current.zip,
+    }));
+  }
+
+  function chooseBarangay(barangayCode: string) {
+    const barangay = barangays.find((item) => item.code === barangayCode);
+    setForm((current) => ({ ...current, barangay: barangay?.name ?? "", barangayCode }));
+    setErrors((current) => ({ ...current, barangay: validateField("barangay", barangay?.name ?? "") }));
+  }
+
+  function useManualAddress() {
+    setAddressMode("manual");
+    setAddressNotice("Manual delivery address enabled. Admin will review the shipping fee before fulfillment.");
+    setLocalities([]);
+    setBarangays([]);
+    setForm((current) => ({ ...current, provinceCode: "", cityMunicipalityCode: "", barangayCode: "" }));
+  }
+
   async function submitOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitError("");
@@ -138,6 +283,10 @@ export default function Shoplet() {
     const nextErrors = validateForm(form);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
+    if (shippingQuote.error) {
+      setSubmitError(shippingQuote.error);
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -148,7 +297,15 @@ export default function Shoplet() {
         address: form.address,
         city: form.city,
         province: form.province,
+        barangay: form.barangay,
         zip: form.zip,
+        provinceCode: form.provinceCode,
+        cityMunicipalityCode: form.cityMunicipalityCode,
+        barangayCode: form.barangayCode,
+        shippingRegion: shippingQuote.label,
+        shippingFee: shippingQuote.fee,
+        shippingWeightGrams: shippingQuote.weightGrams,
+        totalAmount,
         items: basket,
         subtotal,
         paymentMethod: "maya",
@@ -159,7 +316,7 @@ export default function Shoplet() {
       setCreatedCode(order.order_code);
       setStage("redirecting");
       window.setTimeout(() => {
-        window.location.assign(getMayaPaymentUrl(subtotal));
+        window.location.assign(getMayaPaymentUrl(totalAmount));
       }, 900);
     } catch (caught) {
       setSubmitError(caught instanceof Error ? caught.message : "Order could not be saved. Please try again.");
@@ -314,7 +471,7 @@ export default function Shoplet() {
               </section>
             ) : (
               <>
-                <CartLines basket={basket} subtotal={subtotal} onQty={setLineQty} />
+                <CartLines basket={basket} subtotal={subtotal} shippingFee={shippingQuote.fee} total={totalAmount} onQty={setLineQty} />
                 {!checkoutOpen ? (
                   <button
                     type="button"
@@ -335,17 +492,82 @@ export default function Shoplet() {
                       <Field id="mobile" label="Mobile" type="tel" value={form.mobile} error={errors.mobile} onChange={setField} />
                       <Field id="name" label="Full name" value={form.name} error={errors.name} onChange={setField} wide />
                       <Field id="address" label="Street address" value={form.address} error={errors.address} onChange={setField} wide />
-                      <Field id="city" label="City" value={form.city} error={errors.city} onChange={setField} />
-                      <Field id="province" label="Province" value={form.province} error={errors.province} onChange={setField} />
+                      {addressMode === "api" ? (
+                        <>
+                          <SelectField
+                            id="province"
+                            label="Province"
+                            value={form.provinceCode}
+                            error={errors.province}
+                            disabled={isLoadingProvinces}
+                            placeholder={isLoadingProvinces ? "Loading provinces" : "Select province"}
+                            options={provinces.map((item) => ({ label: item.name, value: item.code }))}
+                            onChange={chooseProvince}
+                          />
+                          <SelectField
+                            id="city"
+                            label="City / Municipality"
+                            value={form.cityMunicipalityCode}
+                            error={errors.city}
+                            disabled={!form.provinceCode || isLoadingLocalities}
+                            placeholder={isLoadingLocalities ? "Loading cities" : "Select city or municipality"}
+                            options={localities.map((item) => ({ label: item.name, value: item.code }))}
+                            onChange={chooseLocality}
+                          />
+                          <SelectField
+                            id="barangay"
+                            label="Barangay"
+                            value={form.barangayCode}
+                            error={errors.barangay}
+                            disabled={!form.cityMunicipalityCode || isLoadingBarangays}
+                            placeholder={isLoadingBarangays ? "Loading barangays" : "Select barangay"}
+                            options={barangays.map((item) => ({ label: item.name, value: item.code }))}
+                            onChange={chooseBarangay}
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <Field id="province" label="Province" value={form.province} error={errors.province} onChange={setField} />
+                          <Field id="city" label="City" value={form.city} error={errors.city} onChange={setField} />
+                          <Field id="barangay" label="Barangay" value={form.barangay} error={errors.barangay} onChange={setField} />
+                        </>
+                      )}
                       <Field id="zip" label="ZIP" value={form.zip} error={errors.zip} onChange={setField} />
+                    </div>
+                    <div className="shop-address-tools">
+                      {addressNotice ? <span>{addressNotice}</span> : <span>Shipping is calculated from Davao after province selection.</span>}
+                      {addressMode === "api" ? (
+                        <button type="button" onClick={useManualAddress}>
+                          Enter manually
+                        </button>
+                      ) : null}
+                    </div>
+                    <div className="shop-shipping-summary">
+                      <span>
+                        <small>Subtotal</small>
+                        <strong>{peso(subtotal)}</strong>
+                      </span>
+                      <span>
+                        <small>Shipping {shippingQuote.manualReview ? "(review)" : shippingQuote.label ? `(${shippingQuote.label})` : ""}</small>
+                        <strong>{shippingQuote.manualReview ? "Review" : peso(shippingQuote.fee)}</strong>
+                      </span>
+                      <span>
+                        <small>Estimated weight</small>
+                        <strong>{shippingQuote.weightGrams}g</strong>
+                      </span>
+                      <span>
+                        <small>Total</small>
+                        <strong>{peso(totalAmount)}</strong>
+                      </span>
                     </div>
                     <div className="shop-payment-note">
                       Payment method: Maya. Your details are saved first, then you continue to the secure Maya payment link.
                     </div>
+                    {shippingQuote.error ? <div className="shop-error">{shippingQuote.error}</div> : null}
                     {submitError ? <div className="shop-error">{submitError}</div> : null}
                     <button type="submit" className="shop-primary" disabled={submitting}>
                       <span>
-                        {submitting ? "Saving order" : `Continue to Maya - ${peso(subtotal)}`}
+                        {submitting ? "Saving order" : `Continue to Maya - ${peso(totalAmount)}`}
                         <small>You will receive an order processing email.</small>
                       </span>
                       <ArrowRightIcon />
@@ -382,10 +604,14 @@ export default function Shoplet() {
 function CartLines({
   basket,
   subtotal,
+  shippingFee,
+  total,
   onQty,
 }: {
   basket: ShopOrderItem[];
   subtotal: number;
+  shippingFee: number;
+  total: number;
   onQty: (id: string, qty: number) => void;
 }) {
   if (basket.length === 0) return <p className="shop-empty">Your basket is empty. Add a trial or protocol first.</p>;
@@ -413,8 +639,16 @@ function CartLines({
         </article>
       ))}
       <div className="shop-total">
-        <span>Total</span>
+        <span>Subtotal</span>
         <strong>{peso(subtotal)}</strong>
+      </div>
+      <div className="shop-total">
+        <span>Shipping</span>
+        <strong>{shippingFee ? peso(shippingFee) : "Select address"}</strong>
+      </div>
+      <div className="shop-total grand">
+        <span>Total</span>
+        <strong>{peso(total)}</strong>
       </div>
     </div>
   );
@@ -501,6 +735,41 @@ function Field({
   );
 }
 
+function SelectField({
+  id,
+  label,
+  value,
+  error,
+  placeholder,
+  options,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  error?: string;
+  placeholder: string;
+  options: Array<{ label: string; value: string }>;
+  disabled?: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="shop-field" htmlFor={`shop-${id}`}>
+      <span>{label}</span>
+      <select id={`shop-${id}`} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
+        <option value="">{placeholder}</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      {error ? <em>{error}</em> : null}
+    </label>
+  );
+}
+
 function validateForm(form: FormState) {
   const errors: Partial<Record<keyof FormState, string>> = {};
   (Object.keys(form) as Array<keyof FormState>).forEach((key) => {
@@ -512,6 +781,7 @@ function validateForm(form: FormState) {
 
 function validateField(key: keyof FormState, value: string) {
   const clean = value.trim();
+  if (key.endsWith("Code")) return "";
   if (!clean) return "Required";
   if (key === "email" && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clean)) return "Enter a valid email";
   if (key === "mobile" && !/^09\d{9}$/.test(clean.replace(/\s/g, ""))) return "Enter a valid PH mobile";
@@ -530,4 +800,8 @@ function getMayaPaymentUrl(amount: number) {
   const url = new URL(MAYA_URL);
   url.searchParams.set("amt", String(amount));
   return url.toString();
+}
+
+function getSelectedRegionCode(form: FormState, provinces: ProvinceOption[]) {
+  return provinces.find((item) => item.code === form.provinceCode)?.regionCode ?? "";
 }

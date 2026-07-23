@@ -16,13 +16,34 @@ create table if not exists public.shop_orders (
   address text not null,
   city text not null,
   province text not null,
+  barangay text not null default '',
   zip text not null,
+  province_code text,
+  city_municipality_code text,
+  barangay_code text,
+  shipping_region text,
+  shipping_fee numeric(12, 2) not null default 0,
+  shipping_weight_grams integer not null default 0,
+  total_amount numeric(12, 2) not null default 0,
   subtotal numeric(12, 2) not null default 0,
   items jsonb not null default '[]'::jsonb,
   admin_notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.shop_orders add column if not exists barangay text not null default '';
+alter table public.shop_orders add column if not exists province_code text;
+alter table public.shop_orders add column if not exists city_municipality_code text;
+alter table public.shop_orders add column if not exists barangay_code text;
+alter table public.shop_orders add column if not exists shipping_region text;
+alter table public.shop_orders add column if not exists shipping_fee numeric(12, 2) not null default 0;
+alter table public.shop_orders add column if not exists shipping_weight_grams integer not null default 0;
+alter table public.shop_orders add column if not exists total_amount numeric(12, 2) not null default 0;
+
+update public.shop_orders
+set total_amount = coalesce(nullif(total_amount, 0), subtotal + coalesce(shipping_fee, 0))
+where total_amount = 0;
 
 create index if not exists shop_orders_created_at_idx on public.shop_orders (created_at desc);
 create index if not exists shop_orders_status_idx on public.shop_orders (status, payment_status);
@@ -92,7 +113,15 @@ returns table (
   address text,
   city text,
   province text,
+  barangay text,
   zip text,
+  province_code text,
+  city_municipality_code text,
+  barangay_code text,
+  shipping_region text,
+  shipping_fee numeric,
+  shipping_weight_grams integer,
+  total_amount numeric,
   subtotal numeric,
   items jsonb,
   admin_notes text,
@@ -117,7 +146,15 @@ as $$
     shop_orders.address,
     shop_orders.city,
     shop_orders.province,
+    shop_orders.barangay,
     shop_orders.zip,
+    shop_orders.province_code,
+    shop_orders.city_municipality_code,
+    shop_orders.barangay_code,
+    shop_orders.shipping_region,
+    coalesce(shop_orders.shipping_fee, 0),
+    coalesce(shop_orders.shipping_weight_grams, 0),
+    coalesce(nullif(shop_orders.total_amount, 0), shop_orders.subtotal + coalesce(shop_orders.shipping_fee, 0)),
     shop_orders.subtotal,
     shop_orders.items,
     shop_orders.admin_notes,
@@ -128,6 +165,8 @@ as $$
   limit 1;
 $$;
 
+drop function if exists public.create_shop_order(text, text, text, text, text, text, text, jsonb, numeric, text);
+
 create or replace function public.create_shop_order(
   p_customer_name text,
   p_email text,
@@ -135,7 +174,15 @@ create or replace function public.create_shop_order(
   p_address text,
   p_city text,
   p_province text,
+  p_barangay text,
   p_zip text,
+  p_province_code text,
+  p_city_municipality_code text,
+  p_barangay_code text,
+  p_shipping_region text,
+  p_shipping_fee numeric,
+  p_shipping_weight_grams integer,
+  p_total_amount numeric,
   p_items jsonb,
   p_subtotal numeric,
   p_payment_method text default 'maya'
@@ -153,7 +200,15 @@ returns table (
   address text,
   city text,
   province text,
+  barangay text,
   zip text,
+  province_code text,
+  city_municipality_code text,
+  barangay_code text,
+  shipping_region text,
+  shipping_fee numeric,
+  shipping_weight_grams integer,
+  total_amount numeric,
   subtotal numeric,
   items jsonb,
   admin_notes text,
@@ -179,7 +234,15 @@ begin
     address,
     city,
     province,
+    barangay,
     zip,
+    province_code,
+    city_municipality_code,
+    barangay_code,
+    shipping_region,
+    shipping_fee,
+    shipping_weight_grams,
+    total_amount,
     items,
     subtotal,
     payment_method
@@ -192,34 +255,22 @@ begin
     trim(p_address),
     trim(p_city),
     trim(p_province),
+    trim(p_barangay),
     trim(p_zip),
+    nullif(trim(coalesce(p_province_code, '')), ''),
+    nullif(trim(coalesce(p_city_municipality_code, '')), ''),
+    nullif(trim(coalesce(p_barangay_code, '')), ''),
+    nullif(trim(coalesce(p_shipping_region, '')), ''),
+    coalesce(p_shipping_fee, 0),
+    coalesce(p_shipping_weight_grams, 0),
+    coalesce(p_total_amount, coalesce(p_subtotal, 0) + coalesce(p_shipping_fee, 0)),
     p_items,
     coalesce(p_subtotal, 0),
     lower(trim(coalesce(p_payment_method, 'maya')))
   )
   returning shop_orders.id into v_order_id;
 
-  return query
-  select
-    saved.id,
-    saved.order_code,
-    saved.status,
-    saved.payment_status,
-    saved.payment_method,
-    saved.maya_reference,
-    saved.customer_name,
-    saved.email,
-    saved.mobile,
-    saved.address,
-    saved.city,
-    saved.province,
-    saved.zip,
-    saved.subtotal,
-    saved.items,
-    saved.admin_notes,
-    saved.created_at,
-    saved.updated_at
-  from public.admin_get_shop_order_unchecked(v_order_id) saved;
+  return query select * from public.admin_get_shop_order_unchecked(v_order_id);
 end;
 $$;
 
@@ -237,7 +288,15 @@ returns table (
   address text,
   city text,
   province text,
+  barangay text,
   zip text,
+  province_code text,
+  city_municipality_code text,
+  barangay_code text,
+  shipping_region text,
+  shipping_fee numeric,
+  shipping_weight_grams integer,
+  total_amount numeric,
   subtotal numeric,
   items jsonb,
   admin_notes text,
@@ -252,27 +311,10 @@ begin
   perform public.assert_wheel_admin(p_admin_password);
 
   return query
-  select
-    shop_orders.id,
-    shop_orders.order_code,
-    shop_orders.status,
-    shop_orders.payment_status,
-    shop_orders.payment_method,
-    shop_orders.maya_reference,
-    shop_orders.customer_name,
-    shop_orders.email,
-    shop_orders.mobile,
-    shop_orders.address,
-    shop_orders.city,
-    shop_orders.province,
-    shop_orders.zip,
-    shop_orders.subtotal,
-    shop_orders.items,
-    shop_orders.admin_notes,
-    shop_orders.created_at,
-    shop_orders.updated_at
+  select listed.*
   from public.shop_orders
-  order by shop_orders.created_at desc;
+  cross join lateral public.admin_get_shop_order_unchecked(shop_orders.id) listed
+  order by listed.created_at desc;
 end;
 $$;
 
@@ -290,7 +332,15 @@ returns table (
   address text,
   city text,
   province text,
+  barangay text,
   zip text,
+  province_code text,
+  city_municipality_code text,
+  barangay_code text,
+  shipping_region text,
+  shipping_fee numeric,
+  shipping_weight_grams integer,
+  total_amount numeric,
   subtotal numeric,
   items jsonb,
   admin_notes text,
@@ -304,27 +354,7 @@ as $$
 begin
   perform public.assert_wheel_admin(p_admin_password);
 
-  return query
-  select
-    saved.id,
-    saved.order_code,
-    saved.status,
-    saved.payment_status,
-    saved.payment_method,
-    saved.maya_reference,
-    saved.customer_name,
-    saved.email,
-    saved.mobile,
-    saved.address,
-    saved.city,
-    saved.province,
-    saved.zip,
-    saved.subtotal,
-    saved.items,
-    saved.admin_notes,
-    saved.created_at,
-    saved.updated_at
-  from public.admin_get_shop_order_unchecked(p_order_id) saved;
+  return query select * from public.admin_get_shop_order_unchecked(p_order_id);
 end;
 $$;
 
@@ -349,7 +379,15 @@ returns table (
   address text,
   city text,
   province text,
+  barangay text,
   zip text,
+  province_code text,
+  city_municipality_code text,
+  barangay_code text,
+  shipping_region text,
+  shipping_fee numeric,
+  shipping_weight_grams integer,
+  total_amount numeric,
   subtotal numeric,
   items jsonb,
   admin_notes text,
@@ -371,31 +409,11 @@ begin
     admin_notes = nullif(trim(coalesce(p_admin_notes, '')), '')
   where shop_orders.id = p_order_id;
 
-  return query
-  select
-    saved.id,
-    saved.order_code,
-    saved.status,
-    saved.payment_status,
-    saved.payment_method,
-    saved.maya_reference,
-    saved.customer_name,
-    saved.email,
-    saved.mobile,
-    saved.address,
-    saved.city,
-    saved.province,
-    saved.zip,
-    saved.subtotal,
-    saved.items,
-    saved.admin_notes,
-    saved.created_at,
-    saved.updated_at
-  from public.admin_get_shop_order_unchecked(p_order_id) saved;
+  return query select * from public.admin_get_shop_order_unchecked(p_order_id);
 end;
 $$;
 
-grant execute on function public.create_shop_order(text, text, text, text, text, text, text, jsonb, numeric, text) to anon, authenticated;
+grant execute on function public.create_shop_order(text, text, text, text, text, text, text, text, text, text, text, text, numeric, integer, numeric, jsonb, numeric, text) to anon, authenticated;
 grant execute on function public.admin_list_shop_orders(text) to anon, authenticated;
 grant execute on function public.admin_get_shop_order(text, uuid) to anon, authenticated;
 grant execute on function public.admin_update_shop_order(text, uuid, text, text, text, text) to anon, authenticated;

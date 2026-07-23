@@ -40,6 +40,7 @@ export default function AdminOrdersPage() {
         order.mobile,
         order.city,
         order.province,
+        order.barangay,
         order.status,
         order.maya_reference ?? "",
       ]
@@ -190,7 +191,7 @@ export default function AdminOrdersPage() {
                         <td>{order.mobile}</td>
                         <td>{formatStatus(order.status)}</td>
                         <td>{order.maya_reference || "--"}</td>
-                        <td>{formatPeso(order.subtotal)}</td>
+                        <td>{formatPeso(order.total_amount)}</td>
                         <td>{formatAdminDate(order.created_at)}</td>
                         <td>
                           <div className="admin-tiktok-row-actions">
@@ -236,8 +237,12 @@ export default function AdminOrdersPage() {
                   ["Customer", selectedOrder.customer_name],
                   ["Email", selectedOrder.email],
                   ["Mobile", selectedOrder.mobile],
-                  ["Delivery", `${selectedOrder.address}, ${selectedOrder.city}, ${selectedOrder.province} ${selectedOrder.zip}`],
-                  ["Total", formatPeso(selectedOrder.subtotal)],
+                  ["Delivery", formatDeliveryAddress(selectedOrder)],
+                  ["Shipping area", selectedOrder.shipping_region ?? "--"],
+                  ["Estimated weight", `${selectedOrder.shipping_weight_grams || 0}g`],
+                  ["Subtotal", formatPeso(selectedOrder.subtotal)],
+                  ["Shipping fee", formatPeso(selectedOrder.shipping_fee)],
+                  ["Total", formatPeso(selectedOrder.total_amount)],
                   ["Created", formatAdminDate(selectedOrder.created_at)],
                 ]}
               />
@@ -340,6 +345,10 @@ function formatStatus(value: string) {
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function formatDeliveryAddress(order: ShopOrder) {
+  return [order.address, order.barangay, order.city, order.province, order.zip].filter(Boolean).join(", ");
 }
 
 function mapPaymentStatus(status: ShopOrderStatus) {
