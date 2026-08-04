@@ -41,6 +41,18 @@ alter table public.shop_orders add column if not exists shipping_fee numeric(12,
 alter table public.shop_orders add column if not exists shipping_weight_grams integer not null default 0;
 alter table public.shop_orders add column if not exists total_amount numeric(12, 2) not null default 0;
 
+-- Maya Checkout API integration
+alter table public.shop_orders add column if not exists maya_checkout_id text;
+alter table public.shop_orders add column if not exists maya_payment_id text;
+alter table public.shop_orders add column if not exists maya_payment_status text;
+alter table public.shop_orders add column if not exists maya_request_reference text;
+alter table public.shop_orders add column if not exists maya_fund_source text;
+alter table public.shop_orders add column if not exists payment_attempts integer not null default 0;
+alter table public.shop_orders add column if not exists paid_at timestamptz;
+
+create index if not exists shop_orders_order_code_idx on public.shop_orders (order_code);
+create index if not exists shop_orders_maya_payment_id_idx on public.shop_orders (maya_payment_id);
+
 update public.shop_orders
 set total_amount = coalesce(nullif(total_amount, 0), subtotal + coalesce(shipping_fee, 0))
 where total_amount = 0;
@@ -99,73 +111,23 @@ create trigger shop_orders_touch_updated_at
 before update on public.shop_orders
 for each row execute function public.touch_shop_order_updated_at();
 
+drop function if exists public.admin_update_shop_order(text, uuid, text, text, text, text);
+drop function if exists public.admin_get_shop_order(text, uuid);
+drop function if exists public.admin_list_shop_orders(text);
+drop function if exists public.create_shop_order(text, text, text, text, text, text, text, jsonb, numeric, text);
+drop function if exists public.create_shop_order(text, text, text, text, text, text, text, text, text, text, text, text, numeric, integer, numeric, jsonb, numeric, text);
+drop function if exists public.admin_get_shop_order_unchecked(uuid);
+drop function if exists public.get_shop_order_public(text);
+
 create or replace function public.admin_get_shop_order_unchecked(p_order_id uuid)
-returns table (
-  id uuid,
-  order_code text,
-  status text,
-  payment_status text,
-  payment_method text,
-  maya_reference text,
-  customer_name text,
-  email text,
-  mobile text,
-  address text,
-  city text,
-  province text,
-  barangay text,
-  zip text,
-  province_code text,
-  city_municipality_code text,
-  barangay_code text,
-  shipping_region text,
-  shipping_fee numeric,
-  shipping_weight_grams integer,
-  total_amount numeric,
-  subtotal numeric,
-  items jsonb,
-  admin_notes text,
-  created_at timestamptz,
-  updated_at timestamptz
-)
+returns setof public.shop_orders
 language sql
 stable
 security definer
 set search_path = public
 as $$
-  select
-    shop_orders.id,
-    shop_orders.order_code,
-    shop_orders.status,
-    shop_orders.payment_status,
-    shop_orders.payment_method,
-    shop_orders.maya_reference,
-    shop_orders.customer_name,
-    shop_orders.email,
-    shop_orders.mobile,
-    shop_orders.address,
-    shop_orders.city,
-    shop_orders.province,
-    shop_orders.barangay,
-    shop_orders.zip,
-    shop_orders.province_code,
-    shop_orders.city_municipality_code,
-    shop_orders.barangay_code,
-    shop_orders.shipping_region,
-    coalesce(shop_orders.shipping_fee, 0),
-    coalesce(shop_orders.shipping_weight_grams, 0),
-    coalesce(nullif(shop_orders.total_amount, 0), shop_orders.subtotal + coalesce(shop_orders.shipping_fee, 0)),
-    shop_orders.subtotal,
-    shop_orders.items,
-    shop_orders.admin_notes,
-    shop_orders.created_at,
-    shop_orders.updated_at
-  from public.shop_orders
-  where id = p_order_id
-  limit 1;
+  select * from public.shop_orders where id = p_order_id limit 1;
 $$;
-
-drop function if exists public.create_shop_order(text, text, text, text, text, text, text, jsonb, numeric, text);
 
 create or replace function public.create_shop_order(
   p_customer_name text,
@@ -187,34 +149,7 @@ create or replace function public.create_shop_order(
   p_subtotal numeric,
   p_payment_method text default 'maya'
 )
-returns table (
-  id uuid,
-  order_code text,
-  status text,
-  payment_status text,
-  payment_method text,
-  maya_reference text,
-  customer_name text,
-  email text,
-  mobile text,
-  address text,
-  city text,
-  province text,
-  barangay text,
-  zip text,
-  province_code text,
-  city_municipality_code text,
-  barangay_code text,
-  shipping_region text,
-  shipping_fee numeric,
-  shipping_weight_grams integer,
-  total_amount numeric,
-  subtotal numeric,
-  items jsonb,
-  admin_notes text,
-  created_at timestamptz,
-  updated_at timestamptz
-)
+returns setof public.shop_orders
 language plpgsql
 security definer
 set search_path = public
@@ -274,35 +209,56 @@ begin
 end;
 $$;
 
-create or replace function public.admin_list_shop_orders(p_admin_password text)
+-- Public receipt / payment-status lookup for /shop/order/[code].
+-- The order code is a weak secret, so contact details are masked and admin notes withheld.
+create or replace function public.get_shop_order_public(p_order_code text)
 returns table (
-  id uuid,
   order_code text,
   status text,
   payment_status text,
-  payment_method text,
+  payment_attempts integer,
   maya_reference text,
-  customer_name text,
-  email text,
-  mobile text,
-  address text,
-  city text,
-  province text,
-  barangay text,
-  zip text,
-  province_code text,
-  city_municipality_code text,
-  barangay_code text,
+  maya_fund_source text,
+  first_name text,
+  email_masked text,
   shipping_region text,
   shipping_fee numeric,
-  shipping_weight_grams integer,
-  total_amount numeric,
   subtotal numeric,
+  total_amount numeric,
   items jsonb,
-  admin_notes text,
   created_at timestamptz,
-  updated_at timestamptz
+  paid_at timestamptz,
+  order_id uuid
 )
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    o.order_code,
+    o.status,
+    o.payment_status,
+    coalesce(o.payment_attempts, 0),
+    o.maya_reference,
+    o.maya_fund_source,
+    split_part(o.customer_name, ' ', 1),
+    regexp_replace(o.email, '^(.).*@', '\1***@'),
+    o.shipping_region,
+    coalesce(o.shipping_fee, 0),
+    o.subtotal,
+    coalesce(nullif(o.total_amount, 0), o.subtotal + coalesce(o.shipping_fee, 0)),
+    o.items,
+    o.created_at,
+    o.paid_at,
+    o.id
+  from public.shop_orders o
+  where upper(trim(o.order_code)) = upper(trim(p_order_code))
+  limit 1;
+$$;
+
+create or replace function public.admin_list_shop_orders(p_admin_password text)
+returns setof public.shop_orders
 language plpgsql
 security definer
 set search_path = public
@@ -311,42 +267,12 @@ begin
   perform public.assert_wheel_admin(p_admin_password);
 
   return query
-  select listed.*
-  from public.shop_orders
-  cross join lateral public.admin_get_shop_order_unchecked(shop_orders.id) listed
-  order by listed.created_at desc;
+  select * from public.shop_orders order by created_at desc;
 end;
 $$;
 
 create or replace function public.admin_get_shop_order(p_admin_password text, p_order_id uuid)
-returns table (
-  id uuid,
-  order_code text,
-  status text,
-  payment_status text,
-  payment_method text,
-  maya_reference text,
-  customer_name text,
-  email text,
-  mobile text,
-  address text,
-  city text,
-  province text,
-  barangay text,
-  zip text,
-  province_code text,
-  city_municipality_code text,
-  barangay_code text,
-  shipping_region text,
-  shipping_fee numeric,
-  shipping_weight_grams integer,
-  total_amount numeric,
-  subtotal numeric,
-  items jsonb,
-  admin_notes text,
-  created_at timestamptz,
-  updated_at timestamptz
-)
+returns setof public.shop_orders
 language plpgsql
 security definer
 set search_path = public
@@ -358,6 +284,8 @@ begin
 end;
 $$;
 
+-- Admin override only. Maya's webhook is the normal writer of status/payment_status;
+-- maya_reference stays editable so a phone-confirmed payment can still be reconciled by hand.
 create or replace function public.admin_update_shop_order(
   p_admin_password text,
   p_order_id uuid,
@@ -366,34 +294,7 @@ create or replace function public.admin_update_shop_order(
   p_maya_reference text default null,
   p_admin_notes text default null
 )
-returns table (
-  id uuid,
-  order_code text,
-  status text,
-  payment_status text,
-  payment_method text,
-  maya_reference text,
-  customer_name text,
-  email text,
-  mobile text,
-  address text,
-  city text,
-  province text,
-  barangay text,
-  zip text,
-  province_code text,
-  city_municipality_code text,
-  barangay_code text,
-  shipping_region text,
-  shipping_fee numeric,
-  shipping_weight_grams integer,
-  total_amount numeric,
-  subtotal numeric,
-  items jsonb,
-  admin_notes text,
-  created_at timestamptz,
-  updated_at timestamptz
-)
+returns setof public.shop_orders
 language plpgsql
 security definer
 set search_path = public
@@ -406,7 +307,8 @@ begin
     status = p_status,
     payment_status = p_payment_status,
     maya_reference = nullif(trim(coalesce(p_maya_reference, '')), ''),
-    admin_notes = nullif(trim(coalesce(p_admin_notes, '')), '')
+    admin_notes = nullif(trim(coalesce(p_admin_notes, '')), ''),
+    paid_at = case when p_payment_status = 'paid' then coalesce(paid_at, now()) else paid_at end
   where shop_orders.id = p_order_id;
 
   return query select * from public.admin_get_shop_order_unchecked(p_order_id);
@@ -414,6 +316,7 @@ end;
 $$;
 
 grant execute on function public.create_shop_order(text, text, text, text, text, text, text, text, text, text, text, text, numeric, integer, numeric, jsonb, numeric, text) to anon, authenticated;
+grant execute on function public.get_shop_order_public(text) to anon, authenticated;
 grant execute on function public.admin_list_shop_orders(text) to anon, authenticated;
 grant execute on function public.admin_get_shop_order(text, uuid) to anon, authenticated;
 grant execute on function public.admin_update_shop_order(text, uuid, text, text, text, text) to anon, authenticated;

@@ -7,6 +7,7 @@ import {
   adminUpdateShopOrder,
   type ShopOrder,
   type ShopOrderStatus,
+  type ShopPaymentStatus,
 } from "@/lib/api";
 
 const ORDER_STATUSES: ShopOrderStatus[] = [
@@ -17,6 +18,8 @@ const ORDER_STATUSES: ShopOrderStatus[] = [
   "cancelled",
   "fulfilled",
 ];
+
+const PAYMENT_STATUSES: ShopPaymentStatus[] = ["pending", "review", "paid", "failed", "refunded"];
 
 export default function AdminOrdersPage() {
   const [password, setPassword] = useState("");
@@ -89,7 +92,7 @@ export default function AdminOrdersPage() {
       const saved = await adminUpdateShopOrder(password, {
         id: selectedOrder.id,
         status: selectedOrder.status,
-        paymentStatus: mapPaymentStatus(selectedOrder.status),
+        paymentStatus: selectedOrder.payment_status,
         mayaReference: selectedOrder.maya_reference ?? "",
         adminNotes: selectedOrder.admin_notes ?? "",
       });
@@ -189,7 +192,10 @@ export default function AdminOrdersPage() {
                           <span>{order.email}</span>
                         </td>
                         <td>{order.mobile}</td>
-                        <td>{formatStatus(order.status)}</td>
+                        <td>
+                          {formatStatus(order.status)}
+                          <span>{formatStatus(order.payment_status)}</span>
+                        </td>
                         <td>{order.maya_reference || "--"}</td>
                         <td>{formatPeso(order.total_amount)}</td>
                         <td>{formatAdminDate(order.created_at)}</td>
@@ -244,6 +250,12 @@ export default function AdminOrdersPage() {
                   ["Shipping fee", formatPeso(selectedOrder.shipping_fee)],
                   ["Total", formatPeso(selectedOrder.total_amount)],
                   ["Created", formatAdminDate(selectedOrder.created_at)],
+                  ["Payment status", formatStatus(selectedOrder.payment_status)],
+                  ["Maya status", selectedOrder.maya_payment_status ?? "--"],
+                  ["Maya payment ID", selectedOrder.maya_payment_id ?? "--"],
+                  ["Paid via", selectedOrder.maya_fund_source ?? "--"],
+                  ["Paid at", selectedOrder.paid_at ? formatAdminDate(selectedOrder.paid_at) : "--"],
+                  ["Payment attempts", String(selectedOrder.payment_attempts ?? 0)],
                 ]}
               />
 
@@ -289,13 +301,31 @@ export default function AdminOrdersPage() {
                     ))}
                   </select>
                 </label>
+                <label>
+                  Payment status
+                  <select
+                    value={selectedOrder.payment_status}
+                    onChange={(event) =>
+                      setSelectedOrder({ ...selectedOrder, payment_status: event.target.value as ShopPaymentStatus })
+                    }
+                  >
+                    {PAYMENT_STATUSES.map((status) => (
+                      <option key={status} value={status}>
+                        {formatStatus(status)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <label className="admin-edit-wide">
                   Maya reference
                   <input
                     value={selectedOrder.maya_reference ?? ""}
-                    placeholder="Paste reference from Maya email/dashboard"
+                    placeholder="Filled in automatically by the Maya webhook"
                     onChange={(event) => setSelectedOrder({ ...selectedOrder, maya_reference: event.target.value })}
                   />
+                  <small>
+                    Maya writes this on payment. Only edit it to reconcile a payment the webhook missed.
+                  </small>
                 </label>
                 <label className="admin-edit-wide">
                   Admin notes
@@ -349,13 +379,6 @@ function formatStatus(value: string) {
 
 function formatDeliveryAddress(order: ShopOrder) {
   return [order.address, order.barangay, order.city, order.province, order.zip].filter(Boolean).join(", ");
-}
-
-function mapPaymentStatus(status: ShopOrderStatus) {
-  if (status === "paid" || status === "confirmed" || status === "fulfilled") return "paid";
-  if (status === "payment_review") return "review";
-  if (status === "cancelled") return "failed";
-  return "pending";
 }
 
 function formatAdminDate(value: string) {

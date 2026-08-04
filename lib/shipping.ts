@@ -123,6 +123,17 @@ export function getOrderTotal(subtotal: number, shippingFee: number) {
   return subtotal + shippingFee;
 }
 
+/**
+ * Server-side sanity bound on a stored shipping fee. The exact fee depends on the
+ * PSGC region code, which the order row does not keep - checking membership in the
+ * rate table is enough to stop a tampered total without re-deriving geography.
+ * 0 is valid: it means "manual review" or "address not selected yet".
+ */
+export function isValidShippingFee(fee: number) {
+  if (fee === 0) return true;
+  return Object.values(RATE_TABLE).some((brackets) => brackets.some(([, rate]) => rate === fee));
+}
+
 function getShippingFee(area: ShippingArea, weightGrams: number) {
   const bracket = RATE_TABLE[area].find(([maxWeight]) => weightGrams <= maxWeight);
   return bracket?.[1] ?? 0;

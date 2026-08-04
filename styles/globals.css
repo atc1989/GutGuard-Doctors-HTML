@@ -3543,3 +3543,95 @@
     flex-direction: column;
   }
 }
+
+/* Order status / receipt page - /shop/order/[code] */
+.shop-order-panel {
+  display: grid;
+  gap: 14px;
+  justify-items: start;
+  margin: 0 auto;
+  max-width: 780px;
+  width: 100%;
+  border: 1px solid var(--rule);
+  background: rgba(252, 250, 245, 0.72);
+  padding: clamp(22px, 4vw, 38px);
+}
+
+.shop-order-panel:first-of-type {
+  margin-top: clamp(18px, 4vw, 34px);
+}
+
+.shop-order-panel + .shop-order-panel {
+  margin-top: 18px;
+  margin-bottom: clamp(24px, 6vw, 64px);
+}
+
+.shop-order-panel h1 {
+  margin: 0;
+  font-family: var(--serif, Georgia, serif);
+  font-size: clamp(26px, 4vw, 38px);
+  font-weight: 400;
+  line-height: 1.05;
+}
+
+.shop-order-panel > svg {
+  width: 44px;
+  height: 44px;
+  color: var(--blue);
+}
+
+.shop-order-panel.paid {
+  border-color: rgba(6, 8, 169, 0.32);
+}
+
+.shop-order-panel.failed,
+.shop-order-panel.cancelled {
+  border-color: rgba(176, 32, 46, 0.32);
+}
+
+.shop-order-panel .shop-lines,
+.shop-order-panel .shop-primary,
+.shop-order-panel .shop-error {
+  width: 100%;
+}
+
+.shop-order-meta {
+  display: grid;
+  gap: 12px 26px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  margin: 6px 0 0;
+  width: 100%;
+  border-top: 1px solid var(--rule);
+  padding-top: 16px;
+}
+
+.shop-order-meta dt {
+  color: var(--ink-3);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.shop-order-meta dd {
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.shop-order-panel .shop-secondary {
+  display: inline-block;
+  text-decoration: none;
+}
+
+/* The order page uses the shop nav without the hero wrapper that normally pads it. */
+.shop-shell > .shop-nav {
+  padding: 22px clamp(18px, 5vw, 54px) 0;
+  max-width: none;
+}
+
+.shop-shell > .shop-nav .shop-brand,
+.shop-shell > .shop-nav .shop-nav-link {
+  text-decoration: none;
+}

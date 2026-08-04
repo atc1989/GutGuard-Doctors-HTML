@@ -156,6 +156,25 @@ export type ShopOrderInput = {
   paymentMethod: string;
 };
 
+export type PublicShopOrder = {
+  order_code: string;
+  order_id: string;
+  status: ShopOrderStatus;
+  payment_status: ShopPaymentStatus;
+  payment_attempts: number;
+  maya_reference: string | null;
+  maya_fund_source: string | null;
+  first_name: string;
+  email_masked: string;
+  shipping_region: string | null;
+  shipping_fee: number;
+  subtotal: number;
+  total_amount: number;
+  items: ShopOrderItem[];
+  created_at: string;
+  paid_at: string | null;
+};
+
 export type ShopOrder = {
   id: string;
   order_code: string;
@@ -163,6 +182,12 @@ export type ShopOrder = {
   payment_status: ShopPaymentStatus;
   payment_method: string;
   maya_reference: string | null;
+  maya_checkout_id: string | null;
+  maya_payment_id: string | null;
+  maya_payment_status: string | null;
+  maya_fund_source: string | null;
+  payment_attempts: number;
+  paid_at: string | null;
   customer_name: string;
   email: string;
   mobile: string;
@@ -609,6 +634,57 @@ export async function sendShopOrderEmail(orderId: string): Promise<void> {
   if (error) throw new Error(await getSupabaseFunctionErrorMessage(error));
 }
 
+/**
+ * Starts a Maya Checkout session server-side. The route re-verifies the amount against
+ * the catalog, so the browser never decides what gets charged.
+ */
+export async function startMayaCheckout(orderId: string): Promise<{ redirectUrl?: string; orderUrl: string; alreadyPaid?: boolean }> {
+  const response = await fetch("/api/maya/checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderId }),
+  });
+
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(body?.error ?? "Maya checkout could not be started.");
+  }
+
+  return body as { redirectUrl?: string; orderUrl: string; alreadyPaid?: boolean };
+}
+
+export async function getPublicShopOrder(orderCode: string): Promise<PublicShopOrder | null> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.rpc("get_shop_order_public", { p_order_code: orderCode });
+  if (error) throw error;
+
+  const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | null | undefined;
+  if (!row) return null;
+
+  const subtotal = Number(row.subtotal ?? 0);
+  const shippingFee = Number(row.shipping_fee ?? 0);
+
+  return {
+    order_code: String(row.order_code ?? ""),
+    order_id: String(row.order_id ?? ""),
+    status: (row.status ?? "pending_payment") as ShopOrderStatus,
+    payment_status: (row.payment_status ?? "pending") as ShopPaymentStatus,
+    payment_attempts: Number(row.payment_attempts ?? 0),
+    maya_reference: typeof row.maya_reference === "string" ? row.maya_reference : null,
+    maya_fund_source: typeof row.maya_fund_source === "string" ? row.maya_fund_source : null,
+    first_name: String(row.first_name ?? ""),
+    email_masked: String(row.email_masked ?? ""),
+    shipping_region: typeof row.shipping_region === "string" ? row.shipping_region : null,
+    shipping_fee: shippingFee,
+    subtotal,
+    total_amount: Number(row.total_amount ?? 0) || subtotal + shippingFee,
+    items: Array.isArray(row.items) ? (row.items as ShopOrderItem[]) : [],
+    created_at: String(row.created_at ?? ""),
+    paid_at: typeof row.paid_at === "string" ? row.paid_at : null,
+  };
+}
+
 export async function adminListShopOrders(adminPassword: string): Promise<ShopOrder[]> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
 
@@ -958,6 +1034,12 @@ function normalizeShopOrder(row: unknown): ShopOrder {
     payment_status: (order.payment_status ?? "pending") as ShopPaymentStatus,
     payment_method: String(order.payment_method ?? "maya"),
     maya_reference: typeof order.maya_reference === "string" ? order.maya_reference : null,
+    maya_checkout_id: typeof order.maya_checkout_id === "string" ? order.maya_checkout_id : null,
+    maya_payment_id: typeof order.maya_payment_id === "string" ? order.maya_payment_id : null,
+    maya_payment_status: typeof order.maya_payment_status === "string" ? order.maya_payment_status : null,
+    maya_fund_source: typeof order.maya_fund_source === "string" ? order.maya_fund_source : null,
+    payment_attempts: Number(order.payment_attempts ?? 0),
+    paid_at: typeof order.paid_at === "string" ? order.paid_at : null,
     customer_name: String(order.customer_name ?? ""),
     email: String(order.email ?? ""),
     mobile: String(order.mobile ?? ""),

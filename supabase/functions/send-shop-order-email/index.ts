@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.106.2";
 
-const MAYA_URL = "https://paymaya.me/ASIAPAC";
+const SITE_URL = (Deno.env.get("SHOP_SITE_URL") ?? "https://gutguard.ph").replace(/\/$/, "");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,8 +8,12 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+/** "saved" is the order-received email; "paid" is the receipt fired by the Maya webhook. */
+type EmailKind = "saved" | "paid";
+
 type RequestPayload = {
   orderId?: string;
+  kind?: EmailKind;
 };
 
 type ShopOrder = {
@@ -35,7 +39,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
   try {
-    const { orderId } = (await req.json()) as RequestPayload;
+    const { orderId, kind = "saved" } = (await req.json()) as RequestPayload;
     if (!orderId) return jsonResponse({ error: "Missing orderId" }, 400);
 
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
@@ -59,7 +63,10 @@ Deno.serve(async (req) => {
 
     const order = data as ShopOrder;
     const email = (order.email ?? "").trim().toLowerCase();
-    const subject = `We received your GutGuard order ${order.order_code}`;
+    const subject =
+      kind === "paid"
+        ? `Payment confirmed for GutGuard order ${order.order_code}`
+        : `We received your GutGuard order ${order.order_code}`;
 
     if (!isValidEmail(email)) {
       await recordSendAttempt(supabase, {
@@ -82,7 +89,7 @@ Deno.serve(async (req) => {
         from: fromEmail,
         to: [email],
         subject,
-        html: renderEmail(order),
+        html: renderEmail(order, kind),
         reply_to: replyTo,
       }),
     });
@@ -135,7 +142,9 @@ async function recordSendAttempt(
   });
 }
 
-function renderEmail(order: ShopOrder) {
+function renderEmail(order: ShopOrder, kind: EmailKind) {
+  const isPaid = kind === "paid";
+  const orderUrl = `${SITE_URL}/shop/order/${encodeURIComponent(order.order_code)}`;
   const items = Array.isArray(order.items) ? order.items : [];
   const itemRows = items
     .map(
@@ -152,11 +161,19 @@ function renderEmail(order: ShopOrder) {
     <div style="margin:0;padding:0;background:#F4F1EA;color:#141019;font-family:Arial,sans-serif;">
       <div style="max-width:620px;margin:0 auto;padding:32px 20px;">
         <div style="background:#FCFAF5;border:1px solid #D8D2C2;padding:28px;">
-          <p style="margin:0 0 10px;color:#0608A9;font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;">Order processing</p>
-          <h1 style="margin:0 0 16px;font-family:Georgia,serif;font-size:34px;font-weight:400;line-height:1.05;">We received your GutGuard order.</h1>
-          <p style="margin:0 0 18px;color:#3A3A48;font-size:16px;line-height:1.55;">Hi ${escapeHtml(order.customer_name ?? "there")}, your order <strong>${escapeHtml(order.order_code)}</strong> has been saved and is now being processed.</p>
-          <p style="margin:0 0 22px;color:#3A3A48;font-size:16px;line-height:1.55;">Please complete payment through Maya. Once payment is confirmed from Maya, our admin team will call you to confirm your details before fulfillment.</p>
-          <a href="${getMayaPaymentUrl(Number(order.total_amount ?? order.subtotal ?? 0))}" style="display:inline-block;background:#0608A9;color:#F4F1EA;text-decoration:none;padding:14px 18px;font-weight:800;">Continue to Maya</a>
+          <p style="margin:0 0 10px;color:#0608A9;font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;">${isPaid ? "Payment confirmed" : "Order received"}</p>
+          <h1 style="margin:0 0 16px;font-family:Georgia,serif;font-size:34px;font-weight:400;line-height:1.05;">${isPaid ? "Payment received. Thank you." : "We received your GutGuard order."}</h1>
+          <p style="margin:0 0 18px;color:#3A3A48;font-size:16px;line-height:1.55;">Hi ${escapeHtml(order.customer_name ?? "there")}, ${
+            isPaid
+              ? `we have confirmed payment for order <strong>${escapeHtml(order.order_code)}</strong>.`
+              : `your order <strong>${escapeHtml(order.order_code)}</strong> has been saved.`
+          }</p>
+          <p style="margin:0 0 22px;color:#3A3A48;font-size:16px;line-height:1.55;">${
+            isPaid
+              ? "Our admin team will call you to confirm delivery details before we ship."
+              : "Complete payment on Maya to reserve your stock - card, Maya wallet, QRPh, or online banking. Your order page below always has an up-to-date payment link."
+          }</p>
+          <a href="${orderUrl}" style="display:inline-block;background:#0608A9;color:#F4F1EA;text-decoration:none;padding:14px 18px;font-weight:800;">${isPaid ? "View your order" : "View order and pay"}</a>
           <table style="width:100%;border-collapse:collapse;margin-top:26px;font-size:14px;">
             <thead>
               <tr>
@@ -173,7 +190,11 @@ function renderEmail(order: ShopOrder) {
             <p style="margin:8px 0 0;text-align:right;font-family:Georgia,serif;font-size:24px;color:#141019;">Total ${formatPeso(Number(order.total_amount ?? order.subtotal ?? 0))}</p>
           </div>
           <p style="margin:22px 0 0;color:#3A3A48;font-size:14px;line-height:1.55;"><strong>Delivery address:</strong><br>${escapeHtml(formatDeliveryAddress(order))}</p>
-          <p style="margin:26px 0 0;color:#6B6B7A;font-size:13px;line-height:1.5;">If you already paid, you can ignore the Maya button. We will reconcile your payment manually and contact you soon.</p>
+          <p style="margin:26px 0 0;color:#6B6B7A;font-size:13px;line-height:1.5;">${
+            isPaid
+              ? "Keep this email for your records. Reply here if anything about the order looks wrong."
+              : "Maya payment sessions expire after an hour, so always start payment from your order page rather than an old link."
+          }</p>
         </div>
       </div>
     </div>`;
@@ -181,12 +202,6 @@ function renderEmail(order: ShopOrder) {
 
 function formatPeso(value: number) {
   return new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value);
-}
-
-function getMayaPaymentUrl(amount: number) {
-  const url = new URL(MAYA_URL);
-  url.searchParams.set("amt", String(amount));
-  return url.toString();
 }
 
 function formatDeliveryAddress(order: ShopOrder) {

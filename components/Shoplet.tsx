@@ -4,7 +4,8 @@ import { FormEvent, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRightIcon, CheckIcon } from "@/components/Icons";
-import { createShopOrder, sendShopOrderEmail, type ShopOrderItem } from "@/lib/api";
+import { createShopOrder, sendShopOrderEmail, startMayaCheckout, type ShopOrderItem } from "@/lib/api";
+import { TIERS, TRIALS } from "@/lib/catalog";
 import {
   fetchBarangays,
   fetchLocalities,
@@ -15,18 +16,7 @@ import {
 } from "@/lib/philippines-address";
 import { getOrderTotal, quoteShipping } from "@/lib/shipping";
 
-const MAYA_URL = "https://paymaya.me/ASIAPAC";
-
-const TIERS = [
-  { id: "start", name: "Start", phase: "30-day", days: 30, caps: 135, perCap: 120, price: 16200 },
-  { id: "grow", name: "Grow", phase: "60-day", days: 60, caps: 270, perCap: 110, price: 29700, tag: "Popular" },
-  { id: "peak", name: "Peak", phase: "90-day", days: 90, caps: 400, perCap: 100, price: 39999, tag: "Best rate" },
-];
-
-const TRIALS = [
-  { id: "trial-blister", name: "Blister Trial", caps: 10, price: 1299, image: "/shop/blister.png" },
-  { id: "trial-bottle", name: "Bottle Trial", caps: 30, price: 3799, image: "/shop/bottle.png" },
-];
+const BASKET_STORAGE_KEY = "gutguard-basket";
 
 const SCIENCE = [
   [
@@ -51,7 +41,7 @@ const PROOF = [
 ];
 
 type Mode = "trial" | "protocol";
-type Stage = "shop" | "redirecting";
+type Stage = "shop" | "saving" | "redirecting" | "payment-blocked";
 type InfoModal = "inside" | "trust" | null;
 type FormState = {
   email: string;
@@ -98,6 +88,7 @@ export default function Shoplet() {
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [createdCode, setCreatedCode] = useState("");
+  const [createdOrderId, setCreatedOrderId] = useState("");
   const [provinces, setProvinces] = useState<ProvinceOption[]>([]);
   const [localities, setLocalities] = useState<LocalityOption[]>([]);
   const [barangays, setBarangays] = useState<BarangayOption[]>([]);
@@ -120,6 +111,21 @@ export default function Shoplet() {
   const currentBuyLabel = mode === "trial" ? `Add ${selectedTrial.name}` : `Add ${selectedTier.name}`;
   const currentPrice = mode === "trial" ? selectedTrial.price : selectedTier.price;
   const savings = Math.max(0, selectedTier.caps * 120 - selectedTier.price);
+
+  // Coming back from a cancelled Maya checkout should not cost the customer their basket.
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(BASKET_STORAGE_KEY);
+      if (saved) setBasket(JSON.parse(saved) as ShopOrderItem[]);
+    } catch {
+      window.localStorage.removeItem(BASKET_STORAGE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (basket.length === 0) window.localStorage.removeItem(BASKET_STORAGE_KEY);
+    else window.localStorage.setItem(BASKET_STORAGE_KEY, JSON.stringify(basket));
+  }, [basket]);
 
   useEffect(() => {
     let ignore = false;
@@ -289,6 +295,9 @@ export default function Shoplet() {
     }
 
     setSubmitting(true);
+    setStage("saving");
+    let savedOrderId = "";
+
     try {
       const order = await createShopOrder({
         customerName: form.name,
@@ -313,13 +322,41 @@ export default function Shoplet() {
       sendShopOrderEmail(order.id).catch((emailError) => {
         console.error("Shop order email failed", emailError);
       });
+      savedOrderId = order.id;
       setCreatedCode(order.order_code);
+      setCreatedOrderId(order.id);
       setStage("redirecting");
-      window.setTimeout(() => {
-        window.location.assign(getMayaPaymentUrl(totalAmount));
-      }, 900);
+
+      // The order is already durable at this point, so a Maya failure is recoverable:
+      // keep the customer on the page with a retry instead of dropping them.
+      const checkout = await startMayaCheckout(order.id);
+      window.localStorage.removeItem(BASKET_STORAGE_KEY);
+      window.location.assign(checkout.redirectUrl ?? checkout.orderUrl);
     } catch (caught) {
-      setSubmitError(caught instanceof Error ? caught.message : "Order could not be saved. Please try again.");
+      const message = caught instanceof Error ? caught.message : "Something went wrong. Please try again.";
+      if (savedOrderId) {
+        setStage("payment-blocked");
+        setSubmitError(message);
+      } else {
+        setStage("shop");
+        setSubmitError(message || "Order could not be saved. Please try again.");
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function retryPayment() {
+    if (!createdOrderId) return;
+    setSubmitting(true);
+    setSubmitError("");
+
+    try {
+      const checkout = await startMayaCheckout(createdOrderId);
+      window.localStorage.removeItem(BASKET_STORAGE_KEY);
+      window.location.assign(checkout.redirectUrl ?? checkout.orderUrl);
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : "Maya checkout could not be started.");
     } finally {
       setSubmitting(false);
     }
@@ -347,13 +384,13 @@ export default function Shoplet() {
               <p className="shop-kicker">FDA-registered synbiotic</p>
               <h1>SynBIOTIC+ for daily gut support</h1>
               <p className="shop-lede">
-                Order details are saved first, then you continue to Maya. After payment, our admin team confirms the
-                order and calls you before fulfillment.
+                Pay securely through Maya with a card, your Maya wallet, QRPh, or online banking. Payment is confirmed
+                instantly, then our admin team calls you before fulfillment.
               </p>
               <div className="shop-proof">
-                <span>Free shipping</span>
+                <span>Secure Maya checkout</span>
                 <span>MSU-IIT co-developed</span>
-                <span>Manual payment confirmation</span>
+                <span>Instant payment confirmation</span>
               </div>
               <div className="shop-info-actions">
                 <button type="button" onClick={() => setInfoModal("inside")}>
@@ -467,7 +504,27 @@ export default function Shoplet() {
               <section className="shop-success" role="status">
                 <CheckIcon />
                 <h2>Order {createdCode} saved.</h2>
-                <p>Redirecting you to Maya. After payment, our admin team will confirm the order and call you.</p>
+                <p>Opening the secure Maya checkout. Do not close this tab.</p>
+              </section>
+            ) : stage === "payment-blocked" ? (
+              <section className="shop-success" role="status">
+                <CheckIcon />
+                <h2>Order {createdCode} saved.</h2>
+                <p>
+                  We could not open the Maya checkout just now, but nothing was lost. Try again, or open your order page
+                  and pay whenever you are ready.
+                </p>
+                {submitError ? <div className="shop-error">{submitError}</div> : null}
+                <button type="button" className="shop-primary" onClick={retryPayment} disabled={submitting}>
+                  <span>
+                    {submitting ? "Opening secure Maya checkout" : `Try payment again - ${peso(totalAmount)}`}
+                    <small>Card, Maya wallet, QRPh or online banking</small>
+                  </span>
+                  <ArrowRightIcon />
+                </button>
+                <Link className="shop-secondary" href={`/shop/order/${createdCode}`}>
+                  Open my order page
+                </Link>
               </section>
             ) : (
               <>
@@ -490,7 +547,7 @@ export default function Shoplet() {
                     <div className="shop-form-grid">
                       <Field id="email" label="Email" type="email" value={form.email} error={errors.email} onChange={setField} />
                       <Field id="mobile" label="Mobile" type="tel" value={form.mobile} error={errors.mobile} onChange={setField} />
-                      <Field id="name" label="Full name" value={form.name} error={errors.name} onChange={setField} wide />
+                      <Field id="name" label="Full name (first and last)" value={form.name} error={errors.name} onChange={setField} wide />
                       <Field id="address" label="Street address" value={form.address} error={errors.address} onChange={setField} wide />
                       {addressMode === "api" ? (
                         <>
@@ -561,14 +618,15 @@ export default function Shoplet() {
                       </span>
                     </div>
                     <div className="shop-payment-note">
-                      Payment method: Maya. Your details are saved first, then you continue to the secure Maya payment link.
+                      Pay securely on Maya with a credit or debit card, your Maya wallet, QRPh, or online banking. Your
+                      order is saved first, so you can always come back and finish payment later.
                     </div>
                     {shippingQuote.error ? <div className="shop-error">{shippingQuote.error}</div> : null}
                     {submitError ? <div className="shop-error">{submitError}</div> : null}
                     <button type="submit" className="shop-primary" disabled={submitting}>
                       <span>
-                        {submitting ? "Saving order" : `Continue to Maya - ${peso(totalAmount)}`}
-                        <small>You will receive an order processing email.</small>
+                        {stage === "saving" ? "Saving your order" : `Pay ${peso(totalAmount)} with Maya`}
+                        <small>You will receive an order email and a link to track it.</small>
                       </span>
                       <ArrowRightIcon />
                     </button>
@@ -704,7 +762,7 @@ function TrustPanel() {
           <span>{copy}</span>
         </article>
       ))}
-      <p>GutGuard is currently in a joint clinical study with MSU-IIT. Payment is manually reconciled through Maya so a real person can confirm every order before fulfillment.</p>
+      <p>GutGuard is currently in a joint clinical study with MSU-IIT. Payments run on Maya&apos;s secure checkout, and a real person confirms every order by phone before fulfillment.</p>
     </div>
   );
 }
@@ -784,6 +842,9 @@ function validateField(key: keyof FormState, value: string) {
   if (key.endsWith("Code")) return "";
   if (!clean) return "Required";
   if (key === "email" && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clean)) return "Enter a valid email";
+  // Maya's fraud check needs a first and last name, so ask for both up front
+  // rather than letting the payment fail after the customer has left the site.
+  if (key === "name" && clean.split(/\s+/).length < 2) return "Enter your first and last name";
   if (key === "mobile" && !/^09\d{9}$/.test(clean.replace(/\s/g, ""))) return "Enter a valid PH mobile";
   if (key === "zip" && !/^\d{4}$/.test(clean)) return "Use 4 digits";
   return "";
@@ -794,12 +855,6 @@ function formatMobile(value: string) {
   if (digits.length <= 4) return digits;
   if (digits.length <= 7) return `${digits.slice(0, 4)} ${digits.slice(4)}`;
   return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
-}
-
-function getMayaPaymentUrl(amount: number) {
-  const url = new URL(MAYA_URL);
-  url.searchParams.set("amt", String(amount));
-  return url.toString();
 }
 
 function getSelectedRegionCode(form: FormState, provinces: ProvinceOption[]) {
