@@ -1,4 +1,14 @@
-const PSGC_API_BASE = "https://psgc.cloud/api/v1";
+const PSGC_API_BASE = "https://psgc.cloud/api";
+
+/**
+ * psgc.cloud stopped returning region_code, and shipping rates depend on the region.
+ * PSGC codes encode it in the first two digits ("1102400000" -> region 11 -> "110000000"),
+ * so derive it rather than trusting a field the API may drop again.
+ */
+function toRegionCode(psgcCode: string) {
+  const clean = psgcCode.replace(/\D/g, "");
+  return clean.length >= 2 ? `${clean.slice(0, 2)}0000000` : "";
+}
 
 type PsgcApiItem = {
   code?: string;
@@ -37,7 +47,7 @@ export async function fetchProvinces(): Promise<ProvinceOption[]> {
     .map((item) => ({
       code: String(item.code ?? ""),
       name: String(item.name ?? ""),
-      regionCode: String(item.region_code ?? ""),
+      regionCode: String(item.region_code ?? "") || toRegionCode(String(item.code ?? "")),
     }))
     .filter((item) => item.code && item.name)
     .sort(sortByName);
@@ -50,7 +60,7 @@ export async function fetchLocalities(provinceCode: string): Promise<LocalityOpt
       code: String(item.code ?? ""),
       name: String(item.name ?? ""),
       provinceCode,
-      regionCode: String(item.region_code ?? ""),
+      regionCode: String(item.region_code ?? "") || toRegionCode(provinceCode),
       zipCode: item.zip_code ? String(item.zip_code).replace(/\D/g, "").slice(0, 4) : "",
     }))
     .filter((item) => item.code && item.name)

@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { getMayaPayment, isMayaConfigured } from "@/lib/maya";
+import { getMayaPayment, isMayaConfigured, MayaApiError } from "@/lib/maya";
+import { applyPaymentToOrder } from "@/lib/maya-orders";
 import { getSupabaseAdmin, isSupabaseAdminConfigured } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-type OrderState = { status: string; paymentStatus: string; paidAt: string | null };
 
 /**
  * Maya's webhook payload carries no signature, so the only field trusted here is the
@@ -38,76 +37,38 @@ export async function POST(request: Request) {
 
     // Retries carry a "-2" style suffix; the order code is the part before it.
     const orderCode = reference.replace(/-\d+$/, "");
-    const mayaStatus = String(payment.paymentStatus ?? payment.status ?? "");
 
     const supabase = getSupabaseAdmin();
     const { data, error } = await supabase
       .from("shop_orders")
-      .select("id, order_code, status, payment_status, maya_payment_id, maya_payment_status")
+      .select("id, status, payment_status, maya_payment_id, maya_payment_status")
       .eq("order_code", orderCode)
       .single();
 
     if (error || !data) return NextResponse.json({ error: "Order not found" }, { status: 404 });
 
-    // Idempotent: Maya retries and manual replays deliver the same event more than once.
-    if (data.maya_payment_id === paymentId && data.maya_payment_status === mayaStatus) {
-      return NextResponse.json({ ok: true, duplicate: true });
+    const result = await applyPaymentToOrder(supabase, data, payment);
+    return NextResponse.json({ ok: true, duplicate: !result.changed });
+  } catch (caught) {
+    // Maya cannot find this payment - a synthetic id from the Manager "Test Webhooks"
+    // tool, or an event for another merchant. Permanent, so acknowledge it: four retries
+    // over 45 minutes would all fail the same way. Auth failures (401/403) deliberately
+    // fall through to 500 so a bad secret key surfaces as retries instead of silence.
+    if (isUnknownPayment(caught)) {
+      return NextResponse.json({ ok: true, ignored: "unknown payment" });
     }
-
-    const wasPaid = data.payment_status === "paid";
-    const next = mapStatus(mayaStatus, data.status, data.payment_status);
-
-    const { error: updateError } = await supabase
-      .from("shop_orders")
-      .update({
-        status: next.status,
-        payment_status: next.paymentStatus,
-        maya_payment_id: paymentId,
-        maya_payment_status: mayaStatus,
-        maya_reference: payment.receiptNumber ?? payment.receipt?.receiptNo ?? paymentId,
-        maya_fund_source: payment.fundSource?.type ?? null,
-        paid_at: next.paidAt,
-      })
-      .eq("id", data.id);
 
     // Non-2xx makes Maya retry (0/5/15/45 min), which is what we want on a write failure.
-    if (updateError) return NextResponse.json({ error: "Could not persist payment" }, { status: 500 });
-
-    // Only on the pending -> paid transition, so retried webhooks never re-send the receipt.
-    if (!wasPaid && next.paymentStatus === "paid") {
-      await supabase.functions
-        .invoke("send-shop-order-email", { body: { orderId: data.id, kind: "paid" } })
-        .catch(() => undefined);
-    }
-
-    return NextResponse.json({ ok: true });
-  } catch (caught) {
     const message = caught instanceof Error ? caught.message : "Webhook processing failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
-function mapStatus(mayaStatus: string, currentStatus: string, currentPaymentStatus: string): OrderState {
-  switch (mayaStatus) {
-    case "PAYMENT_SUCCESS":
-      return { status: "paid", paymentStatus: "paid", paidAt: new Date().toISOString() };
-    case "AUTHORIZED":
-    case "AUTH_SUCCESS":
-      return { status: "payment_review", paymentStatus: "review", paidAt: null };
-    case "PAYMENT_FAILED":
-    case "AUTH_FAILED":
-      // Stays pending_payment on purpose: a failed attempt is retryable, not a dead order.
-      return { status: "pending_payment", paymentStatus: "failed", paidAt: null };
-    case "PAYMENT_CANCELLED":
-      return { status: "pending_payment", paymentStatus: "pending", paidAt: null };
-    case "PAYMENT_EXPIRED":
-      return { status: "cancelled", paymentStatus: "failed", paidAt: null };
-    case "VOIDED":
-    case "REFUNDED":
-      return { status: "cancelled", paymentStatus: "refunded", paidAt: null };
-    default:
-      return { status: currentStatus, paymentStatus: currentPaymentStatus, paidAt: null };
-  }
+/** Scoped to MayaApiError on purpose: a database error that happens to say "not found"
+ *  must still retry, not be acknowledged as a phantom payment. */
+function isUnknownPayment(caught: unknown) {
+  if (!(caught instanceof MayaApiError)) return false;
+  return caught.status === 404 || /does not exist/i.test(caught.message);
 }
 
 /**

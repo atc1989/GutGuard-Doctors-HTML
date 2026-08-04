@@ -87,6 +87,16 @@ export function toMayaAmount(value: number): string {
   return value.toFixed(2);
 }
 
+export class MayaApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "MayaApiError";
+    this.status = status;
+  }
+}
+
 function basicAuth(key: string) {
   return `Basic ${Buffer.from(`${key}:`).toString("base64")}`;
 }
@@ -108,7 +118,7 @@ async function mayaFetch(path: string, key: string, init?: RequestInit) {
     const message =
       (body && typeof body === "object" && "message" in body && String((body as { message: unknown }).message)) ||
       `Maya request failed (${response.status})`;
-    throw new Error(message);
+    throw new MayaApiError(message, response.status);
   }
 
   return body;

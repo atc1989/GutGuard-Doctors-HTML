@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CheckIcon } from "@/components/Icons";
-import { getPublicShopOrder, startMayaCheckout, type PublicShopOrder } from "@/lib/api";
+import { getPublicShopOrder, reconcileMayaPayment, startMayaCheckout, type PublicShopOrder } from "@/lib/api";
 
 // Maya redirects here with ?p=success|failure|cancel. That flag only picks the opening
 // copy - the payment result itself always comes from the webhook-written row, because
@@ -67,14 +67,30 @@ export default function OrderStatus({ orderCode }: { orderCode: string }) {
       pollsLeft.current -= 1;
       try {
         const fetched = await load();
-        if (fetched?.payment_status === "paid" || pollsLeft.current <= 0) setIsConfirming(false);
+        if (fetched?.payment_status === "paid") {
+          setIsConfirming(false);
+          return;
+        }
+
+        // Polling exhausted and still not paid: the webhook may have been dropped or
+        // never registered. Ask Maya directly rather than telling a paying customer
+        // their order is unpaid.
+        if (pollsLeft.current <= 0) {
+          try {
+            const result = await reconcileMayaPayment(orderCode);
+            if (result.changed) await load();
+          } catch {
+            // Reconcile is best-effort; the page falls back to its normal unpaid view.
+          }
+          setIsConfirming(false);
+        }
       } catch {
         setIsConfirming(false);
       }
     }, POLL_INTERVAL_MS);
 
     return () => window.clearTimeout(timer);
-  }, [isConfirming, order, load]);
+  }, [isConfirming, order, load, orderCode]);
 
   async function payNow() {
     if (!order) return;
@@ -107,14 +123,22 @@ export default function OrderStatus({ orderCode }: { orderCode: string }) {
     );
   }
 
+  // A failed lookup and a genuinely missing order are different problems: telling a
+  // customer their order does not exist when the backend is down sends them to support
+  // with the wrong story.
   if (!order) {
     return (
       <main className="shop-shell">
         <OrderNav />
-        <section className="shop-order-panel">
-          <p className="shop-kicker">Not found</p>
-          <h1>We could not find order {orderCode}.</h1>
-          <p className="shop-lede">Check the link in your email, or start a new order.</p>
+        <section className={error ? "shop-order-panel failed" : "shop-order-panel"}>
+          <p className="shop-kicker">{error ? "Could not load" : "Not found"}</p>
+          <h1>{error ? "We could not load this order." : `We could not find order ${orderCode}.`}</h1>
+          <p className="shop-lede">
+            {error
+              ? "Your order is safe - this is a problem on our side. Refresh in a moment, or contact us with your order code."
+              : "Check the link in your email, or start a new order."}
+          </p>
+          {error ? <div className="shop-error">{error}</div> : null}
           <Link className="shop-primary" href="/shop">
             <span>Back to the shop</span>
           </Link>

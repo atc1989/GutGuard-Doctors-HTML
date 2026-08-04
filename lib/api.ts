@@ -653,6 +653,22 @@ export async function startMayaCheckout(orderId: string): Promise<{ redirectUrl?
   return body as { redirectUrl?: string; orderUrl: string; alreadyPaid?: boolean };
 }
 
+/**
+ * Asks the server to re-check this order's payment directly with Maya. Used when the
+ * webhook has not landed, so a paid order never stays stuck on "awaiting payment".
+ */
+export async function reconcileMayaPayment(orderCode: string): Promise<{ paymentStatus: string; changed: boolean }> {
+  const response = await fetch("/api/maya/reconcile", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderCode }),
+  });
+
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(body?.error ?? "Payment could not be verified.");
+  return body as { paymentStatus: string; changed: boolean };
+}
+
 export async function getPublicShopOrder(orderCode: string): Promise<PublicShopOrder | null> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
 
