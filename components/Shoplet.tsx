@@ -46,7 +46,8 @@ type InfoModal = "inside" | "trust" | null;
 type FormState = {
   email: string;
   mobile: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   address: string;
   city: string;
   province: string;
@@ -60,7 +61,8 @@ type FormState = {
 const emptyForm: FormState = {
   email: "",
   mobile: "",
-  name: "",
+  firstName: "",
+  lastName: "",
   address: "",
   city: "",
   province: "",
@@ -92,8 +94,8 @@ export default function Shoplet() {
   const [provinces, setProvinces] = useState<ProvinceOption[]>([]);
   const [localities, setLocalities] = useState<LocalityOption[]>([]);
   const [barangays, setBarangays] = useState<BarangayOption[]>([]);
-  const [addressMode, setAddressMode] = useState<"api" | "manual">("api");
-  const [addressNotice, setAddressNotice] = useState("");
+  const [addressError, setAddressError] = useState("");
+  const [addressReloadKey, setAddressReloadKey] = useState(0);
   const [isLoadingProvinces, setIsLoadingProvinces] = useState(false);
   const [isLoadingLocalities, setIsLoadingLocalities] = useState(false);
   const [isLoadingBarangays, setIsLoadingBarangays] = useState(false);
@@ -105,7 +107,6 @@ export default function Shoplet() {
   const shippingQuote = quoteShipping(basket, {
     province: form.province,
     regionCode: getSelectedRegionCode(form, provinces),
-    manualAddress: addressMode === "manual",
   });
   const totalAmount = getOrderTotal(subtotal, shippingQuote.fee);
   const currentBuyLabel = mode === "trial" ? `Add ${selectedTrial.name}` : `Add ${selectedTier.name}`;
@@ -127,18 +128,19 @@ export default function Shoplet() {
     else window.localStorage.setItem(BASKET_STORAGE_KEY, JSON.stringify(basket));
   }, [basket]);
 
+  // Shipping is priced from the selected province, so the address always comes from the
+  // official lists. If they cannot load, the customer retries rather than typing a free-text
+  // address we cannot price - an unpriceable order ships at a loss.
   useEffect(() => {
     let ignore = false;
     setIsLoadingProvinces(true);
+    setAddressError("");
     fetchProvinces()
       .then((items) => {
         if (!ignore) setProvinces(items);
       })
       .catch(() => {
-        if (!ignore) {
-          setAddressMode("manual");
-          setAddressNotice("Address dropdowns are unavailable right now. Enter the delivery address manually and admin will review shipping.");
-        }
+        if (!ignore) setAddressError("Address lists could not be loaded. Check your connection and try again.");
       })
       .finally(() => {
         if (!ignore) setIsLoadingProvinces(false);
@@ -146,21 +148,21 @@ export default function Shoplet() {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [addressReloadKey]);
 
   useEffect(() => {
-    if (addressMode !== "api" || !form.provinceCode) return;
+    if (!form.provinceCode) return;
     let ignore = false;
     setIsLoadingLocalities(true);
     fetchLocalities(form.provinceCode)
       .then((items) => {
-        if (!ignore) setLocalities(items);
+        if (!ignore) {
+          setLocalities(items);
+          setAddressError("");
+        }
       })
       .catch(() => {
-        if (!ignore) {
-          setAddressMode("manual");
-          setAddressNotice("City and barangay lists could not be loaded. Enter the delivery address manually and admin will review shipping.");
-        }
+        if (!ignore) setAddressError("City list could not be loaded. Please try again.");
       })
       .finally(() => {
         if (!ignore) setIsLoadingLocalities(false);
@@ -168,21 +170,21 @@ export default function Shoplet() {
     return () => {
       ignore = true;
     };
-  }, [addressMode, form.provinceCode]);
+  }, [form.provinceCode]);
 
   useEffect(() => {
-    if (addressMode !== "api" || !form.cityMunicipalityCode) return;
+    if (!form.cityMunicipalityCode) return;
     let ignore = false;
     setIsLoadingBarangays(true);
     fetchBarangays(form.cityMunicipalityCode)
       .then((items) => {
-        if (!ignore) setBarangays(items);
+        if (!ignore) {
+          setBarangays(items);
+          setAddressError("");
+        }
       })
       .catch(() => {
-        if (!ignore) {
-          setAddressMode("manual");
-          setAddressNotice("Barangay list could not be loaded. Enter the delivery address manually and admin will review shipping.");
-        }
+        if (!ignore) setAddressError("Barangay list could not be loaded. Please try again.");
       })
       .finally(() => {
         if (!ignore) setIsLoadingBarangays(false);
@@ -190,7 +192,7 @@ export default function Shoplet() {
     return () => {
       ignore = true;
     };
-  }, [addressMode, form.cityMunicipalityCode]);
+  }, [form.cityMunicipalityCode]);
 
   function addCurrentItem() {
     const source =
@@ -269,14 +271,6 @@ export default function Shoplet() {
     setErrors((current) => ({ ...current, barangay: validateField("barangay", barangay?.name ?? "") }));
   }
 
-  function useManualAddress() {
-    setAddressMode("manual");
-    setAddressNotice("Manual delivery address enabled. Admin will review the shipping fee before fulfillment.");
-    setLocalities([]);
-    setBarangays([]);
-    setForm((current) => ({ ...current, provinceCode: "", cityMunicipalityCode: "", barangayCode: "" }));
-  }
-
   async function submitOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitError("");
@@ -300,7 +294,8 @@ export default function Shoplet() {
 
     try {
       const order = await createShopOrder({
-        customerName: form.name,
+        firstName: form.firstName,
+        lastName: form.lastName,
         email: form.email,
         mobile: form.mobile.replace(/\s/g, ""),
         address: form.address,
@@ -547,11 +542,10 @@ export default function Shoplet() {
                     <div className="shop-form-grid">
                       <Field id="email" label="Email" type="email" value={form.email} error={errors.email} onChange={setField} />
                       <Field id="mobile" label="Mobile" type="tel" value={form.mobile} error={errors.mobile} onChange={setField} />
-                      <Field id="name" label="Full name (first and last)" value={form.name} error={errors.name} onChange={setField} wide />
+                      <Field id="firstName" label="First name" value={form.firstName} error={errors.firstName} onChange={setField} />
+                      <Field id="lastName" label="Last name" value={form.lastName} error={errors.lastName} onChange={setField} />
                       <Field id="address" label="Street address" value={form.address} error={errors.address} onChange={setField} wide />
-                      {addressMode === "api" ? (
-                        <>
-                          <SelectField
+                      <SelectField
                             id="province"
                             label="Province"
                             value={form.provinceCode}
@@ -581,21 +575,13 @@ export default function Shoplet() {
                             options={barangays.map((item) => ({ label: item.name, value: item.code }))}
                             onChange={chooseBarangay}
                           />
-                        </>
-                      ) : (
-                        <>
-                          <Field id="province" label="Province" value={form.province} error={errors.province} onChange={setField} />
-                          <Field id="city" label="City" value={form.city} error={errors.city} onChange={setField} />
-                          <Field id="barangay" label="Barangay" value={form.barangay} error={errors.barangay} onChange={setField} />
-                        </>
-                      )}
                       <Field id="zip" label="ZIP" value={form.zip} error={errors.zip} onChange={setField} />
                     </div>
                     <div className="shop-address-tools">
-                      {addressNotice ? <span>{addressNotice}</span> : <span>Shipping is calculated from Davao after province selection.</span>}
-                      {addressMode === "api" ? (
-                        <button type="button" onClick={useManualAddress}>
-                          Enter manually
+                      <span>{addressError || "Shipping is calculated from Davao after province selection."}</span>
+                      {addressError ? (
+                        <button type="button" onClick={() => setAddressReloadKey((key) => key + 1)}>
+                          Try again
                         </button>
                       ) : null}
                     </div>
@@ -605,8 +591,8 @@ export default function Shoplet() {
                         <strong>{peso(subtotal)}</strong>
                       </span>
                       <span>
-                        <small>Shipping {shippingQuote.manualReview ? "(review)" : shippingQuote.label ? `(${shippingQuote.label})` : ""}</small>
-                        <strong>{shippingQuote.manualReview ? "Review" : peso(shippingQuote.fee)}</strong>
+                        <small>Shipping {shippingQuote.label ? `(${shippingQuote.label})` : ""}</small>
+                        <strong>{shippingQuote.fee ? peso(shippingQuote.fee) : "Select province"}</strong>
                       </span>
                       <span>
                         <small>Estimated weight</small>
@@ -842,9 +828,6 @@ function validateField(key: keyof FormState, value: string) {
   if (key.endsWith("Code")) return "";
   if (!clean) return "Required";
   if (key === "email" && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clean)) return "Enter a valid email";
-  // Maya's fraud check needs a first and last name, so ask for both up front
-  // rather than letting the payment fail after the customer has left the site.
-  if (key === "name" && clean.split(/\s+/).length < 2) return "Enter your first and last name";
   if (key === "mobile" && !/^09\d{9}$/.test(clean.replace(/\s/g, ""))) return "Enter a valid PH mobile";
   if (key === "zip" && !/^\d{4}$/.test(clean)) return "Use 4 digits";
   return "";

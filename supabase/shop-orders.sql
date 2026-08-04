@@ -41,6 +41,21 @@ alter table public.shop_orders add column if not exists shipping_fee numeric(12,
 alter table public.shop_orders add column if not exists shipping_weight_grams integer not null default 0;
 alter table public.shop_orders add column if not exists total_amount numeric(12, 2) not null default 0;
 
+-- First/last name collected separately: Kount scores the buyer name, and splitting a
+-- single field guesses wrong on compound Filipino surnames ("dela Cruz", "de los Santos").
+-- customer_name stays populated so emails, admin and shipping labels are unaffected.
+alter table public.shop_orders add column if not exists first_name text;
+alter table public.shop_orders add column if not exists last_name text;
+
+update public.shop_orders
+set
+  first_name = coalesce(first_name, nullif(split_part(customer_name, ' ', 1), '')),
+  last_name = coalesce(
+    last_name,
+    nullif(substr(customer_name, length(split_part(customer_name, ' ', 1)) + 2), '')
+  )
+where first_name is null or last_name is null;
+
 -- Maya Checkout API integration
 alter table public.shop_orders add column if not exists maya_checkout_id text;
 alter table public.shop_orders add column if not exists maya_payment_id text;
@@ -116,6 +131,7 @@ drop function if exists public.admin_get_shop_order(text, uuid);
 drop function if exists public.admin_list_shop_orders(text);
 drop function if exists public.create_shop_order(text, text, text, text, text, text, text, jsonb, numeric, text);
 drop function if exists public.create_shop_order(text, text, text, text, text, text, text, text, text, text, text, text, numeric, integer, numeric, jsonb, numeric, text);
+drop function if exists public.create_shop_order(text, text, text, text, text, text, text, text, text, text, text, text, text, numeric, integer, numeric, jsonb, numeric, text);
 drop function if exists public.admin_get_shop_order_unchecked(uuid);
 drop function if exists public.get_shop_order_public(text);
 
@@ -130,7 +146,8 @@ as $$
 $$;
 
 create or replace function public.create_shop_order(
-  p_customer_name text,
+  p_first_name text,
+  p_last_name text,
   p_email text,
   p_mobile text,
   p_address text,
@@ -161,9 +178,15 @@ begin
     raise exception 'Order must include at least one item.';
   end if;
 
+  if length(trim(coalesce(p_first_name, ''))) = 0 or length(trim(coalesce(p_last_name, ''))) = 0 then
+    raise exception 'First and last name are required.';
+  end if;
+
   insert into public.shop_orders (
     order_code,
     customer_name,
+    first_name,
+    last_name,
     email,
     mobile,
     address,
@@ -184,7 +207,9 @@ begin
   )
   values (
     public.generate_shop_order_code(),
-    trim(p_customer_name),
+    trim(p_first_name) || ' ' || trim(p_last_name),
+    trim(p_first_name),
+    trim(p_last_name),
     lower(trim(p_email)),
     trim(p_mobile),
     trim(p_address),
@@ -315,7 +340,7 @@ begin
 end;
 $$;
 
-grant execute on function public.create_shop_order(text, text, text, text, text, text, text, text, text, text, text, text, numeric, integer, numeric, jsonb, numeric, text) to anon, authenticated;
+grant execute on function public.create_shop_order(text, text, text, text, text, text, text, text, text, text, text, text, text, numeric, integer, numeric, jsonb, numeric, text) to anon, authenticated;
 grant execute on function public.get_shop_order_public(text) to anon, authenticated;
 grant execute on function public.admin_list_shop_orders(text) to anon, authenticated;
 grant execute on function public.admin_get_shop_order(text, uuid) to anon, authenticated;

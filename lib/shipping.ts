@@ -7,7 +7,6 @@ export type ShippingQuote = {
   label: string;
   weightGrams: number;
   fee: number;
-  manualReview: boolean;
   error: string;
 };
 
@@ -71,31 +70,14 @@ export function estimateShippingWeight(items: ShopOrderItem[]) {
   return bottles * BOTTLE_WEIGHT_GRAMS + PACKAGING_BUFFER_GRAMS;
 }
 
-export function quoteShipping(items: ShopOrderItem[], input: { province: string; regionCode: string; manualAddress: boolean }): ShippingQuote {
+export function quoteShipping(items: ShopOrderItem[], input: { province: string; regionCode: string }): ShippingQuote {
   const weightGrams = estimateShippingWeight(items);
   const area = getShippingArea(input.province, input.regionCode);
   const fee = getShippingFee(area, weightGrams);
 
-  if (!input.province.trim() && !input.manualAddress) {
-    return {
-      area,
-      label: "",
-      weightGrams,
-      fee: 0,
-      manualReview: false,
-      error: "",
-    };
-  }
-
-  if (input.manualAddress) {
-    return {
-      area,
-      label: "Manual review",
-      weightGrams,
-      fee: 0,
-      manualReview: true,
-      error: "",
-    };
+  // No province chosen yet - nothing to quote, and no error to show either.
+  if (!input.province.trim()) {
+    return { area, label: "", weightGrams, fee: 0, error: "" };
   }
 
   if (!fee) {
@@ -104,19 +86,11 @@ export function quoteShipping(items: ShopOrderItem[], input: { province: string;
       label: SHIPPING_LABELS[area],
       weightGrams,
       fee: 0,
-      manualReview: false,
       error: "This order is above 6kg. Please contact admin before payment.",
     };
   }
 
-  return {
-    area,
-    label: SHIPPING_LABELS[area],
-    weightGrams,
-    fee,
-    manualReview: false,
-    error: "",
-  };
+  return { area, label: SHIPPING_LABELS[area], weightGrams, fee, error: "" };
 }
 
 export function getOrderTotal(subtotal: number, shippingFee: number) {
@@ -127,7 +101,8 @@ export function getOrderTotal(subtotal: number, shippingFee: number) {
  * Server-side sanity bound on a stored shipping fee. The exact fee depends on the
  * PSGC region code, which the order row does not keep - checking membership in the
  * rate table is enough to stop a tampered total without re-deriving geography.
- * 0 is valid: it means "manual review" or "address not selected yet".
+ * 0 is only valid for legacy rows created before the address lists were mandatory;
+ * a new order always carries a province and therefore a real rate.
  */
 export function isValidShippingFee(fee: number) {
   if (fee === 0) return true;

@@ -136,7 +136,8 @@ export type ShopOrderItem = {
 };
 
 export type ShopOrderInput = {
-  customerName: string;
+  firstName: string;
+  lastName: string;
   email: string;
   mobile: string;
   address: string;
@@ -189,6 +190,8 @@ export type ShopOrder = {
   payment_attempts: number;
   paid_at: string | null;
   customer_name: string;
+  first_name: string | null;
+  last_name: string | null;
   email: string;
   mobile: string;
   address: string;
@@ -600,7 +603,8 @@ export async function createShopOrder(payload: ShopOrderInput): Promise<ShopOrde
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
 
   const { data, error } = await supabase.rpc("create_shop_order", {
-    p_customer_name: payload.customerName,
+    p_first_name: payload.firstName,
+    p_last_name: payload.lastName,
     p_email: payload.email,
     p_mobile: payload.mobile,
     p_address: payload.address,
@@ -1057,6 +1061,8 @@ function normalizeShopOrder(row: unknown): ShopOrder {
     payment_attempts: Number(order.payment_attempts ?? 0),
     paid_at: typeof order.paid_at === "string" ? order.paid_at : null,
     customer_name: String(order.customer_name ?? ""),
+    first_name: typeof order.first_name === "string" ? order.first_name : null,
+    last_name: typeof order.last_name === "string" ? order.last_name : null,
     email: String(order.email ?? ""),
     mobile: String(order.mobile ?? ""),
     address: String(order.address ?? ""),

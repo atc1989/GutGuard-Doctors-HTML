@@ -14,6 +14,8 @@ type OrderRow = {
   status: string;
   payment_status: string;
   customer_name: string;
+  first_name: string | null;
+  last_name: string | null;
   email: string;
   mobile: string;
   address: string;
@@ -45,7 +47,7 @@ export async function POST(request: Request) {
   const { data, error } = await supabase
     .from("shop_orders")
     .select(
-      "id, order_code, status, payment_status, customer_name, email, mobile, address, city, province, zip, shipping_fee, subtotal, total_amount, items, payment_attempts",
+      "id, order_code, status, payment_status, customer_name, first_name, last_name, email, mobile, address, city, province, zip, shipping_fee, subtotal, total_amount, items, payment_attempts",
     )
     .eq("id", orderId)
     .single();
@@ -88,12 +90,12 @@ export async function POST(request: Request) {
       // and each address needs countryCode. Only one address is collected at checkout,
       // so billing mirrors shipping.
       buyer: {
-        ...splitName(order.customer_name),
+        ...buyerName(order),
         contact: { phone: order.mobile, email: order.email },
         billingAddress: buildAddress(order),
         shippingAddress: {
           ...buildAddress(order),
-          ...splitName(order.customer_name),
+          ...buyerName(order),
           phone: order.mobile,
           email: order.email,
           shippingType: "ST",
@@ -164,12 +166,16 @@ function buildAddress(order: OrderRow) {
 }
 
 /**
- * Kount requires both firstName and lastName. The checkout form asks for two words,
- * but older rows may hold a single token - repeat it rather than send an empty
- * required field, which Kount rejects outright.
+ * Kount requires both names. New orders store them separately because splitting a single
+ * field guesses wrong on compound surnames ("Juan dela Cruz" -> "Juan dela" / "Cruz").
+ * The split is kept only as a fallback for rows created before those columns existed.
  */
-function splitName(fullName: string) {
-  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+function buyerName(order: OrderRow) {
+  const first = (order.first_name ?? "").trim();
+  const last = (order.last_name ?? "").trim();
+  if (first && last) return { firstName: first, lastName: last };
+
+  const parts = (order.customer_name ?? "").trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return { firstName: "Customer", lastName: "Customer" };
   if (parts.length === 1) return { firstName: parts[0], lastName: parts[0] };
   return { firstName: parts.slice(0, -1).join(" "), lastName: parts[parts.length - 1] };

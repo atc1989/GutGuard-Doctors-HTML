@@ -3548,7 +3548,6 @@
 .shop-order-panel {
   display: grid;
   gap: 14px;
-  justify-items: start;
   margin: 0 auto;
   max-width: 780px;
   width: 100%;
@@ -3572,12 +3571,26 @@
   font-size: clamp(26px, 4vw, 38px);
   font-weight: 400;
   line-height: 1.05;
+  /* Use the full panel width, and even out the lines if it does wrap. */
+  text-wrap: balance;
 }
 
+.shop-order-panel .shop-lede {
+  margin: 0;
+  max-width: 62ch;
+}
+
+/* Explicit size keeps the icon from stretching now that items fill the row. */
 .shop-order-panel > svg {
   width: 44px;
   height: 44px;
+  justify-self: start;
   color: var(--blue);
+}
+
+.shop-order-panel .shop-kicker,
+.shop-order-panel .shop-note {
+  margin: 0;
 }
 
 .shop-order-panel.paid {
@@ -3622,6 +3635,7 @@
 
 .shop-order-panel .shop-secondary {
   display: inline-block;
+  justify-self: start;
   text-decoration: none;
 }
 
