@@ -41,6 +41,20 @@ const PROOF = [
   ["LactoSpore", "Spore probiotic"],
 ];
 
+const FACTS = {
+  serving: "1 capsule (600 mg)",
+  actives: [
+    ["L-Tryptophan", "100 mg"],
+    ["Urolithin-A", "10 mg"],
+    ["Glutathione", "250 mg"],
+    ["Lutein", "250 mg"],
+  ],
+  macros: "Calories 0 · Total Fat 0 · Cholesterol 0 · Sodium 0 · Total Carbohydrate 0 · Sugar 0 · Protein 0",
+  footnote: "** % RENI not established for these actives. % values based on PDRI 2015 (adult male, 19-29 yrs).",
+};
+
+const SCIENCE_URL = "https://gutguard.ph/#/science";
+
 type Mode = "trial" | "protocol";
 type Stage = "shop" | "saving" | "redirecting" | "payment-blocked";
 type InfoModal = "inside" | "trust" | null;
@@ -728,29 +742,28 @@ function InsidePanel() {
       ))}
       <div className="shop-facts">
         <h3>Supplement Facts</h3>
+        <p className="shop-facts-serving">
+          Serving size <b>{FACTS.serving}</b>
+        </p>
+        <p className="shop-facts-col">Amount per serving</p>
         <dl>
-          <div>
-            <dt>Serving size</dt>
-            <dd>1 capsule (600 mg)</dd>
-          </div>
-          <div>
-            <dt>L-Tryptophan</dt>
-            <dd>100 mg</dd>
-          </div>
-          <div>
-            <dt>Urolithin-A</dt>
-            <dd>10 mg</dd>
-          </div>
-          <div>
-            <dt>Glutathione</dt>
-            <dd>250 mg</dd>
-          </div>
-          <div>
-            <dt>Lutein</dt>
-            <dd>250 mg</dd>
-          </div>
+          {FACTS.actives.map(([name, amount]) => (
+            <div key={name}>
+              <dt>
+                {name}
+                <sup>**</sup>
+              </dt>
+              <dd>{amount}</dd>
+            </div>
+          ))}
         </dl>
+        <p className="shop-facts-macros">{FACTS.macros}</p>
+        <p className="shop-facts-foot">{FACTS.footnote}</p>
       </div>
+      <a className="shop-facts-link" href={SCIENCE_URL} target="_blank" rel="noopener noreferrer">
+        Full formulation & science
+        <ArrowRightIcon />
+      </a>
     </div>
   );
 }
