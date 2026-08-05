@@ -198,6 +198,7 @@ const PUBLIC_SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://gut-gua
   /\/$/,
   "",
 );
+const SHOP_ORIGIN = (process.env.NEXT_PUBLIC_SHOP_URL ?? "https://shop.gutguard.ph").replace(/\/$/, "");
 const PLACEHOLDER_TOKENS = [
   "{{doctor_name}}",
   "{{doctor_email}}",
@@ -255,13 +256,17 @@ function getPrizeOdds(prize: AdminWheelPrize, activeWeightTotal: number) {
   return (prize.chance_weight / activeWeightTotal) * 100;
 }
 
-function getDoctorQrUrl(doctor: AdminDoctorRegistration) {
+type DoctorQrMode = "shop" | "profile";
+
+function getDoctorQrUrl(doctor: AdminDoctorRegistration, mode: DoctorQrMode) {
   if (!doctor.routing_slug) return "";
-  return `${PUBLIC_SITE_ORIGIN}/dr/${encodeURIComponent(doctor.routing_slug)}`;
+  if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${encodeURIComponent(doctor.routing_slug)}`;
+  if (doctor.routing_slug === "dr-grace-saraza") return `${SHOP_ORIGIN}/beehive`;
+  return `${SHOP_ORIGIN}/r/${encodeURIComponent(doctor.routing_slug)}`;
 }
 
-function getDoctorQrElementId(doctorId: string) {
-  return `doctor-qr-${doctorId}`;
+function getDoctorQrElementId(doctorId: string, mode: DoctorQrMode) {
+  return `doctor-qr-${doctorId}-${mode}`;
 }
 
 export default function AdminWheelPage() {
@@ -272,6 +277,7 @@ export default function AdminWheelPage() {
   const [doctorSearch, setDoctorSearch] = useState("");
   const [doctorPage, setDoctorPage] = useState(1);
   const [doctorPageSize, setDoctorPageSize] = useState(10);
+  const [doctorQrModes, setDoctorQrModes] = useState<Record<string, DoctorQrMode>>({});
   const [newsletterSearch, setNewsletterSearch] = useState("");
   const [newsletterPage, setNewsletterPage] = useState(1);
   const [newsletterPageSize, setNewsletterPageSize] = useState(10);
@@ -1036,11 +1042,11 @@ export default function AdminWheelPage() {
     }
   }
 
-  function downloadDoctorQr(doctor: AdminDoctorRegistration, qrUrl: string) {
+  function downloadDoctorQr(doctor: AdminDoctorRegistration, qrUrl: string, mode: DoctorQrMode) {
     setError(null);
     setNotice(null);
 
-    const svg = document.getElementById(getDoctorQrElementId(doctor.id));
+    const svg = document.getElementById(getDoctorQrElementId(doctor.id, mode));
     if (!(svg instanceof SVGSVGElement)) {
       setError("Unable to find the QR code for download.");
       return;
@@ -1058,7 +1064,7 @@ export default function AdminWheelPage() {
     const link = document.createElement("a");
 
     link.href = downloadUrl;
-    link.download = `${doctor.routing_slug || slugifyDownloadName(doctor.full_name)}-qr.svg`;
+    link.download = `${doctor.routing_slug || slugifyDownloadName(doctor.full_name)}-${mode}-qr.svg`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -1634,24 +1640,47 @@ export default function AdminWheelPage() {
           <div className="admin-doctor-list">
             {visibleDoctors.length > 0 ? (
               visibleDoctors.map((doctor) => {
-                const qrUrl = getDoctorQrUrl(doctor);
+                const qrMode = doctorQrModes[doctor.id] ?? "shop";
+                const qrUrl = getDoctorQrUrl(doctor, qrMode);
 
                 return (
                   <article className="admin-doctor-row" key={doctor.id}>
                     <div className="admin-doctor-primary">
                       <strong>{doctor.full_name || "Unnamed doctor"}</strong>
                       <span>@{doctor.tiktok_username || "no-handle"}</span>
+                      <div
+                        className="admin-doctor-qr-toggle"
+                        role="group"
+                        aria-label={`QR type for ${doctor.full_name || "doctor"}`}
+                      >
+                        <button
+                          type="button"
+                          className={qrMode === "shop" ? "active" : ""}
+                          aria-pressed={qrMode === "shop"}
+                          onClick={() => setDoctorQrModes((current) => ({ ...current, [doctor.id]: "shop" }))}
+                        >
+                          Shop referral
+                        </button>
+                        <button
+                          type="button"
+                          className={qrMode === "profile" ? "active" : ""}
+                          aria-pressed={qrMode === "profile"}
+                          onClick={() => setDoctorQrModes((current) => ({ ...current, [doctor.id]: "profile" }))}
+                        >
+                          TikTok route
+                        </button>
+                      </div>
                       {qrUrl ? (
                         <div className="admin-doctor-qr">
                           <QRCodeSVG
-                            id={getDoctorQrElementId(doctor.id)}
+                            id={getDoctorQrElementId(doctor.id, qrMode)}
                             className="admin-doctor-qr-code"
                             value={qrUrl}
                             size={108}
                             marginSize={2}
                           />
                           <div>
-                            <small>Permanent QR route</small>
+                            <small>{qrMode === "shop" ? "Shop referral route" : "TikTok redirect route"}</small>
                             <code>{qrUrl}</code>
                             <div className="admin-doctor-qr-actions">
                               <button type="button" onClick={() => copyDoctorQrUrl(qrUrl)}>
@@ -1662,7 +1691,7 @@ export default function AdminWheelPage() {
                                 className="icon-only"
                                 title="Download QR code"
                                 aria-label={`Download QR code for ${doctor.full_name || "doctor"}`}
-                                onClick={() => downloadDoctorQr(doctor, qrUrl)}
+                                onClick={() => downloadDoctorQr(doctor, qrUrl, qrMode)}
                               >
                                 <DownloadIcon />
                               </button>

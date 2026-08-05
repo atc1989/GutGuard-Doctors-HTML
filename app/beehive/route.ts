@@ -11,7 +11,7 @@ const DEFAULT_SHOP_ORIGIN = "https://shop.gutguard.ph";
  */
 export function GET() {
   const shopOrigin = process.env.NEXT_PUBLIC_SHOP_URL?.trim() || DEFAULT_SHOP_ORIGIN;
-  const referralUrl = new URL(`/r/${GRACE_REFERRAL_SLUG}`, shopOrigin);
+  const referralUrl = new URL(`/r/${GRACE_REFERRAL_SLUG}?shop=beehive`, shopOrigin);
 
   return NextResponse.redirect(referralUrl, { status: 302 });
 }

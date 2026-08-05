@@ -14,7 +14,7 @@ import {
   type LocalityOption,
   type ProvinceOption,
 } from "@/lib/philippines-address";
-import { readReferralSlug } from "@/lib/referral";
+import { readReferralShopName, readReferralSlug } from "@/lib/referral";
 import { getOrderTotal, quoteShipping } from "@/lib/shipping";
 
 const BASKET_STORAGE_KEY = "gutguard-basket";
@@ -100,6 +100,7 @@ export default function Shoplet() {
   const [isLoadingProvinces, setIsLoadingProvinces] = useState(false);
   const [isLoadingLocalities, setIsLoadingLocalities] = useState(false);
   const [isLoadingBarangays, setIsLoadingBarangays] = useState(false);
+  const [referralShopName, setReferralShopName] = useState("");
 
   const selectedTrial = TRIALS.find((item) => item.id === trialId) ?? TRIALS[0];
   const selectedTier = TIERS.find((item) => item.id === tierId) ?? TIERS[2];
@@ -113,6 +114,10 @@ export default function Shoplet() {
   const currentBuyLabel = mode === "trial" ? `Add ${selectedTrial.name}` : `Add ${selectedTier.name}`;
   const currentPrice = mode === "trial" ? selectedTrial.price : selectedTier.price;
   const savings = Math.max(0, selectedTier.caps * 120 - selectedTier.price);
+
+  useEffect(() => {
+    setReferralShopName(readReferralShopName());
+  }, []);
 
   // Coming back from a cancelled Maya checkout should not cost the customer their basket.
   useEffect(() => {
@@ -380,6 +385,13 @@ export default function Shoplet() {
               <Image src="/shop/bottle.png" alt="GutGuard SynBIOTIC+ bottle" width={520} height={720} priority />
             </div>
             <div>
+              {referralShopName ? (
+                <p className="shop-referral-welcome">
+                  {referralShopName === "Beehive"
+                    ? "Welcome to the Beehive GutGuard shop."
+                    : `Welcome to ${referralShopName}'s GutGuard shop.`}
+                </p>
+              ) : null}
               <p className="shop-kicker">FDA-registered synbiotic</p>
               <h1>SynBIOTIC+ for daily gut support</h1>
               <p className="shop-lede">

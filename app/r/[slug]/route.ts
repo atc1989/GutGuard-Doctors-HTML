@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { REFERRAL_COOKIE, REFERRAL_MAX_AGE_SECONDS } from "@/lib/referral";
+import { REFERRAL_COOKIE, REFERRAL_MAX_AGE_SECONDS, REFERRAL_SHOP_NAME_COOKIE } from "@/lib/referral";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -43,5 +43,24 @@ export async function GET(request: NextRequest, context: RouteContext) {
     httpOnly: false,
   });
 
+  response.cookies.set(REFERRAL_SHOP_NAME_COOKIE, getReferralShopName(matched, request), {
+    maxAge: REFERRAL_MAX_AGE_SECONDS,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    httpOnly: false,
+  });
+
   return response;
+}
+
+function getReferralShopName(slug: string, request: NextRequest) {
+  const requestedShop = request.nextUrl.searchParams.get("shop")?.trim().toLowerCase();
+  if (slug === "dr-grace-saraza" && requestedShop === "beehive") return "Beehive";
+
+  return slug
+    .split("-")
+    .filter(Boolean)
+    .map((part) => (part.toLowerCase() === "dr" ? "Dr." : part.charAt(0).toUpperCase() + part.slice(1)))
+    .join(" ");
 }
