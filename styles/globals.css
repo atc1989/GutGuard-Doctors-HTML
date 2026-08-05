@@ -3651,3 +3651,27 @@
 .shop-shell > .shop-nav .shop-nav-link {
   text-decoration: none;
 }
+
+.shop-order-address {
+  width: 100%;
+  border-top: 1px solid var(--rule);
+  padding-top: 16px;
+}
+
+.shop-order-address p {
+  margin: 6px 0 0;
+  font-size: 15px;
+  line-height: 1.5;
+  max-width: 52ch;
+}
+
+.shop-order-address small,
+.shop-order-meta dd small {
+  display: block;
+  margin-top: 6px;
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}

@@ -15,6 +15,10 @@ type ReturnFlag = "success" | "failure" | "cancel" | null;
 const POLL_INTERVAL_MS = 2000;
 const POLL_ATTEMPTS = 10;
 
+// PLACEHOLDER - confirm the real callback commitment before launch. Stated in one place
+// so the promise on the page and in the emails cannot drift apart.
+const CALLBACK_SLA = "within 1 business day";
+
 const peso = (value: number) =>
   new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value);
 
@@ -176,10 +180,28 @@ export default function OrderStatus({ orderCode }: { orderCode: string }) {
           {order.maya_reference ? (
             <div>
               <dt>Maya reference</dt>
-              <dd>{order.maya_reference}</dd>
+              <dd>
+                {order.maya_reference}
+                <small>Quote this if you contact us</small>
+              </dd>
             </div>
           ) : null}
         </dl>
+
+        {/* Shown in every state, not just after payment: someone checking an unpaid order
+            is just as likely to be verifying where it ships, and it is cheapest to correct
+            an address before fulfilment starts. */}
+        {formatDeliveryAddress(order) ? (
+          <div className="shop-order-address">
+            <p className="shop-kicker">Delivering to</p>
+            <p>
+              <strong>{order.first_name}</strong>
+              <br />
+              {formatDeliveryAddress(order)}
+            </p>
+            <small>Wrong address? Contact us with your order code before we ship.</small>
+          </div>
+        ) : null}
 
         {error ? <div className="shop-error">{error}</div> : null}
 
@@ -215,7 +237,8 @@ export default function OrderStatus({ orderCode }: { orderCode: string }) {
             <strong>{peso(order.subtotal)}</strong>
           </div>
           <div className="shop-total">
-            <span>Shipping {order.shipping_region ? `(${order.shipping_region})` : ""}</span>
+            {/* The customer thinks in "Davao City", not in the internal rate zone. */}
+            <span>Shipping {order.city ? `to ${order.city}` : ""}</span>
             <strong>{order.shipping_fee ? peso(order.shipping_fee) : "For review"}</strong>
           </div>
           <div className="shop-total grand">
@@ -261,7 +284,7 @@ function getView(order: PublicShopOrder, flag: ReturnFlag, isConfirming: boolean
       tone: "pending",
       kicker: "Payment on hold",
       headline: "Your payment is being confirmed.",
-      body: "The payment went through and is being verified. Nothing more is needed from you - we will email you once it clears.",
+      body: `The payment went through and is being verified. Nothing more is needed from you - we will email you once it clears, then call ${CALLBACK_SLA}.`,
       showPayButton: false,
     };
   }
@@ -271,7 +294,7 @@ function getView(order: PublicShopOrder, flag: ReturnFlag, isConfirming: boolean
       tone: "paid",
       kicker: "Paid",
       headline: `Payment received, ${order.first_name}.`,
-      body: "Our admin team will call you to confirm delivery details before we ship. Keep this page for your reference.",
+      body: `Our team will call you ${CALLBACK_SLA} to confirm delivery details, then your order ships. Keep this page for your reference.`,
       showPayButton: false,
     };
   }
@@ -327,6 +350,10 @@ function getView(order: PublicShopOrder, flag: ReturnFlag, isConfirming: boolean
 
 function normalizeFlag(value: string | null): ReturnFlag {
   return value === "success" || value === "failure" || value === "cancel" ? value : null;
+}
+
+function formatDeliveryAddress(order: PublicShopOrder) {
+  return [order.address, order.barangay, order.city, order.province, order.zip].filter(Boolean).join(", ");
 }
 
 function formatDate(value: string) {

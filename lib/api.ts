@@ -167,6 +167,11 @@ export type PublicShopOrder = {
   maya_fund_source: string | null;
   first_name: string;
   email_masked: string;
+  address: string;
+  barangay: string;
+  city: string;
+  province: string;
+  zip: string;
   shipping_region: string | null;
   shipping_fee: number;
   subtotal: number;
@@ -695,6 +700,11 @@ export async function getPublicShopOrder(orderCode: string): Promise<PublicShopO
     maya_fund_source: typeof row.maya_fund_source === "string" ? row.maya_fund_source : null,
     first_name: String(row.first_name ?? ""),
     email_masked: String(row.email_masked ?? ""),
+    address: String(row.address ?? ""),
+    barangay: String(row.barangay ?? ""),
+    city: String(row.city ?? ""),
+    province: String(row.province ?? ""),
+    zip: String(row.zip ?? ""),
     shipping_region: typeof row.shipping_region === "string" ? row.shipping_region : null,
     shipping_fee: shippingFee,
     subtotal,
