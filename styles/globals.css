@@ -3571,7 +3571,9 @@
   font-size: clamp(26px, 4vw, 38px);
   font-weight: 400;
   line-height: 1.05;
-  /* Use the full panel width, and even out the lines if it does wrap. */
+  /* The global `h1` rule caps headings at 11ch for short hero titles. These headlines
+     are sentences, so lift the cap and let them use the panel width. */
+  max-width: none;
   text-wrap: balance;
 }
 

@@ -243,6 +243,29 @@ function OrderNav() {
 }
 
 function getView(order: PublicShopOrder, flag: ReturnFlag, isConfirming: boolean) {
+  // Checked before `paid` and `cancelled`: a refund sets payment_status refunded while the
+  // order status also moves to cancelled, and "cancelled" is the wrong story for a refund.
+  if (order.payment_status === "refunded") {
+    return {
+      tone: "cancelled",
+      kicker: "Refunded",
+      headline: "This order was refunded.",
+      body: "The payment has been returned to your original payment method. Refunds usually take a few banking days to appear.",
+      showPayButton: false,
+    };
+  }
+
+  // Authorised but not captured. Never offer to pay again - the money is already held.
+  if (order.payment_status === "review") {
+    return {
+      tone: "pending",
+      kicker: "Payment on hold",
+      headline: "Your payment is being confirmed.",
+      body: "The payment went through and is being verified. Nothing more is needed from you - we will email you once it clears.",
+      showPayButton: false,
+    };
+  }
+
   if (order.payment_status === "paid") {
     return {
       tone: "paid",
