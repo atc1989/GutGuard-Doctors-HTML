@@ -3207,10 +3207,24 @@
 }
 
 .shop-product-visual img {
-  width: min(82%, 410px);
+  width: min(68%, 330px);
   height: auto;
   object-fit: contain;
   filter: drop-shadow(0 28px 48px rgba(15, 15, 24, 0.18));
+  animation: shop-bottle-breathe 5s ease-in-out infinite;
+  transform-origin: center center;
+  will-change: transform;
+}
+
+@keyframes shop-bottle-breathe {
+  0%,
+  100% {
+    transform: translateY(4px) scale(0.985);
+  }
+
+  50% {
+    transform: translateY(-5px) scale(1.015);
+  }
 }
 
 .shop-product h1 {
@@ -3504,7 +3518,14 @@
   }
 
   .shop-product-visual img {
-    width: min(82%, 320px);
+    width: min(70%, 270px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shop-product-visual img {
+    animation: none;
+    transform: none;
   }
 }
 
