@@ -181,8 +181,14 @@ function buyerName(order: OrderRow) {
   return { firstName: parts.slice(0, -1).join(" "), lastName: parts[parts.length - 1] };
 }
 
+/**
+ * The shop's own origin - NOT NEXT_PUBLIC_SITE_URL, which points at the partner/doctors
+ * host that QR codes are generated against. Maya has to redirect a paying customer back
+ * to the shop, so these must stay separate once the two live on different subdomains.
+ * Falling back to the request origin keeps this correct even if the var is unset.
+ */
 function getSiteUrl(request: Request) {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL;
+  const configured = process.env.NEXT_PUBLIC_SHOP_URL;
   if (configured) return configured.replace(/\/$/, "");
   return new URL(request.url).origin;
 }

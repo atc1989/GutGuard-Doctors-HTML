@@ -56,6 +56,17 @@ set
   )
 where first_name is null or last_name is null;
 
+-- Referral attribution (last-click, 30-day window set by the /r/[slug] cookie).
+-- referral_slug records what the link claimed; referral_doctor_id is set only when the
+-- referral is valid AND not a self-referral, so "attributed" means referral_doctor_id is
+-- not null. Keeping the slug on a rejected self-referral leaves an audit trail.
+alter table public.shop_orders add column if not exists referral_slug text;
+alter table public.shop_orders add column if not exists referral_doctor_id uuid
+  references public.doctor_registrations(id) on delete set null;
+
+create index if not exists shop_orders_referral_doctor_id_idx
+  on public.shop_orders (referral_doctor_id, created_at desc);
+
 -- Maya Checkout API integration
 alter table public.shop_orders add column if not exists maya_checkout_id text;
 alter table public.shop_orders add column if not exists maya_payment_id text;
@@ -135,8 +146,27 @@ drop function if exists public.admin_list_shop_orders(text);
 drop function if exists public.create_shop_order(text, text, text, text, text, text, text, jsonb, numeric, text);
 drop function if exists public.create_shop_order(text, text, text, text, text, text, text, text, text, text, text, text, numeric, integer, numeric, jsonb, numeric, text);
 drop function if exists public.create_shop_order(text, text, text, text, text, text, text, text, text, text, text, text, text, numeric, integer, numeric, jsonb, numeric, text);
+drop function if exists public.create_shop_order(text, text, text, text, text, text, text, text, text, text, text, text, text, numeric, integer, numeric, jsonb, numeric, text, text);
 drop function if exists public.admin_get_shop_order_unchecked(uuid);
 drop function if exists public.get_shop_order_public(text);
+drop function if exists public.get_referral_partner(text);
+
+-- Existence check for /r/[slug]. Returns the slug only - no name or contact - so the
+-- endpoint cannot be used to enumerate partner details.
+create or replace function public.get_referral_partner(p_slug text)
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select routing_slug
+  from public.doctor_registrations
+  where routing_slug = lower(trim(p_slug))
+  limit 1;
+$$;
+
+grant execute on function public.get_referral_partner(text) to anon, authenticated;
 
 create or replace function public.admin_get_shop_order_unchecked(p_order_id uuid)
 returns setof public.shop_orders
@@ -167,7 +197,8 @@ create or replace function public.create_shop_order(
   p_total_amount numeric,
   p_items jsonb,
   p_subtotal numeric,
-  p_payment_method text default 'maya'
+  p_payment_method text default 'maya',
+  p_referral_slug text default null
 )
 returns setof public.shop_orders
 language plpgsql
@@ -176,7 +207,23 @@ set search_path = public
 as $$
 declare
   v_order_id uuid;
+  v_referral_slug text;
+  v_referral_doctor_id uuid;
 begin
+  v_referral_slug := nullif(lower(trim(coalesce(p_referral_slug, ''))), '');
+
+  -- Resolve the referrer, but refuse to credit a partner for their own order.
+  -- Matching on email OR mobile so a second email address is not an easy dodge.
+  if v_referral_slug is not null then
+    select d.id into v_referral_doctor_id
+    from public.doctor_registrations d
+    where d.routing_slug = v_referral_slug
+      and lower(trim(coalesce(d.email, ''))) is distinct from lower(trim(coalesce(p_email, '')))
+      and nullif(regexp_replace(coalesce(d.mobile, ''), '\D', '', 'g'), '')
+          is distinct from nullif(regexp_replace(coalesce(p_mobile, ''), '\D', '', 'g'), '')
+    limit 1;
+  end if;
+
   if jsonb_typeof(coalesce(p_items, '[]'::jsonb)) <> 'array' or jsonb_array_length(coalesce(p_items, '[]'::jsonb)) = 0 then
     raise exception 'Order must include at least one item.';
   end if;
@@ -206,7 +253,9 @@ begin
     total_amount,
     items,
     subtotal,
-    payment_method
+    payment_method,
+    referral_slug,
+    referral_doctor_id
   )
   values (
     public.generate_shop_order_code(),
@@ -229,7 +278,9 @@ begin
     coalesce(p_total_amount, coalesce(p_subtotal, 0) + coalesce(p_shipping_fee, 0)),
     p_items,
     coalesce(p_subtotal, 0),
-    lower(trim(coalesce(p_payment_method, 'maya')))
+    lower(trim(coalesce(p_payment_method, 'maya'))),
+    v_referral_slug,
+    v_referral_doctor_id
   )
   returning shop_orders.id into v_order_id;
 
@@ -353,7 +404,7 @@ begin
 end;
 $$;
 
-grant execute on function public.create_shop_order(text, text, text, text, text, text, text, text, text, text, text, text, text, numeric, integer, numeric, jsonb, numeric, text) to anon, authenticated;
+grant execute on function public.create_shop_order(text, text, text, text, text, text, text, text, text, text, text, text, text, numeric, integer, numeric, jsonb, numeric, text, text) to anon, authenticated;
 grant execute on function public.get_shop_order_public(text) to anon, authenticated;
 grant execute on function public.admin_list_shop_orders(text) to anon, authenticated;
 grant execute on function public.admin_get_shop_order(text, uuid) to anon, authenticated;

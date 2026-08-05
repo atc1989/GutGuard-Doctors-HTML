@@ -46,6 +46,7 @@ export default function AdminOrdersPage() {
         order.barangay,
         order.status,
         order.maya_reference ?? "",
+        order.referral_slug ?? "",
       ]
         .join(" ")
         .toLowerCase()
@@ -256,6 +257,7 @@ export default function AdminOrdersPage() {
                   ["Paid via", selectedOrder.maya_fund_source ?? "--"],
                   ["Paid at", selectedOrder.paid_at ? formatAdminDate(selectedOrder.paid_at) : "--"],
                   ["Payment attempts", String(selectedOrder.payment_attempts ?? 0)],
+                  ["Referred by", formatReferral(selectedOrder)],
                 ]}
               />
 
@@ -375,6 +377,16 @@ function formatStatus(value: string) {
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+/**
+ * A slug with no doctor id means the referral was recorded but not credited - almost
+ * always a self-referral. Say so explicitly so nobody pays out on it by mistake.
+ */
+function formatReferral(order: ShopOrder) {
+  if (!order.referral_slug) return "--";
+  if (!order.referral_doctor_id) return `${order.referral_slug} (not credited - self-referral)`;
+  return order.referral_slug;
 }
 
 function formatDeliveryAddress(order: ShopOrder) {

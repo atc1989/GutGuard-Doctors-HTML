@@ -155,6 +155,7 @@ export type ShopOrderInput = {
   items: ShopOrderItem[];
   subtotal: number;
   paymentMethod: string;
+  referralSlug: string;
 };
 
 export type PublicShopOrder = {
@@ -194,6 +195,10 @@ export type ShopOrder = {
   maya_fund_source: string | null;
   payment_attempts: number;
   paid_at: string | null;
+  /** What the referral link claimed - present even when the referral was rejected. */
+  referral_slug: string | null;
+  /** Set only for a valid, non-self referral. Null here means "not attributable". */
+  referral_doctor_id: string | null;
   customer_name: string;
   first_name: string | null;
   last_name: string | null;
@@ -627,6 +632,7 @@ export async function createShopOrder(payload: ShopOrderInput): Promise<ShopOrde
     p_items: payload.items,
     p_subtotal: payload.subtotal,
     p_payment_method: payload.paymentMethod,
+    p_referral_slug: payload.referralSlug,
   });
 
   if (error) throw error;
@@ -1070,6 +1076,8 @@ function normalizeShopOrder(row: unknown): ShopOrder {
     maya_fund_source: typeof order.maya_fund_source === "string" ? order.maya_fund_source : null,
     payment_attempts: Number(order.payment_attempts ?? 0),
     paid_at: typeof order.paid_at === "string" ? order.paid_at : null,
+    referral_slug: typeof order.referral_slug === "string" ? order.referral_slug : null,
+    referral_doctor_id: typeof order.referral_doctor_id === "string" ? order.referral_doctor_id : null,
     customer_name: String(order.customer_name ?? ""),
     first_name: typeof order.first_name === "string" ? order.first_name : null,
     last_name: typeof order.last_name === "string" ? order.last_name : null,

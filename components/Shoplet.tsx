@@ -14,6 +14,7 @@ import {
   type LocalityOption,
   type ProvinceOption,
 } from "@/lib/philippines-address";
+import { readReferralSlug } from "@/lib/referral";
 import { getOrderTotal, quoteShipping } from "@/lib/shipping";
 
 const BASKET_STORAGE_KEY = "gutguard-basket";
@@ -313,6 +314,9 @@ export default function Shoplet() {
         items: basket,
         subtotal,
         paymentMethod: "maya",
+        // Read at submit, not at mount, so a referral link opened in another tab mid-session
+        // still counts. Attribution is frozen into the row before the Maya redirect.
+        referralSlug: readReferralSlug(),
       });
       sendShopOrderEmail(order.id).catch((emailError) => {
         console.error("Shop order email failed", emailError);
