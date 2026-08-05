@@ -3207,7 +3207,7 @@
 }
 
 .shop-product-visual img {
-  width: min(76%, 380px);
+  width: min(96%, 494px);
   height: auto;
   object-fit: contain;
   filter: drop-shadow(0 28px 48px rgba(15, 15, 24, 0.18));
@@ -3518,7 +3518,7 @@
   }
 
   .shop-product-visual img {
-    width: min(78%, 300px);
+    width: min(96%, 390px);
   }
 }
 
