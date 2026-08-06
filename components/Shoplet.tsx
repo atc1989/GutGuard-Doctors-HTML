@@ -127,7 +127,6 @@ export default function Shoplet() {
   const totalAmount = getOrderTotal(subtotal, shippingQuote.fee);
   const currentBuyLabel = mode === "trial" ? `Add ${selectedTrial.name}` : `Add ${selectedTier.name}`;
   const currentPrice = mode === "trial" ? selectedTrial.price : selectedTier.price;
-  const savings = Math.max(0, selectedTier.caps * 120 - selectedTier.price);
 
   useEffect(() => {
     setReferralShopName(readReferralShopName());
@@ -408,14 +407,11 @@ export default function Shoplet() {
               ) : null}
               <p className="shop-kicker">FDA-registered synbiotic</p>
               <h1>SynBIOTIC+ for daily gut support</h1>
-              <p className="shop-lede">
-                Pay securely through Maya with a card, your Maya wallet, QRPh, or online banking. Payment is confirmed
-                instantly, then our admin team calls you before fulfillment.
-              </p>
+              <p className="shop-lede">A living synbiotic that targets the inflammation aging you.</p>
               <div className="shop-proof">
-                <span>Secure Maya checkout</span>
-                <span>MSU-IIT co-developed</span>
-                <span>Instant payment confirmation</span>
+                <span>Secure</span>
+                <span>FDA-registered</span>
+                <span>Nationwide delivery</span>
               </div>
               <div className="shop-info-actions">
                 <button type="button" onClick={() => setInfoModal("inside")}>
@@ -453,46 +449,61 @@ export default function Shoplet() {
             </div>
 
             {mode === "trial" ? (
-              <div className="shop-options trial">
-                {TRIALS.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={trialId === item.id ? "shop-option active has-image" : "shop-option has-image"}
-                    onClick={() => setTrialId(item.id)}
-                  >
-                    <Image src={item.image} alt={item.name} width={150} height={150} />
-                    <span>
-                      <strong>{item.name}</strong>
-                      <small>{item.caps} capsules</small>
-                    </span>
-                    <b>{peso(item.price)}</b>
-                  </button>
-                ))}
-              </div>
+              <>
+                <p className="shop-options-label">
+                  <span>Start here · low risk</span>
+                </p>
+                <div className="shop-options trial">
+                  {TRIALS.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={trialId === item.id ? "shop-option active has-image" : "shop-option has-image"}
+                      onClick={() => setTrialId(item.id)}
+                    >
+                      <Image src={item.image} alt={item.name} width={150} height={150} />
+                      <span>
+                        <strong>{item.name}</strong>
+                        <small>
+                          {item.caps} caps · {peso(Math.round(item.price / item.caps))}/cap
+                        </small>
+                      </span>
+                      <b>{peso(item.price)}</b>
+                    </button>
+                  ))}
+                </div>
+                <p className="shop-note">
+                  The same living formula as the full protocol - try it before you commit.
+                </p>
+              </>
             ) : (
-              <div className="shop-options protocol">
-                {TIERS.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={tierId === item.id ? "shop-option active" : "shop-option"}
-                    onClick={() => setTierId(item.id)}
-                  >
-                    <span>
-                      <strong>
-                        {item.name}
-                        {item.tag ? <em>{item.tag}</em> : null}
-                      </strong>
-                      <small>
-                        {item.phase} - {item.caps} capsules
-                      </small>
-                    </span>
-                    <b>{peso(item.perCap)}/cap</b>
-                  </button>
-                ))}
-                <p className="shop-note">Selected protocol saves {peso(savings)} versus the starter rate.</p>
-              </div>
+              <>
+                <p className="shop-options-label">
+                  <span>When you&apos;re ready</span>
+                  <em>₱120 → ₱100 / cap</em>
+                </p>
+                <div className="shop-options protocol">
+                  {TIERS.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={tierId === item.id ? "shop-option active" : "shop-option"}
+                      onClick={() => setTierId(item.id)}
+                    >
+                      <span>
+                        <strong>
+                          {item.name}
+                          {item.tag ? <em>{item.tag}</em> : null}
+                        </strong>
+                        <small>
+                          {item.phase} · {item.caps} capsules
+                        </small>
+                      </span>
+                      <b>{peso(item.perCap)}/cap</b>
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
 
             <button type="button" className="shop-primary" onClick={addCurrentItem}>
