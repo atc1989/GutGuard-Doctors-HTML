@@ -17,7 +17,11 @@ import {
 import { readReferralShopName, readReferralSlug } from "@/lib/referral";
 import { getOrderTotal, quoteShipping } from "@/lib/shipping";
 
-const BASKET_STORAGE_KEY = "gutguard-basket";
+// Bump this suffix whenever catalog prices change. A stored basket carries the price
+// it was added at, and the server re-derives prices at checkout - so a stale basket
+// would fail verification only after the customer had filled in the whole form.
+// Changing the key drops those baskets up front instead.
+const BASKET_STORAGE_KEY = "gutguard-basket-v2";
 
 const SCIENCE = [
   [
