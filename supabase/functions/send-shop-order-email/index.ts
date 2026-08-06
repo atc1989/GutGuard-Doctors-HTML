@@ -14,6 +14,8 @@ type EmailKind = "saved" | "paid";
 type RequestPayload = {
   orderId?: string;
   kind?: EmailKind;
+  /** Which Postgres schema holds the order. "sandbox" for the mirrored system. */
+  schema?: string;
 };
 
 type ShopOrder = {
@@ -39,7 +41,10 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
   try {
-    const { orderId, kind = "saved" } = (await req.json()) as RequestPayload;
+    const { orderId, kind = "saved", schema } = (await req.json()) as RequestPayload;
+    // Only 'public' and 'sandbox' are valid; anything else is ignored so a caller
+    // cannot point this at an arbitrary schema.
+    const dbSchema = schema === "sandbox" ? "sandbox" : "public";
     if (!orderId) return jsonResponse({ error: "Missing orderId" }, 400);
 
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
@@ -54,6 +59,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const { data, error } = await supabase
+      .schema(dbSchema)
       .from("shop_orders")
       .select("id, order_code, customer_name, email, mobile, address, barangay, city, province, zip, subtotal, shipping_fee, total_amount, items, created_at")
       .eq("id", orderId)
@@ -71,6 +77,7 @@ Deno.serve(async (req) => {
     if (!isValidEmail(email)) {
       await recordSendAttempt(supabase, {
         orderId,
+        schema: dbSchema,
         email,
         subject,
         status: "skipped",
@@ -89,7 +96,7 @@ Deno.serve(async (req) => {
         from: fromEmail,
         to: [email],
         subject,
-        html: renderEmail(order, kind),
+        html: renderEmail(order, kind, dbSchema),
         reply_to: replyTo,
       }),
     });
@@ -99,6 +106,7 @@ Deno.serve(async (req) => {
       const message = stringifyError(resendBody);
       await recordSendAttempt(supabase, {
         orderId,
+        schema: dbSchema,
         email,
         subject,
         status: "failed",
@@ -130,9 +138,10 @@ async function recordSendAttempt(
     status: "sent" | "failed" | "skipped";
     resendId?: string | null;
     errorMessage?: string | null;
+    schema: string;
   },
 ) {
-  await supabase.from("shop_order_email_sends").insert({
+  await supabase.schema(input.schema).from("shop_order_email_sends").insert({
     order_id: input.orderId,
     email: input.email,
     subject: input.subject,
@@ -142,9 +151,10 @@ async function recordSendAttempt(
   });
 }
 
-function renderEmail(order: ShopOrder, kind: EmailKind) {
+function renderEmail(order: ShopOrder, kind: EmailKind, dbSchema: string) {
   const isPaid = kind === "paid";
-  const orderUrl = `${SITE_URL}/shop/order/${encodeURIComponent(order.order_code)}`;
+  const siteUrl = dbSchema === "sandbox" ? SANDBOX_SITE_URL : PROD_SITE_URL;
+  const orderUrl = `${siteUrl}/shop/order/${encodeURIComponent(order.order_code)}`;
   const items = Array.isArray(order.items) ? order.items : [];
   const itemRows = items
     .map(

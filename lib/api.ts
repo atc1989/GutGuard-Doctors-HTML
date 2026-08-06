@@ -1,6 +1,6 @@
 import { PRIZES } from "@/lib/constants";
 import { pickPrizeIndex } from "@/lib/prizes";
-import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { isSupabaseConfigured, supabase, supabaseShop, SHOP_SCHEMA } from "@/lib/supabase";
 import type { Prize, RegistrationPayload, TaskId, WheelPrize, WheelPrizeInput } from "@/lib/types";
 
 type PrizeRow = {
@@ -610,9 +610,9 @@ export async function sendSmsBlast(
 }
 
 export async function createShopOrder(payload: ShopOrderInput): Promise<ShopOrder> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
 
-  const { data, error } = await supabase.rpc("create_shop_order", {
+  const { data, error } = await supabaseShop.rpc("create_shop_order", {
     p_first_name: payload.firstName,
     p_last_name: payload.lastName,
     p_email: payload.email,
@@ -643,7 +643,7 @@ export async function sendShopOrderEmail(orderId: string): Promise<void> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
 
   const { error } = await supabase.functions.invoke("send-shop-order-email", {
-    body: { orderId },
+    body: { orderId, schema: SHOP_SCHEMA },
   });
 
   if (error) throw new Error(await getSupabaseFunctionErrorMessage(error));
@@ -685,9 +685,9 @@ export async function reconcileMayaPayment(orderCode: string): Promise<{ payment
 }
 
 export async function getPublicShopOrder(orderCode: string): Promise<PublicShopOrder | null> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
 
-  const { data, error } = await supabase.rpc("get_shop_order_public", { p_order_code: orderCode });
+  const { data, error } = await supabaseShop.rpc("get_shop_order_public", { p_order_code: orderCode });
   if (error) throw error;
 
   const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | null | undefined;
@@ -722,9 +722,9 @@ export async function getPublicShopOrder(orderCode: string): Promise<PublicShopO
 }
 
 export async function adminListShopOrders(adminPassword: string): Promise<ShopOrder[]> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
 
-  const { data, error } = await supabase.rpc("admin_list_shop_orders", {
+  const { data, error } = await supabaseShop.rpc("admin_list_shop_orders", {
     p_admin_password: adminPassword,
   });
 
@@ -733,9 +733,9 @@ export async function adminListShopOrders(adminPassword: string): Promise<ShopOr
 }
 
 export async function adminGetShopOrder(adminPassword: string, orderId: string): Promise<ShopOrder> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
 
-  const { data, error } = await supabase.rpc("admin_get_shop_order", {
+  const { data, error } = await supabaseShop.rpc("admin_get_shop_order", {
     p_admin_password: adminPassword,
     p_order_id: orderId,
   });
@@ -748,9 +748,9 @@ export async function adminUpdateShopOrder(
   adminPassword: string,
   update: ShopOrderAdminUpdate,
 ): Promise<ShopOrder> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
 
-  const { data, error } = await supabase.rpc("admin_update_shop_order", {
+  const { data, error } = await supabaseShop.rpc("admin_update_shop_order", {
     p_admin_password: adminPassword,
     p_order_id: update.id,
     p_status: update.status,

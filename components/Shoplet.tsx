@@ -406,7 +406,7 @@ export default function Shoplet() {
                 </p>
               ) : null}
               <p className="shop-kicker">FDA-registered synbiotic</p>
-              <h1>SynBIOTIC+ for daily gut support</h1>
+              <h1>SynBIOTIC+</h1>
               <p className="shop-lede">A living synbiotic that targets the inflammation aging you.</p>
               <div className="shop-proof">
                 <span>Secure</span>

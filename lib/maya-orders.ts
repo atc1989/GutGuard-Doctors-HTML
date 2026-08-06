@@ -1,5 +1,8 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MayaPayment } from "@/lib/maya";
+import type { getSupabaseAdmin } from "@/lib/supabase-admin";
+
+/** Schema-scoped admin client - the generic differs between `public` and `sandbox`. */
+type ShopAdminClient = ReturnType<typeof getSupabaseAdmin>;
 
 // Single place where a Maya payment becomes an order state. The webhook and the
 // reconcile fallback both route through here so they can never disagree.
@@ -46,7 +49,7 @@ type OrderRow = {
  * carry no new information return early, so the receipt email fires exactly once.
  */
 export async function applyPaymentToOrder(
-  supabase: SupabaseClient,
+  supabase: ShopAdminClient,
   order: OrderRow,
   payment: MayaPayment,
 ): Promise<{ changed: boolean; paymentStatus: string }> {
@@ -79,7 +82,9 @@ export async function applyPaymentToOrder(
   // other cannot both send the receipt.
   if (!wasPaid && next.paymentStatus === "paid") {
     await supabase.functions
-      .invoke("send-shop-order-email", { body: { orderId: order.id, kind: "paid" } })
+      .invoke("send-shop-order-email", {
+        body: { orderId: order.id, kind: "paid", schema: process.env.NEXT_PUBLIC_SHOP_DB_SCHEMA || "public" },
+      })
       .catch(() => undefined);
   }
 

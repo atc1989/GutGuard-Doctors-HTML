@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { supabaseShop } from "@/lib/supabase";
 import { REFERRAL_COOKIE, REFERRAL_MAX_AGE_SECONDS, REFERRAL_SHOP_NAME_COOKIE } from "@/lib/referral";
 
 export const dynamic = "force-dynamic";
@@ -21,12 +21,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const shopUrl = new URL("/shop", request.url);
   const response = NextResponse.redirect(shopUrl, { status: 302 });
 
-  if (!slug || !supabase) return response;
+  if (!slug || !supabaseShop) return response;
 
   const clean = decodeURIComponent(slug).trim().toLowerCase();
   if (!clean) return response;
 
-  const { data, error } = await supabase.rpc("get_referral_partner", { p_slug: clean });
+  const { data, error } = await supabaseShop.rpc("get_referral_partner", { p_slug: clean });
   const matched = typeof data === "string" ? data : Array.isArray(data) ? data[0] : null;
 
   // Unknown or unreachable slug: still deliver the visitor to the shop, but leave any
