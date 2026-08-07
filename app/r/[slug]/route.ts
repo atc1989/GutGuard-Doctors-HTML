@@ -26,7 +26,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const clean = decodeURIComponent(slug).trim().toLowerCase();
   if (!clean) return response;
 
-  const { data, error } = await supabaseShop.rpc("get_referral_partner", { p_slug: clean });
+  // Resolves the slug and records the click in one call - see track_referral_click.
+  const { data, error } = await supabaseShop.rpc("track_referral_click", { p_slug: clean });
   const matched = typeof data === "string" ? data : Array.isArray(data) ? data[0] : null;
 
   // Unknown or unreachable slug: still deliver the visitor to the shop, but leave any

@@ -231,6 +231,26 @@ export type ShopOrderAdminUpdate = {
   adminNotes: string;
 };
 
+/** One attributed order as a partner is allowed to see it - no buyer contact or address. */
+export type PartnerOrder = {
+  order_code: string;
+  created_at: string;
+  status: ShopOrderStatus;
+  payment_status: ShopPaymentStatus;
+  total_amount: number;
+  buyer_first_name: string;
+  city: string;
+  province: string;
+};
+
+export type PartnerDashboard = {
+  partner: { full_name: string; routing_slug: string; joined_at: string };
+  clicks: { total: number; last_30_days: number };
+  /** paid_amount is gross order value, not commission. */
+  totals: { orders: number; paid_orders: number; paid_amount: number };
+  orders: PartnerOrder[];
+};
+
 export type TikTokOrderTimeMode = "create_time" | "update_time";
 
 export type TikTokOrdersFilters = {
@@ -718,6 +738,105 @@ export async function getPublicShopOrder(orderCode: string): Promise<PublicShopO
     items: Array.isArray(row.items) ? (row.items as ShopOrderItem[]) : [],
     created_at: String(row.created_at ?? ""),
     paid_at: typeof row.paid_at === "string" ? row.paid_at : null,
+  };
+}
+
+/**
+ * Partner sign-in, step 1: email a 6-digit code.
+ *
+ * shouldCreateUser stays true even though only registered partners may see data. Partner
+ * rows predate this login and have no auth.users entry, so `false` would lock every one of
+ * them out permanently. Access is gated by partner_dashboard(), which checks the verified
+ * address against doctor_registrations - and leaving account creation open means the sign-in
+ * form cannot be used to test whether an address is a registered partner.
+ *
+ * Requires {{ .Token }} in the Supabase "Magic Link" email template, or the mail arrives
+ * with a link and no code to type.
+ */
+export async function sendPartnerOtp(email: string): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { error } = await supabase.auth.signInWithOtp({
+    email: email.trim().toLowerCase(),
+    options: { shouldCreateUser: true },
+  });
+
+  if (error) throw error;
+}
+
+/** Partner sign-in, step 2: exchange the code for a session. */
+export async function verifyPartnerOtp(email: string, token: string): Promise<void> {
+  if (!isSupabaseConfigured || !supabase || !supabaseShop) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.auth.verifyOtp({
+    email: email.trim().toLowerCase(),
+    token: token.trim(),
+    type: "email",
+  });
+
+  if (error) throw error;
+
+  // supabaseShop is a second createClient (see lib/supabase.ts) and was built before this
+  // session existed, so it is still anonymous in this tab until it is handed the session.
+  // Without this the first dashboard read fails and only starts working after a reload.
+  if (data.session) await supabaseShop.auth.setSession(data.session);
+}
+
+export async function signOutPartner(): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) return;
+  await supabase.auth.signOut();
+}
+
+/** True when a partner already has a live session, so the login form can be skipped. */
+export async function hasPartnerSession(): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase || !supabaseShop) return false;
+
+  const { data } = await supabase.auth.getSession();
+  if (!data.session) return false;
+
+  await supabaseShop.auth.setSession(data.session);
+  return true;
+}
+
+export async function getPartnerDashboard(): Promise<PartnerDashboard> {
+  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabaseShop.rpc("partner_dashboard");
+  if (error) throw error;
+
+  const row = (data ?? {}) as Record<string, unknown>;
+  const partner = (row.partner ?? {}) as Record<string, unknown>;
+  const clicks = (row.clicks ?? {}) as Record<string, unknown>;
+  const totals = (row.totals ?? {}) as Record<string, unknown>;
+
+  return {
+    partner: {
+      full_name: String(partner.full_name ?? ""),
+      routing_slug: String(partner.routing_slug ?? ""),
+      joined_at: String(partner.joined_at ?? ""),
+    },
+    clicks: {
+      total: Number(clicks.total ?? 0),
+      last_30_days: Number(clicks.last_30_days ?? 0),
+    },
+    totals: {
+      orders: Number(totals.orders ?? 0),
+      paid_orders: Number(totals.paid_orders ?? 0),
+      paid_amount: Number(totals.paid_amount ?? 0),
+    },
+    orders: (Array.isArray(row.orders) ? row.orders : []).map((entry) => {
+      const order = (entry ?? {}) as Record<string, unknown>;
+      return {
+        order_code: String(order.order_code ?? ""),
+        created_at: String(order.created_at ?? ""),
+        status: (order.status ?? "pending_payment") as ShopOrderStatus,
+        payment_status: (order.payment_status ?? "pending") as ShopPaymentStatus,
+        total_amount: Number(order.total_amount ?? 0),
+        buyer_first_name: String(order.buyer_first_name ?? ""),
+        city: String(order.city ?? ""),
+        province: String(order.province ?? ""),
+      };
+    }),
   };
 }
 

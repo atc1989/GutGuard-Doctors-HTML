@@ -428,3 +428,126 @@ grant select, insert, update, delete on all tables in schema sandbox to service_
 
 -- REMINDER: expose the schema to the Data API or every call 404s:
 --   Supabase Dashboard -> Settings -> API -> Data API -> Exposed schemas -> add "sandbox"
+
+-- ─── Partner dashboard ─────────────────────────────────────────────────────────
+-- referral_clicks is mirrored rather than shared: sandbox link testing would otherwise
+-- inflate the click and conversion numbers real partners are shown.
+
+create table if not exists sandbox.referral_clicks (
+  id uuid primary key default gen_random_uuid(),
+  routing_slug text not null,
+  doctor_id uuid references public.doctor_registrations(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists referral_clicks_doctor_id_idx
+  on sandbox.referral_clicks (doctor_id, created_at desc);
+
+alter table sandbox.referral_clicks enable row level security;
+
+drop function if exists sandbox.track_referral_click(text);
+drop function if exists sandbox.partner_dashboard();
+
+create or replace function sandbox.track_referral_click(p_slug text)
+returns text
+language plpgsql
+security definer
+set search_path = sandbox, public
+as $$
+declare
+  v_slug text;
+  v_doctor_id uuid;
+begin
+  select d.routing_slug, d.id into v_slug, v_doctor_id
+  from public.doctor_registrations d
+  where d.routing_slug = lower(trim(coalesce(p_slug, '')))
+  limit 1;
+
+  if v_slug is null then
+    return null;
+  end if;
+
+  insert into sandbox.referral_clicks (routing_slug, doctor_id) values (v_slug, v_doctor_id);
+
+  return v_slug;
+end;
+$$;
+
+grant execute on function sandbox.track_referral_click(text) to anon, authenticated;
+
+create or replace function sandbox.partner_dashboard()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = sandbox, public
+as $$
+declare
+  v_email text;
+  v_doctor public.doctor_registrations;
+begin
+  v_email := nullif(lower(trim(coalesce(auth.jwt() ->> 'email', ''))), '');
+
+  if v_email is null then
+    raise exception 'Sign in to view your dashboard.' using errcode = '42501';
+  end if;
+
+  select * into v_doctor
+  from public.doctor_registrations
+  where email = v_email
+  limit 1;
+
+  if v_doctor.id is null then
+    raise exception 'This email is not registered as a GutGuard partner.' using errcode = '42501';
+  end if;
+
+  return jsonb_build_object(
+    'partner', jsonb_build_object(
+      'full_name', v_doctor.full_name,
+      'routing_slug', v_doctor.routing_slug,
+      'joined_at', v_doctor.created_at
+    ),
+    'clicks', jsonb_build_object(
+      'total', (
+        select count(*) from sandbox.referral_clicks c where c.doctor_id = v_doctor.id
+      ),
+      'last_30_days', (
+        select count(*) from sandbox.referral_clicks c
+        where c.doctor_id = v_doctor.id and c.created_at >= now() - interval '30 days'
+      )
+    ),
+    'totals', (
+      select jsonb_build_object(
+        'orders', count(*),
+        'paid_orders', count(*) filter (where o.payment_status = 'paid'),
+        'paid_amount', coalesce(sum(
+          coalesce(nullif(o.total_amount, 0), o.subtotal + coalesce(o.shipping_fee, 0))
+        ) filter (where o.payment_status = 'paid'), 0)
+      )
+      from sandbox.shop_orders o
+      where o.referral_doctor_id = v_doctor.id
+    ),
+    'orders', (
+      select coalesce(jsonb_agg(entry order by sort_at desc), '[]'::jsonb)
+      from (
+        select o.created_at as sort_at, jsonb_build_object(
+          'order_code', o.order_code,
+          'created_at', o.created_at,
+          'status', o.status,
+          'payment_status', o.payment_status,
+          'total_amount', coalesce(nullif(o.total_amount, 0), o.subtotal + coalesce(o.shipping_fee, 0)),
+          'buyer_first_name', coalesce(o.first_name, split_part(o.customer_name, ' ', 1)),
+          'city', o.city,
+          'province', o.province
+        ) as entry
+        from sandbox.shop_orders o
+        where o.referral_doctor_id = v_doctor.id
+        order by o.created_at desc
+        limit 200
+      ) recent
+    )
+  );
+end;
+$$;
+
+grant execute on function sandbox.partner_dashboard() to authenticated;

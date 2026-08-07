@@ -312,3 +312,38 @@ begin
   order by sms_sends.sent_at desc;
 end;
 $$;
+
+-- ─── Partner login identity ────────────────────────────────────────────────────
+-- The partner dashboard signs in with Supabase Auth email OTP and matches the verified
+-- address against this table, which promotes `email` from a contact field to an identity.
+-- No auth_user_id column on purpose: the OTP already proves the partner controls the
+-- address, so a second link would only add a row to seed for every partner who registered
+-- before this shipped.
+--
+-- Run this FIRST - the unique index below fails outright if two partners share an address:
+--   select count(*) filter (where coalesce(trim(email), '') = '') as no_email,
+--          count(*) filter (where coalesce(trim(email), '') <> '')
+--            - count(distinct lower(trim(email))) filter (where coalesce(trim(email), '') <> '')
+--            as dupes
+--   from public.doctor_registrations;
+
+-- Normalise in place, never to null: this column is NOT NULL in production, so "no email"
+-- is stored as an empty string and writing null here would abort the whole migration.
+-- Rows that are already null (if the constraint is ever relaxed) compare as null and are
+-- left alone, so this is correct either way.
+update public.doctor_registrations
+set email = lower(trim(email))
+where email <> lower(trim(email));
+
+-- Partial, so the legacy rows with no email do not collide with each other - both '' and
+-- null fall outside the index. Those partners cannot sign in until an address is set via
+-- admin_update_doctor_registration, which is deliberately better than inventing a
+-- placeholder address, as that would be a login anyone could claim.
+-- Dropped first, not `if not exists`: an earlier attempt at this migration used the
+-- predicate `where email is not null`, which on a NOT NULL column indexes every row and
+-- so collides on the '' markers. `if not exists` would silently keep that wrong index.
+drop index if exists public.doctor_registrations_email_key;
+
+create unique index doctor_registrations_email_key
+  on public.doctor_registrations (email)
+  where email <> '';
