@@ -550,4 +550,6 @@ begin
 end;
 $$;
 
+-- See the note in shop-orders.sql: the revoke is what actually keeps anon out.
+revoke all on function sandbox.partner_dashboard() from public, anon;
 grant execute on function sandbox.partner_dashboard() to authenticated;

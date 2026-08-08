@@ -176,6 +176,17 @@ begin
   exception when insufficient_privilege then null;
   end;
 
+  -- Grants, not just behaviour. Postgres gives EXECUTE to PUBLIC on every new function and
+  -- Supabase's default privileges add anon in `public`, so "grant to authenticated" alone
+  -- leaves this reachable with the anon key.
+  assert not has_function_privilege('anon', 'public.partner_dashboard()', 'execute'),
+    'anon must not be able to execute partner_dashboard';
+  assert has_function_privilege('authenticated', 'public.partner_dashboard()', 'execute'),
+    'authenticated must be able to execute partner_dashboard';
+  -- The redirect runs on the anon key, so this one has to stay open.
+  assert has_function_privilege('anon', 'public.track_referral_click(text)', 'execute'),
+    'anon must be able to execute track_referral_click';
+
   raise notice 'ALL CHECKS PASSED';
 end;
 $$;

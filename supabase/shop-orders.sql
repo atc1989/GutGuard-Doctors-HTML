@@ -552,5 +552,9 @@ begin
 end;
 $$;
 
--- authenticated only. anon has no business calling this even though it would find no email.
+-- authenticated only, and the revoke is NOT redundant: Postgres grants EXECUTE to PUBLIC on
+-- every new function, and Supabase's default privileges in `public` add anon on top. The
+-- grant on its own leaves this callable with the anon key. The body would still refuse
+-- (no JWT email), but an unauthenticated caller should not reach it at all.
+revoke all on function public.partner_dashboard() from public, anon;
 grant execute on function public.partner_dashboard() to authenticated;
