@@ -768,18 +768,39 @@ export async function sendPartnerOtp(email: string): Promise<void> {
 export async function verifyPartnerOtp(email: string, token: string): Promise<void> {
   if (!isSupabaseConfigured || !supabase || !supabaseShop) throw new Error("Supabase is not configured.");
 
-  const { data, error } = await supabase.auth.verifyOtp({
-    email: email.trim().toLowerCase(),
-    token: token.trim(),
-    type: "email",
-  });
+  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedToken = token.trim();
 
-  if (error) throw error;
+  // Supabase normally verifies a numeric email OTP with type "email". On a partner's
+  // first-ever login, however, signInWithOtp creates the auth user and sends the Confirm
+  // signup template; some hosted Auth versions classify that token as "signup" (and older
+  // passwordless flows as "magiclink"). Try the canonical type first, then the two exact
+  // email-flow variants. A failed verification does not consume the token.
+  let session = null;
+  let lastError: Error | null = null;
+
+  for (const type of ["email", "signup", "magiclink"] as const) {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: normalizedEmail,
+      token: normalizedToken,
+      type,
+    });
+
+    if (!error) {
+      session = data.session;
+      lastError = null;
+      break;
+    }
+
+    lastError = error;
+  }
+
+  if (lastError) throw lastError;
 
   // supabaseShop is a second createClient (see lib/supabase.ts) and was built before this
   // session existed, so it is still anonymous in this tab until it is handed the session.
   // Without this the first dashboard read fails and only starts working after a reload.
-  if (data.session) await supabaseShop.auth.setSession(data.session);
+  if (session) await supabaseShop.auth.setSession(session);
 }
 
 export async function signOutPartner(): Promise<void> {

@@ -15,10 +15,13 @@ import {
 } from "@/lib/api";
 
 const SHOP_ORIGIN = (process.env.NEXT_PUBLIC_SHOP_URL ?? "https://shop.gutguard.ph").replace(/\/$/, "");
+const PUBLIC_SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://partners.gutguard.ph").replace(/\/$/, "");
 
 // Rendered large and scaled down by CSS so the download and the print sheet are both
 // sharp. The on-screen size is set in globals.css, not here.
 const QR_RENDER_PX = 1024;
+
+type PartnerQrMode = "shop" | "profile";
 
 const peso = (value: number) =>
   new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value);
@@ -197,8 +200,10 @@ export default function PartnerPortal() {
 function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () => void }) {
   const qrRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
+  const [qrMode, setQrMode] = useState<PartnerQrMode>("shop");
 
-  const link = getReferralLink(data.partner.routing_slug);
+  const link = getPartnerQrLink(data.partner.routing_slug, qrMode);
+  const isShopQr = qrMode === "shop";
   const conversion = data.clicks.total > 0 ? (data.totals.orders / data.clicks.total) * 100 : 0;
 
   async function copyLink() {
@@ -219,12 +224,12 @@ function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () 
 
     const anchor = document.createElement("a");
     anchor.href = canvas.toDataURL("image/png");
-    anchor.download = `gutguard-qr-${data.partner.routing_slug}.png`;
+    anchor.download = `gutguard-${qrMode}-qr-${data.partner.routing_slug}.png`;
     anchor.click();
   }
 
   return (
-    <main className="shop-shell">
+    <main className="shop-shell partner-dashboard-shell">
       <PartnerNav onSignOut={onSignOut} />
 
       <section className="shop-order-panel">
@@ -247,54 +252,96 @@ function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () 
         </div>
       </section>
 
-      <section className="shop-order-panel">
-        <p className="shop-kicker">Your link</p>
-        <h2>Share this anywhere</h2>
-        <p className="partner-link">{link}</p>
-        <button type="button" className="shop-primary" onClick={copyLink}>
-          <span>{copied ? "Copied" : "Copy link"}</span>
-        </button>
-
-        <div className="partner-qr" ref={qrRef}>
-          <QRCodeCanvas value={link} size={QR_RENDER_PX} level="M" marginSize={2} />
-        </div>
-
-        <div className="partner-qr-actions">
-          <button type="button" className="shop-secondary" onClick={downloadQr}>
-            Download QR (PNG)
-          </button>
-          <button type="button" className="shop-secondary" onClick={() => window.print()}>
-            Print poster
-          </button>
-        </div>
-      </section>
-
-      <section className="shop-order-panel">
-        <p className="shop-kicker">Your orders</p>
-        <h2>{data.orders.length > 0 ? `${data.orders.length} attributed` : "Nothing yet"}</h2>
-
-        {data.orders.length === 0 ? (
+      <div className="partner-dashboard-grid">
+        <section className="shop-order-panel partner-share-panel">
+          <p className="shop-kicker">Share &amp; grow</p>
+          <h2>Your QR codes</h2>
           <p className="shop-lede">
-            Share your link or QR code. Orders appear here as soon as someone buys through it.
+            Share the shop QR for tracked orders, or the profile QR for your TikTok page.
           </p>
-        ) : (
-          <div className="partner-orders">
-            {data.orders.map((order) => (
-              <OrderRow key={order.order_code} order={order} />
-            ))}
-          </div>
-        )}
 
-        <p className="shop-note">
-          Buyer contact details and delivery addresses stay private - you see the first name and
-          area only.
-        </p>
-      </section>
+          <div className="partner-qr-toggle" role="group" aria-label="QR code type">
+            <button
+              type="button"
+              className={isShopQr ? "active" : ""}
+              aria-pressed={isShopQr}
+              onClick={() => {
+                setQrMode("shop");
+                setCopied(false);
+              }}
+            >
+              <strong>Shop QR</strong>
+              <span>Track clicks &amp; orders</span>
+            </button>
+            <button
+              type="button"
+              className={!isShopQr ? "active" : ""}
+              aria-pressed={!isShopQr}
+              onClick={() => {
+                setQrMode("profile");
+                setCopied(false);
+              }}
+            >
+              <strong>Profile QR</strong>
+              <span>Open your TikTok</span>
+            </button>
+          </div>
+
+          <div className="partner-link-row">
+            <p className="partner-link">{link}</p>
+            <button type="button" className="shop-primary" onClick={copyLink}>
+              <span>{copied ? "Copied" : "Copy link"}</span>
+            </button>
+          </div>
+
+          <div className="partner-qr" ref={qrRef}>
+            <QRCodeCanvas
+              key={qrMode}
+              value={link}
+              size={QR_RENDER_PX}
+              level="M"
+              marginSize={2}
+              style={{ width: "100%", height: "auto" }}
+            />
+          </div>
+
+          <div className="partner-qr-actions">
+            <button type="button" className="shop-secondary" onClick={downloadQr}>
+              Download PNG
+            </button>
+            <button type="button" className="shop-secondary" onClick={() => window.print()}>
+              Print poster
+            </button>
+          </div>
+        </section>
+
+        <section className="shop-order-panel partner-orders-panel">
+          <p className="shop-kicker">Your orders</p>
+          <h2>{data.orders.length > 0 ? `${data.orders.length} attributed` : "No orders yet"}</h2>
+
+          {data.orders.length === 0 ? (
+            <div className="partner-empty-orders">
+              <strong>Your first referral order will appear here.</strong>
+              <p>Share your shop link or QR code to get started.</p>
+            </div>
+          ) : (
+            <div className="partner-orders">
+              {data.orders.map((order) => (
+                <OrderRow key={order.order_code} order={order} />
+              ))}
+            </div>
+          )}
+
+          <p className="shop-note">
+            Buyer details stay private. You only see their first name and area.
+          </p>
+        </section>
+      </div>
 
       {/* Screen-hidden, print-only. Kept in the DOM so window.print() needs no new page. */}
       <div className="partner-print" aria-hidden="true">
         <Image src="/gutguard-logo.png" alt="" width={68} height={80} />
-        <strong>Scan to order GutGuard</strong>
+        <strong>{isShopQr ? "Scan to order GutGuard" : "Scan to visit my TikTok profile"}</strong>
         <QRCodeCanvas value={link} size={QR_RENDER_PX} level="M" marginSize={2} />
         <span>{data.partner.full_name}</span>
         <small>{link}</small>
@@ -350,9 +397,10 @@ function PartnerNav({ onSignOut }: { onSignOut?: () => void }) {
   );
 }
 
-/** Mirrors getDoctorQrUrl in the admin, so the dashboard shows the link already on printed QRs. */
-function getReferralLink(slug: string) {
-  if (!slug) return SHOP_ORIGIN;
+/** Mirrors getDoctorQrUrl in the admin, so both views generate the same two QR destinations. */
+function getPartnerQrLink(slug: string, mode: PartnerQrMode) {
+  if (!slug) return mode === "shop" ? SHOP_ORIGIN : PUBLIC_SITE_ORIGIN;
+  if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${encodeURIComponent(slug)}`;
   if (slug === "dr-grace-saraza") return `${SHOP_ORIGIN}/beehive`;
   return `${SHOP_ORIGIN}/r/${encodeURIComponent(slug)}`;
 }
