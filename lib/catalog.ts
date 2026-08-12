@@ -20,11 +20,9 @@ export type CatalogTrial = {
 };
 
 export const TIERS: CatalogTier[] = [
-  // price is what gets charged; perCap is display only. Keep them consistent -
-  // price must equal caps * perCap, or the card shows one number and Maya charges another.
-  // (Peak is the deliberate exception: 39,999 instead of 40,000.)
-  { id: "start", name: "Start", phase: "30-day", days: 30, caps: 40, perCap: 125, price: 5000 },
-  { id: "grow", name: "Grow", phase: "60-day", days: 60, caps: 270, perCap: 116, price: 31320, tag: "Popular" },
+  // price is the exact amount charged; perCap is a rounded display value.
+  { id: "start", name: "Start", phase: "30-day", days: 30, caps: 40, perCap: 125, price: 4999 },
+  { id: "grow", name: "Grow", phase: "60-day", days: 60, caps: 120, perCap: 117, price: 13999, tag: "Popular" },
   { id: "peak", name: "Peak", phase: "90-day", days: 90, caps: 400, perCap: 100, price: 39999, tag: "Best rate" },
 ];
 

@@ -1,9 +1,11 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { Menu, X } from "lucide-react";
 import { ArrowRightIcon, CheckIcon } from "@/components/Icons";
+import { Logo } from "@/components/GutguardSite";
 import { createShopOrder, sendShopOrderEmail, startMayaCheckout, type ShopOrderItem } from "@/lib/api";
 import { TIERS, TRIALS } from "@/lib/catalog";
 import {
@@ -101,6 +103,9 @@ export default function Shoplet() {
   const [tierId, setTierId] = useState("peak");
   const [basket, setBasket] = useState<ShopOrderItem[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const menuPanelRef = useRef<HTMLDivElement>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [infoModal, setInfoModal] = useState<InfoModal>(null);
   const [stage, setStage] = useState<Stage>("shop");
@@ -128,6 +133,41 @@ export default function Shoplet() {
     province: form.province,
     regionCode: getSelectedRegionCode(form, provinces),
   });
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const panel = menuPanelRef.current;
+    const menuButton = menuButtonRef.current;
+    const focusable = () => Array.from(panel?.querySelectorAll<HTMLElement>('a[href],button:not([disabled])') ?? []);
+    document.body.style.overflow = "hidden";
+    requestAnimationFrame(() => focusable()[0]?.focus());
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMenuOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const nodes = focusable();
+      if (!nodes.length) return;
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      menuButton?.focus();
+    };
+  }, [menuOpen]);
   const totalAmount = getOrderTotal(subtotal, shippingQuote.fee);
   const currentBuyLabel = mode === "trial" ? `Add ${selectedTrial.name}` : `Add ${selectedTier.name}`;
   const currentPrice = mode === "trial" ? selectedTrial.price : selectedTier.price;
@@ -385,17 +425,60 @@ export default function Shoplet() {
 
   return (
     <main className="shop-shell">
-      <section className="shop-hero">
-        <nav className="shop-nav" aria-label="Shop header">
-          <Link className="shop-brand" href="/">
-            <Image src="/gutguard-logo.png" alt="GutGuard" width={34} height={40} priority />
-            <span>GutGuard</span>
+      <header className="shop-site-header">
+        <nav className="shop-site-nav-inner" aria-label="Primary">
+          <Link className="shop-site-brand" href="/" aria-label="GutGuard home">
+            <Logo h={29} />
           </Link>
-          <button className="shop-nav-link" type="button" onClick={() => setDrawerOpen(true)}>
+          <div className="shop-site-links">
+            <Link href="/#why-now">Why GutGuard</Link>
+            <Link href="/system">How It Works</Link>
+            <Link href="/science">Science</Link>
+            <Link href="/shop" aria-current="page">Shop</Link>
+            <Link href="/physicians">For Physicians</Link>
+          </div>
+          <div className="shop-site-actions">
+            <Link className="shop-site-login" href="/partner">Log in</Link>
+            <button className="shop-site-basket" type="button" onClick={() => setDrawerOpen(true)}>
+              Basket ({basketCount})
+            </button>
+          </div>
+          <button className="shop-site-basket-mobile" type="button" onClick={() => setDrawerOpen(true)}>
             Basket ({basketCount})
           </button>
+          <button
+            ref={menuButtonRef}
+            className="shop-site-menu-button"
+            type="button"
+            aria-label="Open menu"
+            aria-haspopup="dialog"
+            aria-expanded={menuOpen}
+            aria-controls="shop-mobile-menu"
+            onClick={() => setMenuOpen(true)}
+          >
+            <Menu size={20} />
+          </button>
         </nav>
-
+      </header>
+      <div
+        id="shop-mobile-menu"
+        ref={menuPanelRef}
+        className={"shop-site-menu" + (menuOpen ? " open" : "")}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Site menu"
+      >
+        <button className="shop-site-menu-button shop-site-menu-close" type="button" aria-label="Close menu" onClick={() => setMenuOpen(false)}>
+          <X size={20} />
+        </button>
+        <Link href="/#why-now" onClick={() => setMenuOpen(false)}>Why GutGuard</Link>
+        <Link href="/system" onClick={() => setMenuOpen(false)}>How It Works</Link>
+        <Link href="/science" onClick={() => setMenuOpen(false)}>Science</Link>
+        <Link href="/shop" aria-current="page" onClick={() => setMenuOpen(false)}>Shop</Link>
+        <Link href="/physicians" onClick={() => setMenuOpen(false)}>For Physicians</Link>
+        <Link className="shop-site-menu-login" href="/partner" onClick={() => setMenuOpen(false)}>Already a partner? Log in →</Link>
+      </div>
+      <section className="shop-hero">
         <div className="shop-hero-grid">
           <section className="shop-product">
             <div className="shop-product-visual">
@@ -417,7 +500,7 @@ export default function Shoplet() {
                 <span>FDA-registered</span>
                 <span>Nationwide delivery</span>
               </div>
-              <div className="shop-info-actions">
+              <div className="shop-info-actions" id="composition">
                 <button type="button" onClick={() => setInfoModal("inside")}>
                   What&apos;s inside
                 </button>
@@ -430,7 +513,7 @@ export default function Shoplet() {
         </div>
       </section>
 
-      <section className="shop-buy-band" aria-label="Product selection">
+      <section className="shop-buy-band" id="flagship" aria-label="Product selection">
         <div className="shop-buy-inner">
           <div className="shop-section-head">
             <div>
@@ -484,7 +567,7 @@ export default function Shoplet() {
               <>
                 <p className="shop-options-label">
                   <span>When you&apos;re ready</span>
-                  <em>₱120 → ₱100 / cap</em>
+                  <em>₱125 → ₱100 / cap</em>
                 </p>
                 <div className="shop-options protocol">
                   {TIERS.map((item) => (

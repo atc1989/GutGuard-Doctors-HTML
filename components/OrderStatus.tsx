@@ -15,10 +15,6 @@ type ReturnFlag = "success" | "failure" | "cancel" | null;
 const POLL_INTERVAL_MS = 2000;
 const POLL_ATTEMPTS = 10;
 
-// PLACEHOLDER - confirm the real callback commitment before launch. Stated in one place
-// so the promise on the page and in the emails cannot drift apart.
-const CALLBACK_SLA = "within 1 business day";
-
 const peso = (value: number) =>
   new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value);
 
@@ -284,7 +280,7 @@ function getView(order: PublicShopOrder, flag: ReturnFlag, isConfirming: boolean
       tone: "pending",
       kicker: "Payment on hold",
       headline: "Your payment is being confirmed.",
-      body: `The payment went through and is being verified. Nothing more is needed from you - we will email you once it clears, then call ${CALLBACK_SLA}.`,
+      body: "The payment went through and is being verified. Nothing more is needed from you - we will email you once it clears and contact you using the details on your order.",
       showPayButton: false,
     };
   }
@@ -294,7 +290,7 @@ function getView(order: PublicShopOrder, flag: ReturnFlag, isConfirming: boolean
       tone: "paid",
       kicker: "Paid",
       headline: `Payment received, ${order.first_name}.`,
-      body: `Our team will call you ${CALLBACK_SLA} to confirm delivery details, then your order ships. Keep this page for your reference.`,
+      body: "Our team will contact you using the details on your order to confirm delivery before it ships. Keep this page for your reference.",
       showPayButton: false,
     };
   }

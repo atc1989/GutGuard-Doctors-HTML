@@ -14,3 +14,10 @@ pnpm-debug.log*
 next-dev.log
 next-dev.err.log
 .vercel
+
+# scratch design docs / QA screenshots
+qa-*.png
+design-qa.md
+NAV_STICKY_FOOTER_REDESIGN.md
+PARTNER_AUTH_REDESIGN.md
+SCIENCE_TRUST_FOOTER_REFINEMENT.md

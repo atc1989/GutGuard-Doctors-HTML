@@ -1,9 +1,21 @@
 import type { Metadata, Viewport } from "next";
 import "@/styles/globals.css";
 
+const marketingUrl = process.env.NEXT_PUBLIC_MARKETING_URL ?? "https://gutguard.ph";
+
 export const metadata: Metadata = {
-  title: "GutGuard Doctors' TikTok Affiliate Program",
-  description: "Lead Clinical Adopter registration for GutGuard Doctors.",
+  metadataBase: new URL(marketingUrl),
+  title: {
+    default: "GutGuard | Measure your inflammation. Change your trajectory.",
+    template: "%s | GutGuard",
+  },
+  description: "The measured 90-day protocol for gut health, inflammation and healthy aging.",
+  openGraph: {
+    type: "website",
+    siteName: "GutGuard",
+    title: "GutGuard | Measure your inflammation. Change your trajectory.",
+    description: "The measured 90-day protocol for gut health, inflammation and healthy aging.",
+  },
 };
 
 export const viewport: Viewport = {

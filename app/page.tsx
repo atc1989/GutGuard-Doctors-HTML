@@ -1,5 +1,5 @@
-import RegistrationExperience from "@/components/RegistrationExperience";
+import GutguardSite from "@/components/GutguardSite";
 
 export default function Home() {
-  return <RegistrationExperience />;
+  return <GutguardSite />;
 }

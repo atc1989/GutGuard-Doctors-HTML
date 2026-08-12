@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
-// One Vercel project serves two hosts:
+// One Vercel project serves the public website and two operational hosts:
+//   gutguard.ph          - marketing pages
 //   shop.gutguard.ph     - the shop and Maya checkout
 //   partners.gutguard.ph - registration, partner area, /dr/<slug> QR links
 // The app's own "/" is the registration page, which is the right front door for
