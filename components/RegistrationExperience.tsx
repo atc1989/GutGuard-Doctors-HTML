@@ -6,14 +6,22 @@ import ProgressRail from "@/components/ProgressRail";
 import RegistrationSection from "@/sections/RegistrationSection";
 import VerificationSection from "@/sections/VerificationSection";
 import WheelSection from "@/sections/WheelSection";
-import { claimPrize, listWheelPrizes, updateTask } from "@/lib/api";
+import { claimPrize, listWheelPrizes, sendRegistrationEmail, updateTask } from "@/lib/api";
 import {
   clearExperienceState,
   INITIAL_STATE,
   loadExperienceState,
   saveExperienceState,
 } from "@/lib/storage";
-import type { ExperienceState, Prize, Registration, Screen, TaskId, WheelPrize } from "@/lib/types";
+import type {
+  ExperienceState,
+  Prize,
+  Registration,
+  RegistrationEmailDelivery,
+  Screen,
+  TaskId,
+  WheelPrize,
+} from "@/lib/types";
 
 export default function RegistrationExperience() {
   const [state, setState] = useState<ExperienceState>(INITIAL_STATE);
@@ -23,6 +31,7 @@ export default function RegistrationExperience() {
   const [wheelPrizes, setWheelPrizes] = useState<WheelPrize[]>([]);
   const [wheelLoading, setWheelLoading] = useState(false);
   const [wheelError, setWheelError] = useState<string | null>(null);
+  const [emailDelivery, setEmailDelivery] = useState<RegistrationEmailDelivery>({ status: "idle" });
 
   const dateLabel = useMemo(
     () => new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date()),
@@ -81,7 +90,25 @@ export default function RegistrationExperience() {
     updateTask(registration.id, "email", true).catch(() => {
       window.alert("Registration saved, but email verification could not be recorded.");
     });
+    void deliverRegistrationEmail(registration);
     setScreen(2);
+  }
+
+  async function deliverRegistrationEmail(registration: Registration) {
+    const email = registration.email.trim();
+    if (!email) {
+      setEmailDelivery({ status: "not-requested" });
+      return;
+    }
+
+    setEmailDelivery({ status: "sending", email });
+    try {
+      await sendRegistrationEmail(registration.id);
+      setEmailDelivery({ status: "sent", email });
+    } catch (error) {
+      console.error("Registration email delivery failed:", error);
+      setEmailDelivery({ status: "failed", email });
+    }
   }
 
   async function handleCompleteTask(taskId: TaskId) {
@@ -115,6 +142,7 @@ export default function RegistrationExperience() {
   function handleBackToRegistration() {
     clearExperienceState();
     setState(INITIAL_STATE);
+    setEmailDelivery({ status: "idle" });
     setRegistrationResetKey((current) => current + 1);
     setScreen(1);
   }
@@ -132,6 +160,10 @@ export default function RegistrationExperience() {
       <VerificationSection
         active={screen === 2}
         tasks={state.tasks}
+        emailDelivery={emailDelivery}
+        onRetryEmail={() => {
+          if (state.registration) void deliverRegistrationEmail(state.registration);
+        }}
         onCompleteTask={handleCompleteTask}
         onContinue={() => setScreen(3)}
       />

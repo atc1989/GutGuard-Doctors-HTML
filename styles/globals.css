@@ -496,6 +496,40 @@
       list-style: none;
       margin-top: 8px;
     }
+    .registration-email-status {
+      display: grid;
+      gap: 6px;
+      margin: -20px 0 30px;
+      padding: 16px 18px;
+      border: 1px solid var(--rule-strong);
+      border-left: 3px solid var(--blue);
+      background: rgba(255, 255, 255, 0.45);
+      color: var(--ink-2);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    .registration-email-status strong {
+      color: var(--ink);
+      font-size: 15px;
+    }
+    .registration-email-status.failed { border-left-color: var(--orange); }
+    .registration-email-status button {
+      justify-self: start;
+      min-height: 44px;
+      margin-top: 4px;
+      padding: 0 16px;
+      border: 1px solid var(--blue);
+      background: transparent;
+      color: var(--blue);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .registration-email-status button:hover,
+    .registration-email-status button:focus-visible {
+      background: var(--blue);
+      color: white;
+    }
     .task {
       display: flex;
       align-items: flex-start;

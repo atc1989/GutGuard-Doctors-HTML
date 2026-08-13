@@ -7,7 +7,7 @@ import { ArrowRightIcon } from "@/components/Icons";
 import { InputField, SelectField } from "@/components/FormField";
 import SectionLabel from "@/components/SectionLabel";
 import { SPECIALTIES } from "@/lib/constants";
-import { enrollDoctorInSequence, registerDoctor } from "@/lib/api";
+import { registerDoctor } from "@/lib/api";
 import type { FieldErrors, FieldName, FormValues } from "@/lib/validation";
 import {
   normalizeMobile,
@@ -96,13 +96,6 @@ export default function RegistrationSection({
     setSubmitting(true);
     try {
       const doctor = await registerDoctor(pendingPayload);
-      if (pendingPayload.email) {
-        try {
-          await enrollDoctorInSequence(doctor.id);
-        } catch {
-          // Fire-and-forget — registration is saved even if step 1 email fails
-        }
-      }
       setValues(INITIAL_VALUES);
       setErrors({});
       setPendingPayload(null);

@@ -16,6 +16,13 @@ export type Registration = {
 
 export type RegistrationPayload = Omit<Registration, "id" | "registeredAt">;
 
+export type RegistrationEmailDelivery =
+  | { status: "idle" }
+  | { status: "sending"; email: string }
+  | { status: "sent"; email: string }
+  | { status: "failed"; email: string }
+  | { status: "not-requested" };
+
 export type TaskState = Record<TaskId, boolean>;
 
 export type ExperienceState = {

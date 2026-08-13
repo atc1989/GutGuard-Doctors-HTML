@@ -5,11 +5,13 @@ import { ArrowRightIcon } from "@/components/Icons";
 import SectionLabel from "@/components/SectionLabel";
 import TaskItem from "@/components/TaskItem";
 import { LINKS, TASKS } from "@/lib/constants";
-import type { TaskId, TaskState } from "@/lib/types";
+import type { RegistrationEmailDelivery, TaskId, TaskState } from "@/lib/types";
 
 type VerificationSectionProps = {
   active: boolean;
   tasks: TaskState;
+  emailDelivery: RegistrationEmailDelivery;
+  onRetryEmail: () => void;
   onCompleteTask: (taskId: TaskId) => void;
   onContinue: () => void;
 };
@@ -17,6 +19,8 @@ type VerificationSectionProps = {
 export default function VerificationSection({
   active,
   tasks,
+  emailDelivery,
+  onRetryEmail,
   onCompleteTask,
   onContinue,
 }: VerificationSectionProps) {
@@ -37,6 +41,30 @@ export default function VerificationSection({
         Tap each row to open the right app. We mark each task complete the moment you
         return.
       </p>
+
+      {emailDelivery.status !== "idle" ? (
+        <div
+          className={`registration-email-status ${emailDelivery.status}`}
+          role={emailDelivery.status === "failed" ? "alert" : "status"}
+          aria-live="polite"
+        >
+          <strong>
+            {emailDelivery.status === "sending" && "Registration saved. Sending your email…"}
+            {emailDelivery.status === "sent" && "Registration email sent."}
+            {emailDelivery.status === "failed" && "Registration saved, but the email was not sent."}
+            {emailDelivery.status === "not-requested" && "Registration saved without an email."}
+          </strong>
+          <span>
+            {emailDelivery.status === "sending" && `We are delivering the onboarding documents to ${emailDelivery.email}.`}
+            {emailDelivery.status === "sent" && `The onboarding documents were sent to ${emailDelivery.email}.`}
+            {emailDelivery.status === "failed" && `Check ${emailDelivery.email}, then try sending the onboarding documents again.`}
+            {emailDelivery.status === "not-requested" && "No onboarding email was requested. You can continue with verification."}
+          </span>
+          {emailDelivery.status === "failed" ? (
+            <button type="button" onClick={onRetryEmail}>Try sending again</button>
+          ) : null}
+        </div>
+      ) : null}
 
       <ul className="tasks">
         {TASKS.map((task) => (

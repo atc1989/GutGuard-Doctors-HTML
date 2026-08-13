@@ -422,15 +422,29 @@ export async function registerDoctor(payload: RegistrationPayload) {
   };
 }
 
-export async function sendProposalEmail(registrationId: string) {
-  if (!isSupabaseConfigured || !supabase || registrationId.startsWith("local-")) return;
+type RegistrationEmailResponse = {
+  sent?: boolean;
+  skipped?: boolean;
+  reason?: string;
+  resendId?: string;
+};
 
-  const { error } = await supabase.functions.invoke("send-proposal", {
+export async function sendRegistrationEmail(registrationId: string) {
+  if (!isSupabaseConfigured || !supabase || registrationId.startsWith("local-")) {
+    throw new Error("Registration email is unavailable because Supabase is not configured.");
+  }
+
+  const { data, error } = await supabase.functions.invoke<RegistrationEmailResponse>("send-proposal", {
     body: { registrationId },
   });
 
   if (error) throw error;
+  if (!data?.sent) throw new Error(data?.reason || "The registration email was not sent.");
+  return data;
 }
+
+/** @deprecated Use sendRegistrationEmail. */
+export const sendProposalEmail = sendRegistrationEmail;
 
 export async function updateTask(doctorId: string | null | undefined, taskId: TaskId, value: boolean) {
   if (!doctorId || !isSupabaseConfigured || !supabase) return;
