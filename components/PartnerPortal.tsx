@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { QRCodeCanvas, QRCodeSVG } from "qrcode.react";
 import { LoaderCircle, X } from "lucide-react";
@@ -627,7 +626,7 @@ export function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignO
       </div> : null}
 
       <div className="partner-print" aria-hidden="true">
-        <Image src="/gutguard-logo.png" alt="" width={68} height={80} />
+        <Logo h={44} className="partner-poster-logo" />
         <strong>{posterTitle(qrMode)}</strong>
         <QRCodeSVG value={link} size={QR_RENDER_PX} level="M" marginSize={4} />
         <span>{dashboard.partner.full_name}</span>
@@ -649,7 +648,7 @@ function Stat({ label, value, note }: { label: string; value: string; note: stri
 
 function PosterContent({ mode, link, partnerName }: { mode: PartnerQrMode; link: string; partnerName: string }) {
   return <div className="partner-poster-preview" aria-label={`${posterTitle(mode)} poster preview`}>
-    <Image src="/gutguard-logo.png" alt="GutGuard" width={68} height={80} />
+    <Logo h={44} className="partner-poster-logo" />
     <strong>{posterTitle(mode)}</strong>
     <div className="partner-poster-qr"><QRCodeSVG value={link} size={QR_RENDER_PX} level="M" marginSize={4} style={{ width: "100%", height: "auto" }} /></div>
     <span>{partnerName}</span><small>{link}</small>
