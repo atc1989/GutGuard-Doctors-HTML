@@ -34,3 +34,10 @@ sed -n '/^-- ─── CHECKS/,$p' partner-dashboard.test.sql | $PSQL 2>&1 | gre
 # still parses even though the assertions only exercise public.
 sed -n '/^-- ─── Partner dashboard/,$p' shop-orders-sandbox.sql | $PSQL
 echo "sandbox mirror applied cleanly"
+
+cat migrations/20260813000000_partner_registration_referrals.sql | $PSQL
+cat migrations/20260813000100_partner_dashboard_referral_orders.sql | $PSQL
+cat migrations/20260813000200_partner_referral_email.sql | $PSQL
+cat migrations/20260813000300_sandbox_partner_dashboard_referral_orders.sql | $PSQL
+sed -n '/REFERRAL V2 CHECKS/,$p' partner-dashboard.test.sql | $PSQL
+echo "partner referral dashboard checks passed"

@@ -241,15 +241,37 @@ export type PartnerOrder = {
   buyer_first_name: string;
   city: string;
   province: string;
+  source_type: "direct" | "referred";
+  source_partner_name: string;
+  source_partner_slug: string;
+};
+
+export type ReferredPartner = {
+  full_name: string;
+  routing_slug: string;
+  specialty: string;
+  practice_location: string;
+  joined_at: string;
+  orders: number;
+  paid_order_value: number;
 };
 
 export type PartnerDashboard = {
   partner: { full_name: string; routing_slug: string; joined_at: string };
   clicks: { total: number; last_30_days: number };
   /** paid_amount is gross order value, not commission. */
-  totals: { orders: number; paid_orders: number; paid_amount: number };
+  totals: {
+    orders: number; paid_orders: number; paid_amount: number;
+    direct_orders: number; referred_orders: number; referred_partners: number;
+    direct_paid_amount: number; referred_paid_amount: number;
+  };
   orders: PartnerOrder[];
+  orders_page: { total: number; limit: number; offset: number; has_more: boolean };
+  referred_partners: ReferredPartner[];
 };
+
+export type PartnerOrderScope = "all" | "direct" | "referred";
+export type PartnerDashboardQuery = { scope?: PartnerOrderScope; status?: string; limit?: number; offset?: number; dateFrom?: string; dateTo?: string; sort?: "newest" | "oldest" };
 
 export type TikTokOrderTimeMode = "create_time" | "update_time";
 
@@ -406,6 +428,7 @@ export async function registerDoctor(payload: RegistrationPayload) {
       p_tiktok_username: payload.tiktokUsername,
       p_specialty: payload.specialty,
       p_practice_location: payload.location,
+      p_referrer_slug: payload.referrerSlug || null,
     });
 
     if (error) throw new Error(`Registration failed: ${error.message}`);
@@ -420,6 +443,21 @@ export async function registerDoctor(payload: RegistrationPayload) {
     id: `local-${Date.now()}`,
     ...payload,
   };
+}
+
+export async function getPartnerInvitation(slug: string): Promise<{ routing_slug: string; full_name: string } | null> {
+  if (!isSupabaseConfigured || !supabase) return null;
+  const { data, error } = await supabase.rpc("get_partner_invitation", { p_slug: slug });
+  if (error) return null;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row?.routing_slug) return null;
+  return { routing_slug: String(row.routing_slug), full_name: String(row.full_name ?? "") };
+}
+
+export async function sendPartnerReferralNotification(registrationId: string): Promise<void> {
+  if (!isSupabaseConfigured || !supabase || registrationId.startsWith("local-")) return;
+  const { error } = await supabase.functions.invoke("send-partner-referral-notification", { body: { registrationId } });
+  if (error) throw error;
 }
 
 type RegistrationEmailResponse = {
@@ -833,10 +871,18 @@ export async function hasPartnerSession(): Promise<boolean> {
   return true;
 }
 
-export async function getPartnerDashboard(): Promise<PartnerDashboard> {
+export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Promise<PartnerDashboard> {
   if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
 
-  const { data, error } = await supabaseShop.rpc("partner_dashboard");
+  const { data, error } = await supabaseShop.rpc("partner_dashboard", {
+    p_scope: query.scope ?? "all",
+    p_status: query.status || null,
+    p_limit: query.limit ?? 25,
+    p_offset: query.offset ?? 0,
+    p_date_from: query.dateFrom || null,
+    p_date_to: query.dateTo || null,
+    p_sort: query.sort ?? "newest",
+  });
   if (error) throw error;
 
   const row = (data ?? {}) as Record<string, unknown>;
@@ -858,6 +904,11 @@ export async function getPartnerDashboard(): Promise<PartnerDashboard> {
       orders: Number(totals.orders ?? 0),
       paid_orders: Number(totals.paid_orders ?? 0),
       paid_amount: Number(totals.paid_amount ?? 0),
+      direct_orders: Number(totals.direct_orders ?? 0),
+      referred_orders: Number(totals.referred_orders ?? 0),
+      referred_partners: Number(totals.referred_partners ?? 0),
+      direct_paid_amount: Number(totals.direct_paid_amount ?? 0),
+      referred_paid_amount: Number(totals.referred_paid_amount ?? 0),
     },
     orders: (Array.isArray(row.orders) ? row.orders : []).map((entry) => {
       const order = (entry ?? {}) as Record<string, unknown>;
@@ -870,6 +921,24 @@ export async function getPartnerDashboard(): Promise<PartnerDashboard> {
         buyer_first_name: String(order.buyer_first_name ?? ""),
         city: String(order.city ?? ""),
         province: String(order.province ?? ""),
+        source_type: order.source_type === "referred" ? "referred" : "direct",
+        source_partner_name: String(order.source_partner_name ?? ""),
+        source_partner_slug: String(order.source_partner_slug ?? ""),
+      };
+    }),
+    orders_page: {
+      total: Number(((row.orders_page ?? {}) as Record<string, unknown>).total ?? 0),
+      limit: Number(((row.orders_page ?? {}) as Record<string, unknown>).limit ?? 25),
+      offset: Number(((row.orders_page ?? {}) as Record<string, unknown>).offset ?? 0),
+      has_more: Boolean(((row.orders_page ?? {}) as Record<string, unknown>).has_more),
+    },
+    referred_partners: (Array.isArray(row.referred_partners) ? row.referred_partners : []).map((entry) => {
+      const partner = (entry ?? {}) as Record<string, unknown>;
+      return {
+        full_name: String(partner.full_name ?? ""), routing_slug: String(partner.routing_slug ?? ""),
+        specialty: String(partner.specialty ?? ""), practice_location: String(partner.practice_location ?? ""),
+        joined_at: String(partner.joined_at ?? ""), orders: Number(partner.orders ?? 0),
+        paid_order_value: Number(partner.paid_order_value ?? 0),
       };
     }),
   };
@@ -1086,12 +1155,17 @@ export async function enrollDoctorInSequence(doctorId: string): Promise<Sequence
   return data;
 }
 
-export async function resendSequenceStep(doctorId: string, stepNumber: number): Promise<void> {
+export async function resendSequenceStep(
+  doctorId: string,
+  stepNumber: number,
+): Promise<SequenceStepSendResponse> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-  const { error } = await supabase.functions.invoke("send-sequence-step", {
+  const { data, error } = await supabase.functions.invoke<SequenceStepSendResponse>("send-sequence-step", {
     body: { doctorId, stepNumber },
   });
   if (error) throw error;
+  if (!data?.sent) throw new Error(data?.reason || `Step ${stepNumber} was not sent.`);
+  return data;
 }
 
 // ─── Registration Email Settings ───────────────────────────────────────────
@@ -1131,6 +1205,33 @@ export async function sendRegistrationEmailTest(
     body: { action: "test", adminPassword, testEmail },
   });
 
+  if (error) throw error;
+  return data as RegistrationEmailTestResponse;
+}
+
+export async function getPartnerReferralEmailSettings(adminPassword: string): Promise<RegistrationEmailSettings> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
+    body: { action: "get", templateKind: "partner-referral", adminPassword },
+  });
+  if (error) throw error;
+  return (data as RegistrationEmailSettingsResponse).settings;
+}
+
+export async function savePartnerReferralEmailSettings(adminPassword: string, settings: RegistrationEmailSettings): Promise<RegistrationEmailSettings> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
+    body: { action: "save", templateKind: "partner-referral", adminPassword, settings },
+  });
+  if (error) throw error;
+  return (data as RegistrationEmailSettingsResponse).settings;
+}
+
+export async function sendPartnerReferralEmailTest(adminPassword: string, testEmail: string): Promise<RegistrationEmailTestResponse> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
+    body: { action: "test", templateKind: "partner-referral", adminPassword, testEmail },
+  });
   if (error) throw error;
   return data as RegistrationEmailTestResponse;
 }

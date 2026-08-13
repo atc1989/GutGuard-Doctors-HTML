@@ -190,3 +190,39 @@ begin
   raise notice 'ALL CHECKS PASSED';
 end;
 $$;
+
+-- REFERRAL V2 CHECKS
+do $$
+declare
+  v_ana uuid; v_child uuid; v_result jsonb;
+begin
+  select id into v_ana from public.doctor_registrations where routing_slug='dr-ana-reyes';
+  v_child := public.register_doctor('Dr Child Partner','child@clinic.ph','09170000000','childpartner','Pediatrics','Quezon City','dr-ana-reyes');
+  assert (select referred_by_partner_id from public.doctor_registrations where id=v_child)=v_ana, 'registration referrer was not persisted';
+  assert (select full_name from public.get_partner_invitation('DR-ANA-REYES '))='Dr Ana Reyes', 'invitation lookup failed';
+  begin
+    update public.doctor_registrations set referred_by_partner_id=null where id=v_child;
+    raise exception 'referral attribution must be immutable';
+  exception when check_violation then null;
+  end;
+  insert into public.shop_orders(order_code,payment_status,status,customer_name,first_name,city,province,total_amount,referral_doctor_id,created_at)
+  values ('GG-CHILD-1','paid','paid','Private Buyer','Private','Quezon City','NCR',1200,v_child,now()+interval '1 minute');
+  perform set_config('request.jwt.claims','{"email":"ana@clinic.ph"}',true);
+  v_result := public.partner_dashboard('all',null,25,0);
+  assert (v_result->'totals'->>'direct_orders')::int=2, 'direct total wrong';
+  assert (v_result->'totals'->>'referred_orders')::int=1, 'referred total wrong';
+  assert (v_result->'totals'->>'referred_partners')::int=1, 'referred partner total wrong';
+  assert jsonb_array_length(v_result->'referred_partners')=1, 'referred partner list wrong';
+  assert v_result->'orders'->0->>'source_type'='referred', 'order source missing';
+  assert not (v_result->'orders'->0 ? 'email'), 'buyer email leaked in v2';
+  v_result := public.partner_dashboard('referred','paid',1,0);
+  assert (v_result->'orders_page'->>'total')::int=1, 'scope/status total wrong';
+  assert (v_result->'orders_page'->>'has_more')::boolean=false, 'pagination flag wrong';
+  insert into sandbox.shop_orders(order_code,payment_status,status,customer_name,first_name,city,province,total_amount,referral_doctor_id)
+  values ('SB-CHILD-1','paid','paid','Sandbox Buyer','Sandbox','Cebu','Cebu',800,v_child);
+  v_result := sandbox.partner_dashboard('referred',null,25,0);
+  assert (v_result->'orders_page'->>'total')::int=1, 'sandbox referred total wrong';
+  assert v_result->'orders'->0->>'source_partner_name'='Dr Child Partner', 'sandbox source missing';
+  assert not has_function_privilege('anon','public.partner_dashboard(text,text,integer,integer,timestamptz,timestamptz,text)','execute'), 'anon v2 dashboard access';
+end;
+$$;

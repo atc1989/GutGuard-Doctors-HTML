@@ -6,7 +6,7 @@ import ProgressRail from "@/components/ProgressRail";
 import RegistrationSection from "@/sections/RegistrationSection";
 import VerificationSection from "@/sections/VerificationSection";
 import WheelSection from "@/sections/WheelSection";
-import { claimPrize, enrollDoctorInSequence, listWheelPrizes, updateTask } from "@/lib/api";
+import { claimPrize, enrollDoctorInSequence, getPartnerInvitation, listWheelPrizes, sendPartnerReferralNotification, updateTask } from "@/lib/api";
 import {
   clearExperienceState,
   INITIAL_STATE,
@@ -23,7 +23,7 @@ import type {
   WheelPrize,
 } from "@/lib/types";
 
-export default function RegistrationExperience() {
+export default function RegistrationExperience({ initialReferrerSlug = "", initialInvitationInvalid = false }: { initialReferrerSlug?: string; initialInvitationInvalid?: boolean }) {
   const [state, setState] = useState<ExperienceState>(INITIAL_STATE);
   const [screen, setScreen] = useState<Screen>(1);
   const [isHydrated, setIsHydrated] = useState(false);
@@ -32,6 +32,8 @@ export default function RegistrationExperience() {
   const [wheelLoading, setWheelLoading] = useState(false);
   const [wheelError, setWheelError] = useState<string | null>(null);
   const [emailDelivery, setEmailDelivery] = useState<RegistrationEmailDelivery>({ status: "idle" });
+  const [invitation, setInvitation] = useState<{ routing_slug: string; full_name: string } | null>(null);
+  const [invitationInvalid, setInvitationInvalid] = useState(initialInvitationInvalid);
 
   const dateLabel = useMemo(
     () => new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date()),
@@ -44,6 +46,15 @@ export default function RegistrationExperience() {
     setScreen(resolveScreen(saved));
     setIsHydrated(true);
   }, []);
+
+  useEffect(() => {
+    const slug = initialReferrerSlug.trim().toLowerCase();
+    if (!slug) return;
+    getPartnerInvitation(slug).then((value) => {
+      setInvitation(value);
+      setInvitationInvalid(!value);
+    });
+  }, [initialReferrerSlug]);
 
   useEffect(() => {
     if (isHydrated) saveExperienceState(state);
@@ -91,6 +102,11 @@ export default function RegistrationExperience() {
       window.alert("Registration saved, but email verification could not be recorded.");
     });
     void deliverRegistrationEmail(registration);
+    if (registration.referrerSlug) {
+      void sendPartnerReferralNotification(registration.id).catch((error) => {
+        console.error("Partner referral notification failed without affecting registration:", error);
+      });
+    }
     setScreen(2);
   }
 
@@ -156,6 +172,8 @@ export default function RegistrationExperience() {
         key={registrationResetKey}
         active={screen === 1}
         onRegistered={handleRegistered}
+        invitation={invitation}
+        invitationInvalid={invitationInvalid}
       />
       <VerificationSection
         active={screen === 2}

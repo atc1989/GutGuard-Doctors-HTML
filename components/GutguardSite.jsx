@@ -1119,10 +1119,10 @@ function Nav({ route, scrolled, open, setOpen, sheetRef, burgerRef }) {
             ))}
           </div>
           <div className="nav-actions">
-            <a className="nav-login" href="/partner" aria-label="Open the partner login page">Log in</a>
-            <a className="nav-cta" href="/shop">Choose Your Protocol <ArrowRight size={14} /></a>
+            <Link className="nav-login" href="/partner" aria-label="Open the partner login page">Log in</Link>
+            <Link className="nav-cta" href="/shop">Choose Your Protocol <ArrowRight size={14} /></Link>
           </div>
-          <a className="nav-shop-mobile" href="/shop">Shop</a>
+          <Link className="nav-shop-mobile" href="/shop">Shop</Link>
           <button ref={burgerRef} className="burger" aria-label="Open menu" aria-haspopup="dialog" aria-expanded={open} aria-controls="mobile-menu" onClick={() => setOpen(true)}>
             <Menu size={20} />
           </button>
@@ -1135,8 +1135,8 @@ function Nav({ route, scrolled, open, setOpen, sheetRef, burgerRef }) {
             <em>{String(i + 1).padStart(2, "0")}</em>{l}
           </a>
         ))}
-        <a className="nav-cta" href="/shop" onClick={() => setOpen(false)}>Choose Your Protocol <ArrowRight size={16} /></a>
-        <a className="sheet-login" href="/partner">Already a partner? Log in →</a>
+        <Link className="nav-cta" href="/shop" onClick={() => setOpen(false)}>Choose Your Protocol <ArrowRight size={16} /></Link>
+        <Link className="sheet-login" href="/partner">Already a partner? Log in →</Link>
       </div>
     </>
   );
@@ -1389,8 +1389,8 @@ function Home() {
             <h1>Your body’s silently aging toward disease. <em>Take back control.</em></h1>
             <p className="hero-lede">Chronic inflammation can build silently for years before symptoms. <strong>The 90-day protocol is designed to support gut and inflammatory balance.</strong> Routine blood markers at Day 30, 60 and 90 can show how your trajectory changes. <strong>Progress you can follow.</strong></p>
             <div className="hero-actions">
-              <a className="btn-primary" href="/shop" data-buyanchor>Start the 90-Day Protocol <Arrow /></a>
-              <a className="btn-ghost" href="/system"><span className="ring"><ArrowRight size={13} /></span>See how the scan works</a>
+              <Link className="btn-primary" href="/shop" data-buyanchor>Start the 90-Day Protocol <Arrow /></Link>
+              <Link className="btn-ghost" href="/system"><span className="ring"><ArrowRight size={13} /></span>See how the scan works</Link>
             </div>
             <ul className="hero-proof reveal" aria-label="Why this is credible">
               <li>FDA-registered formula</li>
@@ -1488,19 +1488,19 @@ function Home() {
             <span className="ic"><IconClinical size={22} /></span>
             <h3>Physicians</h3>
             <p>Explore the measured protocol and the Lead Clinical Adopter program.</p>
-            <a className="lnk" href="/physicians">Explore the physician program <ArrowRight size={15} /></a>
+            <Link className="lnk" href="/physicians">Explore the physician program <ArrowRight size={15} /></Link>
           </article>
           <article className="door">
             <span className="ic"><IconPeople size={22} /></span>
             <h3>Registered partners</h3>
             <p>Sign in securely to view your tracked links, clicks, and attributed orders.</p>
-            <a className="lnk" href="/partner">Open partner dashboard <ArrowRight size={15} /></a>
+            <Link className="lnk" href="/partner">Open partner dashboard <ArrowRight size={15} /></Link>
           </article>
           <article className="door">
             <span className="ic"><IconNetwork size={22} /></span>
             <h3>Start the protocol</h3>
             <p>Choose the protocol length or begin with one of the trial formats.</p>
-            <a className="lnk" href="/shop">Visit the GutGuard shop <ArrowRight size={15} /></a>
+            <Link className="lnk" href="/shop">Visit the GutGuard shop <ArrowRight size={15} /></Link>
           </article>
         </div>
       </div></section>
@@ -1556,7 +1556,7 @@ function Science() {
           <span className="eyebrow">The Science</span>
           <h1>The science, <em>in plain sight.</em></h1>
           <p className="hero-lede">No black box. Here is exactly how inflammation compounds into the way you feel — and how the right repair runs it in reverse.</p>
-          <div className="hero-actions"><a className="btn-primary" href="/shop">Start the 90-Day Protocol <Arrow /></a></div>
+          <div className="hero-actions"><Link className="btn-primary" href="/shop">Start the 90-Day Protocol <Arrow /></Link></div>
         </div></div>
       </header>
 
@@ -1573,7 +1573,7 @@ function Science() {
           <div className="teaser-body">
             <h3>The gut–inflammation pathway</h3>
             <p>See how gut-barrier disruption, inflammatory signalling, and mitochondrial stress connect—and how the BioScan, GLIS, and MiAge layers are intended to describe that trajectory.</p>
-            <a className="btn-ghost" href="/system"><span className="ring"><ArrowRight size={13} /></span>Explore the measurement system</a>
+            <Link className="btn-ghost" href="/system"><span className="ring"><ArrowRight size={13} /></span>Explore the measurement system</Link>
           </div>
         </div>
         <ol className="ref-list reveal" style={{ marginTop: 26 }}>
@@ -1617,7 +1617,7 @@ function Science() {
           <h2 className="sec">Belief needs <em>proof.</em> Proof needs a method.</h2>
           <p className="sec-body">Understanding the biology is only half of it. The other half is measuring it — repeatably, from routine lab markers, the same way every time.</p>
           <div className="hero-actions" style={{ marginTop: 24 }}>
-            <a className="btn-primary" href="/system">See the measurement system <Arrow /></a>
+            <Link className="btn-primary" href="/system">See the measurement system <Arrow /></Link>
           </div>
         </div>
       </div></section>
@@ -1650,7 +1650,7 @@ function Physicians() {
           <span className="eyebrow">For Physicians · Lead Clinical Adopters</span>
           <h1>Practice medicine at the <em>upstream.</em></h1>
           <p className="hero-lede">An invitation to the first 100 founding Filipino physicians treating mitochondrial dysfunction and inflammaging — with measurement, not guesswork.</p>
-          <div className="hero-actions"><a className="btn-primary" href="/physicians/register">Request the program brief <Arrow /></a></div>
+          <div className="hero-actions"><Link className="btn-primary" href="/physicians/register">Request the program brief <Arrow /></Link></div>
         </div></div>
       </header>
 
@@ -1721,8 +1721,8 @@ function System() {
           <h1>Three layers between a <em>sample</em> and an answer.</h1>
           <p className="hero-lede">No single number tells the whole story. Gutguard reads inflammation through a measured stack — a sample, a composite score, and a translation you can actually feel.</p>
           <div className="hero-actions">
-            <a className="btn-primary" href="/shop">Start the 90-Day Protocol <Arrow /></a>
-            <a className="btn-ghost" href="/physicians"><span className="ring"><ArrowRight size={13} /></span>For physicians</a>
+            <Link className="btn-primary" href="/shop">Start the 90-Day Protocol <Arrow /></Link>
+            <Link className="btn-ghost" href="/physicians"><span className="ring"><ArrowRight size={13} /></span>For physicians</Link>
           </div>
         </div></div>
       </header>
@@ -1947,7 +1947,7 @@ function BuyBar({ route }) {
           <span className="bb-amt">₱{GROW.price.toLocaleString("en-PH")}</span>
           <span className="bb-sub">₱{GROW.perCap} per capsule</span>
         </div>
-        <a className="btn-primary bb-cta" tabIndex={shown ? 0 : -1} href="/shop#flagship">Compare Protocols <Arrow /></a>
+        <Link className="btn-primary bb-cta" tabIndex={shown ? 0 : -1} href="/shop#flagship">Compare Protocols <Arrow /></Link>
       </div>
     </nav>
   );
