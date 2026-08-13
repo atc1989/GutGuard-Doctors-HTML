@@ -550,7 +550,7 @@ export function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignO
 
           <div className="partner-order-toolbar">
             <div className="partner-order-tabs" role="tablist" aria-label="Order attribution">
-              {([['all', `All ${dashboard.totals.orders}`], ['direct', `Direct ${dashboard.totals.direct_orders}`], ['referred', `From referred partners ${dashboard.totals.referred_orders}`]] as const).map(([value, label]) => (
+              {([['all', `All ${dashboard.totals.orders}`], ['direct', `Direct ${dashboard.totals.direct_orders}`], ['referred', `Referred ${dashboard.totals.referred_orders}`]] as const).map(([value, label]) => (
                 <button key={value} type="button" role="tab" aria-selected={orderScope === value}
                   className={orderScope === value ? "active" : ""}
                   onClick={() => { setOrderScope(value); setOrderOffset(0); }}>{label}</button>

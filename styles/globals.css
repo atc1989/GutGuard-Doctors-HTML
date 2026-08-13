@@ -4519,8 +4519,10 @@
 }
 
 .partner-qr-toggle {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: inline-flex;
+  justify-self: start;
+  max-width: 100%;
+  overflow-x: auto;
   gap: 4px;
   border: 1px solid var(--rule);
   border-radius: var(--r-md);
@@ -4540,6 +4542,8 @@
   cursor: pointer;
   min-height: 46px;
   align-content: center;
+  flex: 0 0 auto;
+  min-width: 112px;
 }
 
 .partner-qr-toggle button.active {
@@ -4584,7 +4588,6 @@
 
 @media (max-width: 480px) {
   .partner-qr-toggle {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 3px;
     padding: 3px;
   }
@@ -4630,8 +4633,8 @@
 }
 
 .partner-performance-detail { margin: 12px 0 0; color: var(--ink-3); font-size: 12px; font-weight: 700; }
-.partner-activity-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 24px; padding: 4px; border: 1px solid var(--rule); border-radius: var(--r-md); background: var(--bone); }
-.partner-activity-tabs button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border: 0; border-radius: calc(var(--r-md) - 4px); background: transparent; color: var(--ink-3); font-weight: 900; cursor: pointer; }
+.partner-activity-tabs { display: inline-flex; justify-self: start; max-width: 100%; overflow-x: auto; gap: 4px; margin-bottom: 24px; padding: 4px; border: 1px solid var(--rule); border-radius: var(--r-md); background: var(--bone); }
+.partner-activity-tabs button { display: flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border: 0; border-radius: calc(var(--r-md) - 4px); background: transparent; padding: 10px 18px; color: var(--ink-3); font-weight: 900; white-space: nowrap; cursor: pointer; }
 .partner-activity-tabs button span { display: grid; place-items: center; min-width: 24px; height: 24px; border-radius: 999px; background: rgba(15,15,24,.08); padding: 0 7px; font-size: 11px; }
 .partner-activity-tabs button.active { background: var(--blue); color: #fff; }
 .partner-activity-tabs button.active span { background: rgba(255,255,255,.2); }
