@@ -1069,12 +1069,21 @@ export async function getSequenceProgress(
   return data as { progress: SequenceProgress[]; totalSteps: number };
 }
 
-export async function enrollDoctorInSequence(doctorId: string): Promise<void> {
+type SequenceStepSendResponse = {
+  sent?: boolean;
+  reason?: string;
+  sendId?: string;
+  step?: number;
+};
+
+export async function enrollDoctorInSequence(doctorId: string): Promise<SequenceStepSendResponse> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-  const { error } = await supabase.functions.invoke("send-sequence-step", {
+  const { data, error } = await supabase.functions.invoke<SequenceStepSendResponse>("send-sequence-step", {
     body: { doctorId, stepNumber: 1 },
   });
   if (error) throw error;
+  if (!data?.sent) throw new Error(data?.reason || "Drip Campaign Step 1 was not sent.");
+  return data;
 }
 
 export async function resendSequenceStep(doctorId: string, stepNumber: number): Promise<void> {

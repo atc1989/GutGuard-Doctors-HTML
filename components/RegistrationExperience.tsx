@@ -6,7 +6,7 @@ import ProgressRail from "@/components/ProgressRail";
 import RegistrationSection from "@/sections/RegistrationSection";
 import VerificationSection from "@/sections/VerificationSection";
 import WheelSection from "@/sections/WheelSection";
-import { claimPrize, listWheelPrizes, sendRegistrationEmail, updateTask } from "@/lib/api";
+import { claimPrize, enrollDoctorInSequence, listWheelPrizes, updateTask } from "@/lib/api";
 import {
   clearExperienceState,
   INITIAL_STATE,
@@ -103,7 +103,7 @@ export default function RegistrationExperience() {
 
     setEmailDelivery({ status: "sending", email });
     try {
-      await sendRegistrationEmail(registration.id);
+      await enrollDoctorInSequence(registration.id);
       setEmailDelivery({ status: "sent", email });
     } catch (error) {
       console.error("Registration email delivery failed:", error);

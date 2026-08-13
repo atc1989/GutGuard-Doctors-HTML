@@ -49,19 +49,19 @@ export default function VerificationSection({
           aria-live="polite"
         >
           <strong>
-            {emailDelivery.status === "sending" && "Registration saved. Sending your email…"}
-            {emailDelivery.status === "sent" && "Registration email sent."}
-            {emailDelivery.status === "failed" && "Registration saved, but the email was not sent."}
+            {emailDelivery.status === "sending" && "Registration saved. Sending Step 1…"}
+            {emailDelivery.status === "sent" && "Drip Campaign Step 1 sent."}
+            {emailDelivery.status === "failed" && "Registration saved, but Step 1 was not sent."}
             {emailDelivery.status === "not-requested" && "Registration saved without an email."}
           </strong>
           <span>
-            {emailDelivery.status === "sending" && `We are delivering the onboarding documents to ${emailDelivery.email}.`}
-            {emailDelivery.status === "sent" && `The onboarding documents were sent to ${emailDelivery.email}.`}
-            {emailDelivery.status === "failed" && `Check ${emailDelivery.email}, then try sending the onboarding documents again.`}
+            {emailDelivery.status === "sending" && `We are delivering the first sequence email to ${emailDelivery.email}.`}
+            {emailDelivery.status === "sent" && `The first sequence email was sent to ${emailDelivery.email}.`}
+            {emailDelivery.status === "failed" && `Check ${emailDelivery.email}, then try sending Step 1 again.`}
             {emailDelivery.status === "not-requested" && "No onboarding email was requested. You can continue with verification."}
           </span>
           {emailDelivery.status === "failed" ? (
-            <button type="button" onClick={onRetryEmail}>Try sending again</button>
+            <button type="button" onClick={onRetryEmail}>Try sending Step 1 again</button>
           ) : null}
         </div>
       ) : null}
