@@ -42,27 +42,19 @@ export default function VerificationSection({
         return.
       </p>
 
-      {emailDelivery.status !== "idle" ? (
+      {emailDelivery.status === "failed" ? (
         <div
           className={`registration-email-status ${emailDelivery.status}`}
-          role={emailDelivery.status === "failed" ? "alert" : "status"}
+          role="alert"
           aria-live="polite"
         >
           <strong>
-            {emailDelivery.status === "sending" && "Registration saved. Sending Step 1…"}
-            {emailDelivery.status === "sent" && "Drip Campaign Step 1 sent."}
-            {emailDelivery.status === "failed" && "Registration saved, but Step 1 was not sent."}
-            {emailDelivery.status === "not-requested" && "Registration saved without an email."}
+            Registration saved, but Step 1 was not sent.
           </strong>
           <span>
-            {emailDelivery.status === "sending" && `We are delivering the first sequence email to ${emailDelivery.email}.`}
-            {emailDelivery.status === "sent" && `The first sequence email was sent to ${emailDelivery.email}.`}
-            {emailDelivery.status === "failed" && `Check ${emailDelivery.email}, then try sending Step 1 again.`}
-            {emailDelivery.status === "not-requested" && "No onboarding email was requested. You can continue with verification."}
+            Check {emailDelivery.email}, then try sending Step 1 again.
           </span>
-          {emailDelivery.status === "failed" ? (
-            <button type="button" onClick={onRetryEmail}>Try sending Step 1 again</button>
-          ) : null}
+          <button type="button" onClick={onRetryEmail}>Try sending Step 1 again</button>
         </div>
       ) : null}
 

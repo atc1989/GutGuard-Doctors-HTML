@@ -152,7 +152,10 @@ type WheelApi = {
   deleteSequenceStep?: (adminPassword: string, stepId: string) => Promise<void>;
   reorderSequenceSteps?: (adminPassword: string, stepIds: string[]) => Promise<void>;
   getSequenceProgress?: (adminPassword: string) => Promise<{ progress: SequenceProgress[]; totalSteps: number }>;
-  resendSequenceStep?: (doctorId: string, stepNumber: number) => Promise<void>;
+  resendSequenceStep?: (
+    doctorId: string,
+    stepNumber: number,
+  ) => Promise<{ sent?: boolean; reason?: string; sendId?: string; step?: number }>;
 };
 
 type SequenceAttachment = {
@@ -3075,7 +3078,7 @@ export default function AdminWheelPage() {
               title="Step preview"
               style={{ flex: 1, border: "none", minHeight: 500 }}
               srcDoc={previewStep.html_body
-                .replace(/\{\{\s*doctor_name\s*\}\}/g, "Dr. Sample Doctor")
+                .replace(/\{\{\s*doctor_name\s*\}\}/g, "Sample Doctor")
                 .replace(/\{\{\s*doctor_email\s*\}\}/g, "doctor@clinic.com")
                 .replace(/\{\{\s*doctor_mobile\s*\}\}/g, "09171234567")
                 .replace(/\{\{\s*tiktok_username\s*\}\}/g, "gutguardph")
