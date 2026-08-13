@@ -4658,8 +4658,8 @@
 .partner-referred-row > span:not(:first-child) { text-align: right; }
 .partner-referred-row small { color: var(--ink-3); font-size: 11px; font-weight: 700; }
 
-.partner-poster-modal { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; overflow: auto; background: rgba(15,15,24,.72); padding: 24px; }
-.partner-poster-dialog { width: min(100%, 720px); border-radius: var(--r-lg); background: var(--paper); padding: 22px; box-shadow: 0 24px 70px rgba(0,0,0,.25); }
+.partner-poster-modal { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; overflow: auto; background: rgba(15,15,24,.82); padding: 24px; }
+.partner-poster-dialog { isolation: isolate; width: min(100%, 720px); border: 1px solid #d9d4c9; border-radius: var(--r-lg); background: #f4f1ea; opacity: 1; padding: 22px; box-shadow: 0 24px 70px rgba(0,0,0,.4); }
 .partner-poster-header, .partner-poster-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .partner-poster-header h2 { margin: 0; }
 .partner-poster-close { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--rule); border-radius: 50%; background: transparent; cursor: pointer; }
