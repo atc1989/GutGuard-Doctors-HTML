@@ -352,7 +352,7 @@ export function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignO
   const linkRef = useRef<HTMLParagraphElement>(null);
   const posterDialogRef = useRef<HTMLDivElement>(null);
   const posterTriggerRef = useRef<HTMLButtonElement>(null);
-  const lastOrderQueryRef = useRef("all||||newest|25|0");
+  const lastOrderQueryRef = useRef("");
   const [copied, setCopied] = useState(false);
   const [qrMode, setQrMode] = useState<PartnerQrMode>("shop");
   const [dashboard, setDashboard] = useState(data);
@@ -363,7 +363,7 @@ export function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignO
   const [orderDateTo, setOrderDateTo] = useState("");
   const [orderSort, setOrderSort] = useState<"newest" | "oldest">("newest");
   const [orderOffset, setOrderOffset] = useState(0);
-  const [orderPageSize, setOrderPageSize] = useState(25);
+  const [orderPageSize, setOrderPageSize] = useState(10);
   const [partnerOffset, setPartnerOffset] = useState(0);
   const [partnerPageSize, setPartnerPageSize] = useState(10);
   const [ordersBusy, setOrdersBusy] = useState(false);
