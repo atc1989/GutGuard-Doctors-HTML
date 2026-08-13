@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type CSSProperties } from "react";
+import Link from "next/link";
 import ActionButton from "@/components/ActionButton";
 import { ArrowRightIcon, SpinIcon } from "@/components/Icons";
 import SectionLabel from "@/components/SectionLabel";
@@ -184,14 +185,18 @@ export default function WheelSection({
           disabled={!canSpin}
         />
       ) : (
-        <ActionButton
-          type="button"
-          className="reveal-reset-action"
-          main="Back to Registration"
-          sub="Start another doctor"
-          icon={<ArrowRightIcon />}
-          onClick={onBackToRegistration}
-        />
+        <div className="wheel-completion-actions">
+          <Link className="action wheel-dashboard-action" href="/partner">
+            <span className="action-label">
+              <span className="action-label-main">Visit your dashboard</span>
+              <span className="action-label-sub">Sign in with your registered email</span>
+            </span>
+            <span className="action-arrow" aria-hidden="true"><ArrowRightIcon /></span>
+          </Link>
+          <button type="button" className="wheel-register-another" onClick={onBackToRegistration}>
+            Register another doctor
+          </button>
+        </div>
       )}
     </section>
   );

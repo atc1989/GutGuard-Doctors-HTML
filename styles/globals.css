@@ -771,6 +771,43 @@
     .action-spin:hover:not(:disabled) { background: var(--blue-press); }
     .action-spin:disabled { background: var(--bone-soft); }
 
+    .wheel-completion-actions {
+      display: grid;
+      gap: 10px;
+      margin-top: 40px;
+    }
+    .wheel-completion-actions .action {
+      margin-top: 0;
+      text-decoration: none;
+    }
+    .wheel-dashboard-action {
+      background: var(--blue);
+    }
+    .wheel-dashboard-action:hover {
+      background: var(--blue-press);
+    }
+    .wheel-dashboard-action:focus-visible,
+    .wheel-register-another:focus-visible {
+      outline: 3px solid var(--gold);
+      outline-offset: 3px;
+    }
+    .wheel-register-another {
+      min-height: 44px;
+      border: 0;
+      background: transparent;
+      padding: 10px 12px;
+      color: var(--ink-3);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      cursor: pointer;
+    }
+    .wheel-register-another:hover {
+      color: var(--blue);
+    }
+
     
     .reveal-stage {
       padding-top: 8px;
