@@ -4618,6 +4618,10 @@
   padding-bottom: clamp(24px, 4vw, 48px);
 }
 
+.shop-order-panel .partner-dashboard-intro {
+  max-width: 82ch;
+}
+
 .partner-dashboard-shell > .shop-order-panel,
 .partner-dashboard-grid {
   max-width: 1080px;

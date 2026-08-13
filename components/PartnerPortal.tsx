@@ -445,7 +445,7 @@ export function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignO
       <section className="shop-order-panel">
         <p className="shop-kicker">Partner dashboard</p>
         <h1>{dashboard.partner.full_name}</h1>
-        <p className="shop-lede">
+        <p className="shop-lede partner-dashboard-intro">
           Track orders placed through your shop link and through partners you referred.
         </p>
 
