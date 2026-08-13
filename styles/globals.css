@@ -4664,6 +4664,8 @@
 .partner-poster-header h2 { margin: 0; }
 .partner-poster-close { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--rule); border-radius: 50%; background: transparent; cursor: pointer; }
 .partner-poster-preview { display: grid; justify-items: center; gap: 14px; width: min(100%, 520px); margin: 18px auto; border: 1px solid var(--rule); background: #fff; padding: 34px 28px; text-align: center; }
+.partner-poster-logo { display: flex; justify-content: center; width: min(72%, 280px); }
+.partner-poster-logo img { width: 100% !important; height: auto !important; object-fit: contain; }
 .partner-poster-preview > strong { font-family: var(--serif, Georgia, serif); font-size: clamp(24px, 4vw, 34px); font-weight: 400; }
 .partner-poster-preview > span { font-size: 18px; font-weight: 900; }
 .partner-poster-preview > small { max-width: 100%; overflow-wrap: anywhere; color: var(--ink-3); }

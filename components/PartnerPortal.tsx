@@ -626,7 +626,7 @@ export function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignO
       </div> : null}
 
       <div className="partner-print" aria-hidden="true">
-        <Logo h={44} className="partner-poster-logo" />
+        <PosterLogo />
         <strong>{posterTitle(qrMode)}</strong>
         <QRCodeSVG value={link} size={QR_RENDER_PX} level="M" marginSize={4} />
         <span>{dashboard.partner.full_name}</span>
@@ -648,11 +648,15 @@ function Stat({ label, value, note }: { label: string; value: string; note: stri
 
 function PosterContent({ mode, link, partnerName }: { mode: PartnerQrMode; link: string; partnerName: string }) {
   return <div className="partner-poster-preview" aria-label={`${posterTitle(mode)} poster preview`}>
-    <Logo h={44} className="partner-poster-logo" />
+    <PosterLogo />
     <strong>{posterTitle(mode)}</strong>
     <div className="partner-poster-qr"><QRCodeSVG value={link} size={QR_RENDER_PX} level="M" marginSize={4} style={{ width: "100%", height: "auto" }} /></div>
     <span>{partnerName}</span><small>{link}</small>
   </div>;
+}
+
+function PosterLogo() {
+  return <div className="partner-poster-logo"><Logo h={44} /></div>;
 }
 
 function posterTitle(mode: PartnerQrMode) {
