@@ -4649,6 +4649,8 @@
 .partner-pagination { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
 .partner-pagination .shop-secondary { min-height: 40px; width: auto; margin: 0; padding: 8px 14px; }
 .partner-pagination span { color: var(--ink-3); font-size: 12px; font-weight: 700; }
+.partner-pagination-size { display: flex; align-items: center; gap: 7px; color: var(--ink-3); font-size: 12px; font-weight: 800; }
+.partner-pagination-size select { min-height: 40px; border: 1px solid var(--rule); border-radius: var(--r-md); background: var(--paper); padding: 7px 30px 7px 10px; color: var(--ink); }
 .partner-referred-panel { max-width: 1080px !important; }
 .partner-referred-list { display: grid; border-top: 1px solid var(--rule); }
 .partner-referred-row { display: grid; grid-template-columns: minmax(0,1fr) auto auto; align-items: center; gap: 28px; width: 100%; border: 0; border-bottom: 1px solid var(--rule); background: transparent; padding: 14px 0; color: var(--ink); text-align: left; cursor: pointer; }
