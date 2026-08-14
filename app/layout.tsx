@@ -1,20 +1,31 @@
 import type { Metadata, Viewport } from "next";
 import "@/styles/globals.css";
 
-const marketingUrl = process.env.NEXT_PUBLIC_MARKETING_URL ?? "https://gutguard.ph";
-
 export const metadata: Metadata = {
-  metadataBase: new URL(marketingUrl),
+  metadataBase: new URL("https://gutguard.ph"),
   title: {
-    default: "GutGuard | Measure your inflammation. Change your trajectory.",
-    template: "%s | GutGuard",
+    default: "Gutguard | The Measured 90-Day Protocol for Healthy Aging",
+    template: "%s | Gutguard",
   },
-  description: "The measured 90-day protocol for gut health, inflammation and healthy aging.",
+  description:
+    "The measured 90-day protocol for gut health, inflammation, and healthy aging. " +
+    "SynBIOTIC+ plus BioScan blood tracking at Day 30, 60, and 90. " +
+    "FDA-registered. 19 branches nationwide.",
   openGraph: {
+    title: "Gutguard | The Measured 90-Day Protocol for Healthy Aging",
+    description:
+      "The measured 90-day protocol for gut health, inflammation, and healthy aging. " +
+      "SynBIOTIC+ plus BioScan blood tracking at Day 30, 60, and 90.",
+    url: "https://gutguard.ph",
+    siteName: "Gutguard",
     type: "website",
-    siteName: "GutGuard",
-    title: "GutGuard | Measure your inflammation. Change your trajectory.",
-    description: "The measured 90-day protocol for gut health, inflammation and healthy aging.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Gutguard | The Measured 90-Day Protocol for Healthy Aging",
+    description:
+      "The measured 90-day protocol for gut health, inflammation, and healthy aging. " +
+      "Tracked at Day 30, 60, and 90.",
   },
 };
 
