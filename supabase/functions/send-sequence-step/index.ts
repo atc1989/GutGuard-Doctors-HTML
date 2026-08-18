@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.106.2";
+import { doctorsDbSchema } from "../_shared/schemas.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -63,7 +64,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Missing Edge Function secrets" }, 500);
     }
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const supabase = createClient(supabaseUrl, serviceRoleKey, { db: { schema: doctorsDbSchema() } });
 
     // Fetch doctor
     const { data: doctorData, error: doctorError } = await supabase

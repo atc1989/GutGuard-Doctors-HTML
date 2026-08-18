@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.106.2";
+import { doctorsDbSchema } from "../_shared/schemas.ts";
 
 const BUCKET = "registration-email-assets";
 const MAX_ATTACHMENTS = 5;
@@ -64,7 +65,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Missing Supabase Edge Function secrets" }, 500);
     }
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const supabase = createClient(supabaseUrl, serviceRoleKey, { db: { schema: doctorsDbSchema() } });
     const { error: adminError } = await supabase.rpc("assert_wheel_admin", {
       p_admin_password: adminPassword,
     });

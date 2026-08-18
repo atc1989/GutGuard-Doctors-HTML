@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.106.2";
+import { shopDbSchema } from "../_shared/schemas.ts";
 
 const PROD_SITE_URL = (Deno.env.get("SHOP_SITE_URL") ?? "https://gutguard.ph").replace(/\/$/, "");
 const SANDBOX_SITE_URL = (Deno.env.get("SHOP_SANDBOX_SITE_URL") ?? PROD_SITE_URL).replace(/\/$/, "");
@@ -15,7 +16,7 @@ type EmailKind = "saved" | "paid";
 type RequestPayload = {
   orderId?: string;
   kind?: EmailKind;
-  /** Which Postgres schema holds the order. "sandbox" for the mirrored system. */
+  /** Which Postgres schema holds the order: public, doctors, or sandbox. */
   schema?: string;
 };
 
@@ -43,9 +44,9 @@ Deno.serve(async (req) => {
 
   try {
     const { orderId, kind = "saved", schema } = (await req.json()) as RequestPayload;
-    // Only 'public' and 'sandbox' are valid; anything else is ignored so a caller
-    // cannot point this at an arbitrary schema.
-    const dbSchema = schema === "sandbox" ? "sandbox" : "public";
+    // Only public / doctors / sandbox are valid; anything else falls back to public
+    // so a caller cannot point this at an arbitrary schema.
+    const dbSchema = shopDbSchema(schema);
     if (!orderId) return jsonResponse({ error: "Missing orderId" }, 400);
 
     const resendApiKey = Deno.env.get("RESEND_API_KEY");

@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.106.2";
+import { doctorsDbSchema } from "../_shared/schemas.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,7 +24,7 @@ Deno.serve(async (req) => {
     return htmlResponse("<h2>Server error.</h2>", 500);
   }
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const supabase = createClient(supabaseUrl, serviceRoleKey, { db: { schema: doctorsDbSchema() } });
 
   // Fetch the send record
   const { data: sendRecord, error: sendError } = await supabase

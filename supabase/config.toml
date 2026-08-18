@@ -1,0 +1,22 @@
+# Linked by default to GutGuard Doctors (fxdsnacuonfvutdquogb), which is still
+# live production and will become staging after the Lifestyle cutover.
+# These remotes are independent Free-plan projects, not Supabase preview branches
+# (branching requires Pro).
+project_id = "fxdsnacuonfvutdquogb"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public", "doctors", "gema", "sandbox"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 17
+
+[remotes.production]
+project_id = "rvwseybgimmewuoccecu"
+
+[remotes.staging]
+project_id = "fxdsnacuonfvutdquogb"

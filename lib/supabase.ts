@@ -1,20 +1,20 @@
 import { createClient } from "@supabase/supabase-js";
+import { DOCTORS_SCHEMA, SHOP_SCHEMA, isSandboxShop } from "@/lib/db-schemas";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+export { DOCTORS_SCHEMA, SHOP_SCHEMA, isSandboxShop };
 
 /**
- * Which Postgres schema holds the shop tables. Production uses `public`; the sandbox
- * mirror at sandbox.gutguard.ph sets this to `sandbox`, so the two run identical code
- * against separate data without duplicating a single function name.
+ * Default client — doctors, wheel, registration RPCs.
+ * GutGuard Doctors (current live) keeps these in `public`.
+ * GutGuard Life Style (intended production) keeps them in `doctors`.
  */
-export const SHOP_SCHEMA = process.env.NEXT_PUBLIC_SHOP_DB_SCHEMA || "public";
-export const isSandboxShop = SHOP_SCHEMA !== "public";
-
-/** Default client - doctors, wheel, registration. Always `public`, shared by both. */
-export const supabase = isSupabaseConfigured ? createClient(supabaseUrl!, supabaseAnonKey!) : null;
+export const supabase = isSupabaseConfigured
+  ? createClient(supabaseUrl!, supabaseAnonKey!, { db: { schema: DOCTORS_SCHEMA } })
+  : null;
 
 /**
  * Shop client, scoped to SHOP_SCHEMA. Deliberately separate from `supabase` above:
