@@ -83,7 +83,7 @@ export async function applyPaymentToOrder(
   if (!wasPaid && next.paymentStatus === "paid") {
     await supabase.functions
       .invoke("send-shop-order-email", {
-        body: { orderId: order.id, kind: "paid", schema: process.env.NEXT_PUBLIC_SHOP_DB_SCHEMA || "public" },
+        body: { orderId: order.id, kind: "paid", schema: process.env.NEXT_PUBLIC_SHOP_DB_SCHEMA || "doctors" },
       })
       .catch(() => undefined);
   }

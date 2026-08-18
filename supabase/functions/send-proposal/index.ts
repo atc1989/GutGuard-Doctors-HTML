@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Missing Edge Function secrets" }, 500);
     }
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const supabase = createClient(supabaseUrl, serviceRoleKey, { db: { schema: "doctors" } });
     const { data: registration, error: registrationError } = await supabase
       .from("doctor_registrations")
       .select(

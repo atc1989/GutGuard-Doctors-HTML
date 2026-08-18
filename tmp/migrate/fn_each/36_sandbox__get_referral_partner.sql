@@ -1,0 +1,11 @@
+CREATE OR REPLACE FUNCTION sandbox.get_referral_partner(p_slug text)
+ RETURNS text
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'sandbox', 'doctors', 'public'
+AS $function$
+  select routing_slug
+  from doctors.doctor_registrations
+  where routing_slug = lower(trim(p_slug))
+  limit 1;
+$function$;
