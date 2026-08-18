@@ -104,8 +104,11 @@ export default function RegistrationSection({
     } catch (error) {
       setSubmitting(false);
       const message = error instanceof Error ? error.message : "";
-      if (message.toLowerCase().includes("tiktok")) {
+      const lower = message.toLowerCase();
+      if (lower.includes("duplicate") && lower.includes("tiktok")) {
         setSubmitError("This TikTok username has already been registered. Please check the handle and try again.");
+      } else if (lower.includes("duplicate") && lower.includes("email")) {
+        setSubmitError("This email has already been registered. Please check the address and try again.");
       } else {
         setSubmitError("Registration failed. Please try again or ask the booth coordinator.");
       }

@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (!supabaseUrl || !serviceRoleKey) return jsonResponse({ error: "Missing Edge Function secrets" }, 500);
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const supabase = createClient(supabaseUrl, serviceRoleKey, { db: { schema: "doctors" } });
 
     // Validate admin password
     const { error: authError } = await supabase.rpc("assert_wheel_admin", { p_admin_password: adminPassword });
