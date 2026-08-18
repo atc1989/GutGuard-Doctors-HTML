@@ -765,14 +765,21 @@ export async function getPublicShopOrder(orderCode: string): Promise<PublicShopO
  * form cannot be used to test whether an address is a registered partner.
  *
  * Requires {{ .Token }} in the Supabase "Magic Link" email template, or the mail arrives
- * with a link and no code to type.
+ * with a link and no code to type. emailRedirectTo must be on the project's URI allow
+ * list; without it GoTrue uses Site URL (currently the Gema /my-account host).
  */
+function partnerAuthRedirectTo() {
+  if (typeof window !== "undefined") return `${window.location.origin}/partner`;
+  const site = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://partners.gutguard.ph").replace(/\/$/, "");
+  return `${site}/partner`;
+}
+
 export async function sendPartnerOtp(email: string): Promise<void> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
 
   const { error } = await supabase.auth.signInWithOtp({
     email: email.trim().toLowerCase(),
-    options: { shouldCreateUser: true },
+    options: { shouldCreateUser: true, emailRedirectTo: partnerAuthRedirectTo() },
   });
 
   if (error) throw error;

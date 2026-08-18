@@ -31,7 +31,7 @@ const peso = (value: number) =>
 type View = "checking" | "email" | "code" | "signing-in" | "dashboard";
 type AuthError = { field: "email" | "code" | "form"; message: string; expired?: boolean } | null;
 
-const RESEND_COOLDOWN_SECONDS = 30;
+const RESEND_COOLDOWN_SECONDS = 60;
 
 export default function PartnerPortal() {
   const [view, setView] = useState<View>("checking");
@@ -593,16 +593,28 @@ function getVerificationError(error: unknown): NonNullable<AuthError> {
 
 function getSendError(error: unknown): NonNullable<AuthError> {
   const message = error instanceof Error ? error.message.toLowerCase() : "";
-  if (message.includes("rate") || message.includes("too many") || message.includes("429")) {
-    return { field: "form", message: "Too many sign-in requests. Wait a moment and try again." };
+  if (
+    message.includes("rate") ||
+    message.includes("too many") ||
+    message.includes("429") ||
+    message.includes("security purposes") ||
+    /after \d+ seconds/.test(message)
+  ) {
+    return { field: "form", message: "Too many sign-in requests. Wait a minute and try again." };
   }
   return { field: "form", message: "We couldn’t send a code. Check your connection and try again." };
 }
 
 function getResendError(error: unknown): NonNullable<AuthError> {
   const message = error instanceof Error ? error.message.toLowerCase() : "";
-  if (message.includes("rate") || message.includes("too many") || message.includes("429")) {
-    return { field: "code", message: "A new code can’t be sent yet. Wait a moment and try again." };
+  if (
+    message.includes("rate") ||
+    message.includes("too many") ||
+    message.includes("429") ||
+    message.includes("security purposes") ||
+    /after \d+ seconds/.test(message)
+  ) {
+    return { field: "code", message: "A new code can’t be sent yet. Wait a minute and try again." };
   }
   return { field: "code", message: "We couldn’t resend the code. Check your connection and try again." };
 }
