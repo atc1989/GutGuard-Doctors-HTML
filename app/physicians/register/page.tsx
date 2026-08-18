@@ -5,6 +5,14 @@ export const metadata = {
   description: "Register for the Gutguard physician and clinical adopter program.",
 };
 
-export default function PhysicianRegistrationPage() {
-  return <RegistrationExperience />;
+type PhysicianRegistrationPageProps = {
+  searchParams: Promise<{ ref?: string | string[] }>;
+};
+
+export default async function PhysicianRegistrationPage({ searchParams }: PhysicianRegistrationPageProps) {
+  const params = await searchParams;
+  const raw = params.ref;
+  const referrerSlug = (Array.isArray(raw) ? raw[0] : raw)?.trim().toLowerCase() ?? "";
+
+  return <RegistrationExperience referrerSlug={referrerSlug} />;
 }

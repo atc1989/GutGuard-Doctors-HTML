@@ -19,6 +19,7 @@ import type { Registration, RegistrationPayload } from "@/lib/types";
 
 type RegistrationSectionProps = {
   active: boolean;
+  invitedBy?: { slug: string; fullName: string } | null;
   onRegistered: (registration: Registration) => void;
 };
 
@@ -34,6 +35,7 @@ const INITIAL_VALUES: FormValues = {
 
 export default function RegistrationSection({
   active,
+  invitedBy,
   onRegistered,
 }: RegistrationSectionProps) {
   const [values, setValues] = useState<FormValues>(INITIAL_VALUES);
@@ -75,6 +77,7 @@ export default function RegistrationSection({
           ? values.otherSpecialty.trim()
           : values.specialty.trim(),
       location: values.location.trim(),
+      referrerSlug: invitedBy?.slug,
     };
   }
 
@@ -109,7 +112,8 @@ export default function RegistrationSection({
         setSubmitError("This TikTok username has already been registered. Please check the handle and try again.");
       } else if (lower.includes("duplicate") && lower.includes("email")) {
         setSubmitError("This email has already been registered. Please check the address and try again.");
-      } else {
+      } else if (lower.includes("cannot refer themselves") || lower.includes("refer themselves")) {
+        setSubmitError("A partner cannot refer themselves. Register without using your own referral link.");
         setSubmitError("Registration failed. Please try again or ask the booth coordinator.");
       }
     }
@@ -122,6 +126,9 @@ export default function RegistrationSection({
         Lead Clinical Adopters are a closed cohort of one hundred Filipino physicians.
         Register here. Add your email if you would like the proposal delivered to your inbox.
       </p>
+      {invitedBy?.fullName ? (
+        <p className="invite-note">Invited by {invitedBy.fullName}.</p>
+      ) : null}
 
       <form noValidate onSubmit={handleSubmit}>
         <InputField
@@ -231,6 +238,7 @@ export default function RegistrationSection({
       <ConfirmRegistrationModal
         open={Boolean(pendingPayload)}
         payload={pendingPayload}
+        invitedByName={invitedBy?.fullName ?? null}
         submitting={submitting}
         error={submitError}
         onCancel={() => {

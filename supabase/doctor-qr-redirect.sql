@@ -3,7 +3,8 @@
 
 alter table public.doctor_registrations
   add column if not exists routing_slug text,
-  add column if not exists redirect_url text;
+  add column if not exists redirect_url text,
+  add column if not exists referred_by_partner_id uuid;
 
 create or replace function public.slugify_doctor_route(input text)
 returns text
@@ -99,13 +100,17 @@ $$;
 
 grant execute on function public.get_doctor_redirect(text) to anon, authenticated;
 
+drop function if exists public.register_doctor(text, text, text, text, text, text);
+drop function if exists public.register_doctor(text, text, text, text, text, text, text);
+
 create or replace function public.register_doctor(
   p_full_name text,
   p_email text,
   p_mobile text,
   p_tiktok_username text,
   p_specialty text,
-  p_practice_location text
+  p_practice_location text,
+  p_referrer_slug text default null
 )
 returns uuid
 language plpgsql
@@ -114,9 +119,17 @@ set search_path = public
 as $$
 declare
   v_doctor_id uuid;
+  v_referrer_id uuid;
   v_tiktok_username text;
 begin
   v_tiktok_username := regexp_replace(lower(trim(coalesce(p_tiktok_username, ''))), '^@+', '');
+
+  if nullif(lower(trim(coalesce(p_referrer_slug, ''))), '') is not null then
+    select d.id into v_referrer_id
+    from public.doctor_registrations d
+    where d.routing_slug = lower(trim(p_referrer_slug))
+    limit 1;
+  end if;
 
   insert into public.doctor_registrations (
     full_name,
@@ -126,11 +139,12 @@ begin
     specialty,
     practice_location,
     routing_slug,
-    redirect_url
+    redirect_url,
+    referred_by_partner_id
   )
   values (
     trim(p_full_name),
-    nullif(lower(trim(coalesce(p_email, ''))), ''),
+    coalesce(nullif(lower(trim(coalesce(p_email, ''))), ''), ''),
     trim(p_mobile),
     v_tiktok_username,
     trim(p_specialty),
@@ -139,13 +153,33 @@ begin
     case
       when v_tiktok_username = '' then null
       else 'https://www.tiktok.com/@' || v_tiktok_username
-    end
+    end,
+    v_referrer_id
   )
   returning id into v_doctor_id;
+
+  if v_referrer_id = v_doctor_id then
+    raise exception 'A partner cannot refer themselves.' using errcode = '23514';
+  end if;
 
   return v_doctor_id;
 end;
 $$;
+
+create or replace function public.get_partner_invitation(p_slug text)
+returns table (routing_slug text, full_name text)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select d.routing_slug, d.full_name
+  from public.doctor_registrations d
+  where d.routing_slug = lower(trim(coalesce(p_slug, '')))
+  limit 1;
+$$;
+
+grant execute on function public.get_partner_invitation(text) to anon, authenticated;
 
 create or replace function public.admin_list_doctor_registrations(p_admin_password text)
 returns table (

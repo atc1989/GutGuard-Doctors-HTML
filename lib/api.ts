@@ -241,14 +241,53 @@ export type PartnerOrder = {
   buyer_first_name: string;
   city: string;
   province: string;
+  source_type: "direct" | "referred";
+  source_partner_name: string;
+  source_partner_slug: string;
+};
+
+export type ReferredPartner = {
+  full_name: string;
+  routing_slug: string;
+  specialty: string;
+  practice_location: string;
+  joined_at: string;
+  orders: number;
+  paid_order_value: number;
+};
+
+export type PartnerDashboardQuery = {
+  scope?: "all" | "direct" | "referred";
+  status?: string;
+  limit?: number;
+  offset?: number;
+  dateFrom?: string;
+  dateTo?: string;
+  sort?: "newest" | "oldest";
 };
 
 export type PartnerDashboard = {
   partner: { full_name: string; routing_slug: string; joined_at: string };
   clicks: { total: number; last_30_days: number };
   /** paid_amount is gross order value, not commission. */
-  totals: { orders: number; paid_orders: number; paid_amount: number };
+  totals: {
+    orders: number;
+    paid_orders: number;
+    paid_amount: number;
+    direct_orders: number;
+    referred_orders: number;
+    referred_partners: number;
+    direct_paid_amount: number;
+    referred_paid_amount: number;
+  };
   orders: PartnerOrder[];
+  orders_page: { total: number; limit: number; offset: number; has_more: boolean };
+  referred_partners: ReferredPartner[];
+};
+
+export type PartnerInvitation = {
+  routing_slug: string;
+  full_name: string;
 };
 
 export type TikTokOrderTimeMode = "create_time" | "update_time";
@@ -406,20 +445,54 @@ export async function registerDoctor(payload: RegistrationPayload) {
       p_tiktok_username: payload.tiktokUsername,
       p_specialty: payload.specialty,
       p_practice_location: payload.location,
+      p_referrer_slug: payload.referrerSlug || null,
     });
 
     if (error) throw new Error(`Registration failed: ${error.message}`);
 
-    return {
+    const registration = {
       id: data as string,
       ...payload,
     };
+
+    if (payload.referrerSlug) {
+      void notifyPartnerReferral(registration.id);
+    }
+
+    return registration;
   }
 
   return {
     id: `local-${Date.now()}`,
     ...payload,
   };
+}
+
+export async function getPartnerInvitation(slug: string): Promise<PartnerInvitation | null> {
+  const clean = slug.trim().toLowerCase();
+  if (!clean || !isSupabaseConfigured || !supabase) return null;
+
+  const { data, error } = await supabase.rpc("get_partner_invitation", { p_slug: clean });
+  if (error) return null;
+
+  const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | null;
+  const routing_slug = String(row?.routing_slug ?? "").trim();
+  const full_name = String(row?.full_name ?? "").trim();
+  if (!routing_slug) return null;
+
+  return { routing_slug, full_name };
+}
+
+async function notifyPartnerReferral(registrationId: string) {
+  if (!isSupabaseConfigured || !supabase || registrationId.startsWith("local-")) return;
+
+  try {
+    await supabase.functions.invoke("send-partner-referral-notification", {
+      body: { registrationId },
+    });
+  } catch {
+    // Registration already succeeded. The referrer email is best-effort.
+  }
 }
 
 type RegistrationEmailResponse = {
@@ -840,16 +913,27 @@ export async function hasPartnerSession(): Promise<boolean> {
   return true;
 }
 
-export async function getPartnerDashboard(): Promise<PartnerDashboard> {
+const DEFAULT_PARTNER_ORDER_PAGE_SIZE = 10;
+
+export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Promise<PartnerDashboard> {
   if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
 
-  const { data, error } = await supabaseShop.rpc("partner_dashboard");
+  const { data, error } = await supabaseShop.rpc("partner_dashboard", {
+    p_scope: query.scope ?? "all",
+    p_status: query.status ?? null,
+    p_limit: query.limit ?? DEFAULT_PARTNER_ORDER_PAGE_SIZE,
+    p_offset: query.offset ?? 0,
+    p_date_from: query.dateFrom ?? null,
+    p_date_to: query.dateTo ?? null,
+    p_sort: query.sort ?? "newest",
+  });
   if (error) throw error;
 
   const row = (data ?? {}) as Record<string, unknown>;
   const partner = (row.partner ?? {}) as Record<string, unknown>;
   const clicks = (row.clicks ?? {}) as Record<string, unknown>;
   const totals = (row.totals ?? {}) as Record<string, unknown>;
+  const ordersPage = (row.orders_page ?? {}) as Record<string, unknown>;
 
   return {
     partner: {
@@ -865,20 +949,48 @@ export async function getPartnerDashboard(): Promise<PartnerDashboard> {
       orders: Number(totals.orders ?? 0),
       paid_orders: Number(totals.paid_orders ?? 0),
       paid_amount: Number(totals.paid_amount ?? 0),
+      direct_orders: Number(totals.direct_orders ?? totals.orders ?? 0),
+      referred_orders: Number(totals.referred_orders ?? 0),
+      referred_partners: Number(totals.referred_partners ?? 0),
+      direct_paid_amount: Number(totals.direct_paid_amount ?? 0),
+      referred_paid_amount: Number(totals.referred_paid_amount ?? 0),
     },
-    orders: (Array.isArray(row.orders) ? row.orders : []).map((entry) => {
-      const order = (entry ?? {}) as Record<string, unknown>;
+    orders: (Array.isArray(row.orders) ? row.orders : []).map(normalizePartnerOrder),
+    orders_page: {
+      total: Number(ordersPage.total ?? 0),
+      limit: Number(ordersPage.limit ?? DEFAULT_PARTNER_ORDER_PAGE_SIZE),
+      offset: Number(ordersPage.offset ?? 0),
+      has_more: Boolean(ordersPage.has_more),
+    },
+    referred_partners: (Array.isArray(row.referred_partners) ? row.referred_partners : []).map((entry) => {
+      const partnerRow = (entry ?? {}) as Record<string, unknown>;
       return {
-        order_code: String(order.order_code ?? ""),
-        created_at: String(order.created_at ?? ""),
-        status: (order.status ?? "pending_payment") as ShopOrderStatus,
-        payment_status: (order.payment_status ?? "pending") as ShopPaymentStatus,
-        total_amount: Number(order.total_amount ?? 0),
-        buyer_first_name: String(order.buyer_first_name ?? ""),
-        city: String(order.city ?? ""),
-        province: String(order.province ?? ""),
+        full_name: String(partnerRow.full_name ?? ""),
+        routing_slug: String(partnerRow.routing_slug ?? ""),
+        specialty: String(partnerRow.specialty ?? ""),
+        practice_location: String(partnerRow.practice_location ?? ""),
+        joined_at: String(partnerRow.joined_at ?? ""),
+        orders: Number(partnerRow.orders ?? 0),
+        paid_order_value: Number(partnerRow.paid_order_value ?? 0),
       };
     }),
+  };
+}
+
+function normalizePartnerOrder(entry: unknown): PartnerOrder {
+  const order = (entry ?? {}) as Record<string, unknown>;
+  return {
+    order_code: String(order.order_code ?? ""),
+    created_at: String(order.created_at ?? ""),
+    status: (order.status ?? "pending_payment") as ShopOrderStatus,
+    payment_status: (order.payment_status ?? "pending") as ShopPaymentStatus,
+    total_amount: Number(order.total_amount ?? 0),
+    buyer_first_name: String(order.buyer_first_name ?? ""),
+    city: String(order.city ?? ""),
+    province: String(order.province ?? ""),
+    source_type: order.source_type === "referred" ? "referred" : "direct",
+    source_partner_name: String(order.source_partner_name ?? ""),
+    source_partner_slug: String(order.source_partner_slug ?? ""),
   };
 }
 

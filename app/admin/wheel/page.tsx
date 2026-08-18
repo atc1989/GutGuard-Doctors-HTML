@@ -194,7 +194,7 @@ const emptyPrize: AdminWheelPrize = {
   sort_order: 0,
 };
 const PAGE_SIZE_OPTIONS = [10, 20, 100];
-const PUBLIC_SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://gut-guard-doctors-html.vercel.app").replace(
+const PUBLIC_SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://partners.gutguard.ph").replace(
   /\/$/,
   "",
 );
@@ -256,11 +256,14 @@ function getPrizeOdds(prize: AdminWheelPrize, activeWeightTotal: number) {
   return (prize.chance_weight / activeWeightTotal) * 100;
 }
 
-type DoctorQrMode = "shop" | "profile";
+type DoctorQrMode = "shop" | "referral" | "profile";
 
 function getDoctorQrUrl(doctor: AdminDoctorRegistration, mode: DoctorQrMode) {
   if (!doctor.routing_slug) return "";
   if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${encodeURIComponent(doctor.routing_slug)}`;
+  if (mode === "referral") {
+    return `${PUBLIC_SITE_ORIGIN}/physicians/register?ref=${encodeURIComponent(doctor.routing_slug)}`;
+  }
   if (doctor.routing_slug === "dr-grace-saraza") return `${SHOP_ORIGIN}/beehive`;
   return `${SHOP_ORIGIN}/r/${encodeURIComponent(doctor.routing_slug)}`;
 }
@@ -1663,6 +1666,14 @@ export default function AdminWheelPage() {
                         </button>
                         <button
                           type="button"
+                          className={qrMode === "referral" ? "active" : ""}
+                          aria-pressed={qrMode === "referral"}
+                          onClick={() => setDoctorQrModes((current) => ({ ...current, [doctor.id]: "referral" }))}
+                        >
+                          Partner invite
+                        </button>
+                        <button
+                          type="button"
                           className={qrMode === "profile" ? "active" : ""}
                           aria-pressed={qrMode === "profile"}
                           onClick={() => setDoctorQrModes((current) => ({ ...current, [doctor.id]: "profile" }))}
@@ -1680,7 +1691,13 @@ export default function AdminWheelPage() {
                             marginSize={2}
                           />
                           <div>
-                            <small>{qrMode === "shop" ? "Shop referral route" : "TikTok redirect route"}</small>
+                            <small>
+                              {qrMode === "shop"
+                                ? "Shop referral route"
+                                : qrMode === "referral"
+                                  ? "Partner registration invite"
+                                  : "TikTok redirect route"}
+                            </small>
                             <code>{qrUrl}</code>
                             <div className="admin-doctor-qr-actions">
                               <button type="button" onClick={() => copyDoctorQrUrl(qrUrl)}>

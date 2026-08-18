@@ -14,6 +14,7 @@ import {
   verifyPartnerOtp,
   type PartnerDashboard,
   type PartnerOrder,
+  type ReferredPartner,
 } from "@/lib/api";
 
 const SHOP_ORIGIN = (process.env.NEXT_PUBLIC_SHOP_URL ?? "https://shop.gutguard.ph").replace(/\/$/, "");
@@ -23,7 +24,10 @@ const PUBLIC_SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://partner
 // sharp. The on-screen size is set in globals.css, not here.
 const QR_RENDER_PX = 1024;
 
-type PartnerQrMode = "shop" | "profile";
+type PartnerQrMode = "shop" | "referral" | "profile";
+type PartnerListTab = "orders" | "partners";
+const PAGE_SIZE_OPTIONS = [10, 20, 50];
+const DEFAULT_PAGE_SIZE = 10;
 
 const peso = (value: number) =>
   new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value);
@@ -46,9 +50,13 @@ export default function PartnerPortal() {
   const codeInputRef = useRef<HTMLInputElement>(null);
   const codeHeadingRef = useRef<HTMLHeadingElement>(null);
   const requestPendingRef = useRef(false);
+  const orderPageRef = useRef({ limit: DEFAULT_PAGE_SIZE, offset: 0 });
 
-  const load = useCallback(async () => {
-    const dashboard = await getPartnerDashboard();
+  const load = useCallback(async (page?: { limit?: number; offset?: number }) => {
+    const limit = page?.limit ?? orderPageRef.current.limit;
+    const offset = page?.offset ?? orderPageRef.current.offset;
+    orderPageRef.current = { limit, offset };
+    const dashboard = await getPartnerDashboard({ limit, offset });
     setData(dashboard);
     setView("dashboard");
   }, []);
@@ -239,7 +247,7 @@ export default function PartnerPortal() {
   }
 
   if (view === "dashboard" && data) {
-    return <Dashboard data={data} onSignOut={signOut} />;
+    return <Dashboard data={data} onSignOut={signOut} onPageChange={(limit, offset) => void load({ limit, offset })} />;
   }
 
   if (view === "signing-in") {
@@ -358,14 +366,29 @@ export default function PartnerPortal() {
   );
 }
 
-function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () => void }) {
+function Dashboard({
+  data,
+  onSignOut,
+  onPageChange,
+}: {
+  data: PartnerDashboard;
+  onSignOut: () => void;
+  onPageChange: (limit: number, offset: number) => void;
+}) {
   const qrRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
   const [qrMode, setQrMode] = useState<PartnerQrMode>("shop");
+  const [listTab, setListTab] = useState<PartnerListTab>("orders");
+  const [partnerPageSize, setPartnerPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [partnerOffset, setPartnerOffset] = useState(0);
 
   const link = getPartnerQrLink(data.partner.routing_slug, qrMode);
-  const isShopQr = qrMode === "shop";
-  const conversion = data.clicks.total > 0 ? (data.totals.orders / data.clicks.total) * 100 : 0;
+  const conversion = data.clicks.total > 0 ? (data.totals.direct_orders / data.clicks.total) * 100 : 0;
+  const orderLimit = data.orders_page.limit || DEFAULT_PAGE_SIZE;
+  const orderOffset = data.orders_page.offset;
+  const orderTotal = data.orders_page.total || data.totals.orders;
+  const referredPartners = data.referred_partners;
+  const visiblePartners = referredPartners.slice(partnerOffset, partnerOffset + partnerPageSize);
 
   async function copyLink() {
     try {
@@ -373,8 +396,6 @@ function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () 
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Clipboard is blocked on insecure origins and in some in-app browsers. The link is
-      // shown in full above the button, so there is still a way through.
       setCopied(false);
     }
   }
@@ -389,6 +410,11 @@ function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () 
     anchor.click();
   }
 
+  function selectQrMode(mode: PartnerQrMode) {
+    setQrMode(mode);
+    setCopied(false);
+  }
+
   return (
     <main className="shop-shell partner-dashboard-shell">
       <PartnerNav onSignOut={onSignOut} />
@@ -396,113 +422,196 @@ function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () 
       <section className="shop-order-panel">
         <p className="shop-kicker">Partner dashboard</p>
         <h1>{data.partner.full_name}</h1>
-        <p className="shop-lede">
-          Every order placed within 30 days of someone using your link is credited to you.
-        </p>
 
         <div className="partner-stats">
-          <Stat label="Link clicks" value={String(data.clicks.total)} note={`${data.clicks.last_30_days} in the last 30 days`} />
-          <Stat label="Orders" value={String(data.totals.orders)} note={`${data.totals.paid_orders} paid`} />
           <Stat
-            label="Conversion"
-            value={data.clicks.total > 0 ? `${conversion.toFixed(1)}%` : "--"}
-            note={data.clicks.total > 0 ? "orders per click" : "no clicks yet"}
+            label="Direct orders"
+            value={String(data.totals.direct_orders)}
+            note={`${data.clicks.total} shop-link click${data.clicks.total === 1 ? "" : "s"}`}
           />
-          {/* Order value, not commission - the wording has to keep saying so. */}
-          <Stat label="Paid order value" value={peso(data.totals.paid_amount)} note="total spent by your referrals" />
+          <Stat
+            label="Referred partners"
+            value={String(data.totals.referred_partners)}
+            note="one referral level"
+          />
+          <Stat
+            label="Referred-partner orders"
+            value={String(data.totals.referred_orders)}
+            note="generated by partners you referred"
+          />
+          <Stat
+            label="Combined paid value"
+            value={peso(data.totals.paid_amount)}
+            note="gross order value, not commission"
+          />
+        </div>
+        <p className="partner-stats-footnote">
+          Direct conversion: {data.clicks.total > 0 ? `${conversion.toFixed(1)}%` : "--"}
+          {" · "}
+          {data.clicks.last_30_days} click{data.clicks.last_30_days === 1 ? "" : "s"} in the last 30 days
+          {" · "}
+          {data.totals.paid_orders} paid order{data.totals.paid_orders === 1 ? "" : "s"}
+        </p>
+      </section>
+
+      <section className="shop-order-panel partner-share-panel">
+        <p className="shop-kicker">Share &amp; grow</p>
+        <h2>Your QR codes</h2>
+        <p className="shop-lede">Choose what you want people to open when they scan.</p>
+
+        <div className="partner-qr-toggle" role="group" aria-label="QR code type">
+          <button
+            type="button"
+            className={qrMode === "shop" ? "active" : ""}
+            aria-pressed={qrMode === "shop"}
+            onClick={() => selectQrMode("shop")}
+          >
+            <strong>Shop QR</strong>
+            <span>Track clicks &amp; orders</span>
+          </button>
+          <button
+            type="button"
+            className={qrMode === "referral" ? "active" : ""}
+            aria-pressed={qrMode === "referral"}
+            onClick={() => selectQrMode("referral")}
+          >
+            <strong>Referral QR</strong>
+            <span>Invite a partner</span>
+          </button>
+          <button
+            type="button"
+            className={qrMode === "profile" ? "active" : ""}
+            aria-pressed={qrMode === "profile"}
+            onClick={() => selectQrMode("profile")}
+          >
+            <strong>Profile QR</strong>
+            <span>Open your TikTok</span>
+          </button>
+        </div>
+
+        <p className="shop-lede partner-qr-hint">{qrHint(qrMode)}</p>
+
+        <div className="partner-link-row">
+          <p className="partner-link">{link}</p>
+          <button type="button" className="shop-primary" onClick={copyLink}>
+            <span>{copied ? "Copied" : "Copy link"}</span>
+          </button>
+        </div>
+
+        <div className="partner-qr" ref={qrRef}>
+          <QRCodeCanvas
+            key={qrMode}
+            value={link}
+            size={QR_RENDER_PX}
+            level="M"
+            marginSize={2}
+            style={{ width: "100%", height: "auto" }}
+          />
+        </div>
+
+        <div className="partner-qr-actions">
+          <button type="button" className="shop-secondary" onClick={downloadQr}>
+            Download PNG
+          </button>
+          <button type="button" className="shop-secondary" onClick={() => window.print()}>
+            Preview poster
+          </button>
         </div>
       </section>
 
-      <div className="partner-dashboard-grid">
-        <section className="shop-order-panel partner-share-panel">
-          <p className="shop-kicker">Share &amp; grow</p>
-          <h2>Your QR codes</h2>
-          <p className="shop-lede">
-            Share the shop QR for tracked orders, or the profile QR for your TikTok page.
-          </p>
+      <section className="shop-order-panel partner-orders-panel">
+        <div className="partner-list-tabs" role="tablist" aria-label="Dashboard lists">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={listTab === "orders"}
+            className={listTab === "orders" ? "active" : ""}
+            onClick={() => setListTab("orders")}
+          >
+            Orders {data.totals.orders}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={listTab === "partners"}
+            className={listTab === "partners" ? "active" : ""}
+            onClick={() => setListTab("partners")}
+          >
+            Referred partners {data.totals.referred_partners}
+          </button>
+        </div>
 
-          <div className="partner-qr-toggle" role="group" aria-label="QR code type">
-            <button
-              type="button"
-              className={isShopQr ? "active" : ""}
-              aria-pressed={isShopQr}
-              onClick={() => {
-                setQrMode("shop");
-                setCopied(false);
-              }}
-            >
-              <strong>Shop QR</strong>
-              <span>Track clicks &amp; orders</span>
-            </button>
-            <button
-              type="button"
-              className={!isShopQr ? "active" : ""}
-              aria-pressed={!isShopQr}
-              onClick={() => {
-                setQrMode("profile");
-                setCopied(false);
-              }}
-            >
-              <strong>Profile QR</strong>
-              <span>Open your TikTok</span>
-            </button>
-          </div>
+        {listTab === "orders" ? (
+          <>
+            <p className="shop-kicker">Your orders</p>
+            <h2>{orderTotal > 0 ? `${orderTotal} attributed` : "No orders yet"}</h2>
 
-          <div className="partner-link-row">
-            <p className="partner-link">{link}</p>
-            <button type="button" className="shop-primary" onClick={copyLink}>
-              <span>{copied ? "Copied" : "Copy link"}</span>
-            </button>
-          </div>
+            {orderTotal === 0 ? (
+              <div className="partner-empty-orders">
+                <strong>Your first referral order will appear here.</strong>
+                <p>Share your shop link or QR code to get started.</p>
+              </div>
+            ) : (
+              <div className="partner-orders">
+                {data.orders.map((order) => (
+                  <OrderRow key={order.order_code} order={order} />
+                ))}
+              </div>
+            )}
 
-          <div className="partner-qr" ref={qrRef}>
-            <QRCodeCanvas
-              key={qrMode}
-              value={link}
-              size={QR_RENDER_PX}
-              level="M"
-              marginSize={2}
-              style={{ width: "100%", height: "auto" }}
-            />
-          </div>
+            {orderTotal > 0 ? (
+              <Pager
+                total={orderTotal}
+                limit={orderLimit}
+                offset={orderOffset}
+                onPageChange={onPageChange}
+              />
+            ) : null}
 
-          <div className="partner-qr-actions">
-            <button type="button" className="shop-secondary" onClick={downloadQr}>
-              Download PNG
-            </button>
-            <button type="button" className="shop-secondary" onClick={() => window.print()}>
-              Print poster
-            </button>
-          </div>
-        </section>
+            <p className="shop-note">
+              Buyer details stay private. You only see their first name and area.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="shop-kicker">Partners you referred</p>
+            <h2>
+              {referredPartners.length > 0
+                ? `${referredPartners.length} partner${referredPartners.length === 1 ? "" : "s"}`
+                : "No referred partners yet"}
+            </h2>
 
-        <section className="shop-order-panel partner-orders-panel">
-          <p className="shop-kicker">Your orders</p>
-          <h2>{data.orders.length > 0 ? `${data.orders.length} attributed` : "No orders yet"}</h2>
+            {referredPartners.length === 0 ? (
+              <div className="partner-empty-orders">
+                <strong>Share your referral QR to invite a colleague.</strong>
+                <p>Partners who register with your link appear here, one level deep.</p>
+              </div>
+            ) : (
+              <div className="partner-orders">
+                {visiblePartners.map((partner) => (
+                  <ReferredPartnerRow key={partner.routing_slug || partner.full_name} partner={partner} />
+                ))}
+              </div>
+            )}
 
-          {data.orders.length === 0 ? (
-            <div className="partner-empty-orders">
-              <strong>Your first referral order will appear here.</strong>
-              <p>Share your shop link or QR code to get started.</p>
-            </div>
-          ) : (
-            <div className="partner-orders">
-              {data.orders.map((order) => (
-                <OrderRow key={order.order_code} order={order} />
-              ))}
-            </div>
-          )}
+            {referredPartners.length > 0 ? (
+              <Pager
+                total={referredPartners.length}
+                limit={partnerPageSize}
+                offset={partnerOffset}
+                onPageChange={(limit, offset) => {
+                  setPartnerPageSize(limit);
+                  setPartnerOffset(offset);
+                }}
+              />
+            ) : null}
+          </>
+        )}
+      </section>
 
-          <p className="shop-note">
-            Buyer details stay private. You only see their first name and area.
-          </p>
-        </section>
-      </div>
-
-      {/* Screen-hidden, print-only. Kept in the DOM so window.print() needs no new page. */}
       <div className="partner-print" aria-hidden="true">
         <Image src="/gutguard-logo.png" alt="" width={68} height={80} />
-        <strong>{isShopQr ? "Scan to order GutGuard" : "Scan to visit my TikTok profile"}</strong>
+        <strong>{posterHeadline(qrMode)}</strong>
         <QRCodeCanvas value={link} size={QR_RENDER_PX} level="M" marginSize={2} />
         <span>{data.partner.full_name}</span>
         <small>{link}</small>
@@ -523,18 +632,87 @@ function Stat({ label, value, note }: { label: string; value: string; note: stri
 
 function OrderRow({ order }: { order: PartnerOrder }) {
   const isPaid = order.payment_status === "paid";
+  const place = [order.city, order.province].filter(Boolean).join(", ") || "Philippines";
+  const via =
+    order.source_type === "referred" && order.source_partner_name
+      ? ` via ${order.source_partner_name}`
+      : "";
 
   return (
     <article className="partner-order">
       <div>
         <strong>{order.buyer_first_name || "A customer"}</strong>
         <span>
-          {[order.city, order.province].filter(Boolean).join(", ") || "Philippines"} - {formatDate(order.created_at)}
+          {place} - {formatDate(order.created_at)}
+          {via}
         </span>
       </div>
       <span className={isPaid ? "partner-badge paid" : "partner-badge"}>{statusLabel(order)}</span>
       <b>{peso(order.total_amount)}</b>
     </article>
+  );
+}
+
+function ReferredPartnerRow({ partner }: { partner: ReferredPartner }) {
+  const detail = [partner.specialty, partner.practice_location].filter(Boolean).join(" - ");
+
+  return (
+    <article className="partner-order partner-referred">
+      <div>
+        <strong>{partner.full_name}</strong>
+        <span>{detail || "GutGuard partner"}</span>
+      </div>
+      <span className="partner-badge">
+        {partner.orders} order{partner.orders === 1 ? "" : "s"}
+      </span>
+      <b>{peso(partner.paid_order_value)}</b>
+    </article>
+  );
+}
+
+function Pager({
+  total,
+  limit,
+  offset,
+  onPageChange,
+}: {
+  total: number;
+  limit: number;
+  offset: number;
+  onPageChange: (limit: number, offset: number) => void;
+}) {
+  const start = total === 0 ? 0 : offset + 1;
+  const end = Math.min(offset + limit, total);
+  const canPrev = offset > 0;
+  const canNext = offset + limit < total;
+
+  return (
+    <div className="partner-pager">
+      <label className="partner-pager-size">
+        Rows
+        <select
+          value={limit}
+          onChange={(event) => onPageChange(Number(event.target.value), 0)}
+        >
+          {PAGE_SIZE_OPTIONS.map((size) => (
+            <option key={size} value={size}>
+              {size}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="partner-pager-nav">
+        <button type="button" disabled={!canPrev} onClick={() => onPageChange(limit, Math.max(0, offset - limit))}>
+          Previous
+        </button>
+        <span>
+          {start}-{end} of {total}
+        </span>
+        <button type="button" disabled={!canNext} onClick={() => onPageChange(limit, offset + limit)}>
+          Next
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -560,12 +738,28 @@ function PartnerNav({ onSignOut }: { onSignOut?: () => void }) {
   );
 }
 
-/** Mirrors getDoctorQrUrl in the admin, so both views generate the same two QR destinations. */
+/** Mirrors getDoctorQrUrl in the admin, so printed codes match across views. */
 function getPartnerQrLink(slug: string, mode: PartnerQrMode) {
-  if (!slug) return mode === "shop" ? SHOP_ORIGIN : PUBLIC_SITE_ORIGIN;
+  if (!slug) {
+    if (mode === "shop") return SHOP_ORIGIN;
+    return `${PUBLIC_SITE_ORIGIN}/physicians/register`;
+  }
   if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${encodeURIComponent(slug)}`;
+  if (mode === "referral") return `${PUBLIC_SITE_ORIGIN}/physicians/register?ref=${encodeURIComponent(slug)}`;
   if (slug === "dr-grace-saraza") return `${SHOP_ORIGIN}/beehive`;
   return `${SHOP_ORIGIN}/r/${encodeURIComponent(slug)}`;
+}
+
+function qrHint(mode: PartnerQrMode) {
+  if (mode === "referral") return "Send colleagues to register as a GutGuard partner.";
+  if (mode === "profile") return "Send visitors directly to your TikTok profile.";
+  return "Send visitors to the shop with your tracking link.";
+}
+
+function posterHeadline(mode: PartnerQrMode) {
+  if (mode === "referral") return "Scan to join as a GutGuard partner";
+  if (mode === "profile") return "Scan to visit my TikTok profile";
+  return "Scan to order GutGuard";
 }
 
 function statusLabel(order: PartnerOrder) {

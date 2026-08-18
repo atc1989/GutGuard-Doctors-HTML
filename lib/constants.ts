@@ -1,4 +1,5 @@
 export const LOCAL_KEY = "gg_lca_v3";
+export const PARTNER_REFERRER_KEY = "gg_partner_ref";
 
 export const LINKS = {
   email: null,

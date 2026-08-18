@@ -38,6 +38,7 @@ create table public.doctor_registrations (
   practice_location text,
   routing_slug text not null,
   redirect_url text,
+  referred_by_partner_id uuid references public.doctor_registrations(id),
   created_at timestamptz not null default now()
 );
 
@@ -127,17 +128,62 @@ begin
   assert (v_result -> 'totals' ->> 'orders')::int = 2,
     'order count must exclude the self-referral and the other partner, got '
     || (v_result -> 'totals' ->> 'orders');
+  assert (v_result -> 'totals' ->> 'direct_orders')::int = 2, 'direct order count wrong';
+  assert (v_result -> 'totals' ->> 'referred_orders')::int = 0, 'referred order count should start at 0';
+  assert (v_result -> 'totals' ->> 'referred_partners')::int = 0, 'referred partner count should start at 0';
   assert (v_result -> 'totals' ->> 'paid_orders')::int = 1, 'paid count wrong';
   assert (v_result -> 'totals' ->> 'paid_amount')::numeric = 1100,
     'paid amount must use total_amount, got ' || (v_result -> 'totals' ->> 'paid_amount');
   assert jsonb_array_length(v_result -> 'orders') = 2, 'order list wrong length';
   assert v_result -> 'orders' -> 0 ->> 'order_code' = 'GG-2',
     'newest order must come first, got ' || (v_result -> 'orders' -> 0 ->> 'order_code');
+  assert v_result -> 'orders' -> 0 ->> 'source_type' = 'direct', 'direct order must be tagged direct';
+  assert (v_result -> 'orders_page' ->> 'total')::int = 2, 'orders_page total wrong';
 
   -- Buyer contact details must never leave the database.
   assert not (v_result -> 'orders' -> 0 ? 'email'), 'buyer email leaked';
   assert not (v_result -> 'orders' -> 0 ? 'mobile'), 'buyer mobile leaked';
   assert not (v_result -> 'orders' -> 0 ? 'address'), 'buyer address leaked';
+
+  -- One referral level: Cara's orders credit Ana as referred, not as direct.
+  insert into public.doctor_registrations (full_name, email, routing_slug, referred_by_partner_id)
+  values ('Dr Cara Lim', 'cara@clinic.ph', 'dr-cara-lim', v_ana);
+  insert into public.shop_orders
+    (order_code, payment_status, status, customer_name, first_name, city, province,
+     subtotal, shipping_fee, total_amount, referral_slug, referral_doctor_id, created_at)
+  values
+    ('GG-5', 'paid', 'paid', 'Luis Tan', 'Luis', 'Baguio', 'Benguet',
+     800, 0, 800, 'dr-cara-lim', (select id from public.doctor_registrations where routing_slug = 'dr-cara-lim'), now());
+
+  -- A grandchild must not appear: one referral level only.
+  insert into public.doctor_registrations (full_name, email, routing_slug, referred_by_partner_id)
+  values (
+    'Dr Dee Ong',
+    'dee@clinic.ph',
+    'dr-dee-ong',
+    (select id from public.doctor_registrations where routing_slug = 'dr-cara-lim')
+  );
+  insert into public.shop_orders
+    (order_code, payment_status, status, customer_name, first_name, city, province,
+     subtotal, shipping_fee, total_amount, referral_slug, referral_doctor_id)
+  values
+    ('GG-6', 'paid', 'paid', 'Nina Uy', 'Nina', 'Davao City', 'Davao del Sur',
+     400, 0, 400, 'dr-dee-ong', (select id from public.doctor_registrations where routing_slug = 'dr-dee-ong'));
+
+  perform set_config('request.jwt.claims', '{"email":"ANA@clinic.ph "}', true);
+  v_result := public.partner_dashboard();
+  assert (v_result -> 'totals' ->> 'direct_orders')::int = 2, 'direct orders must stay Ana''s own';
+  assert (v_result -> 'totals' ->> 'referred_orders')::int = 1, 'only Cara''s order is one level down';
+  assert (v_result -> 'totals' ->> 'orders')::int = 3, 'combined orders must be direct plus one level';
+  assert (v_result -> 'totals' ->> 'referred_partners')::int = 1, 'Dee is Cara''s referral, not Ana''s';
+  assert (v_result -> 'totals' ->> 'paid_amount')::numeric = 1900, 'combined paid value wrong';
+  assert jsonb_array_length(v_result -> 'referred_partners') = 1, 'referred partner list must be one level';
+  assert v_result -> 'referred_partners' -> 0 ->> 'routing_slug' = 'dr-cara-lim', 'wrong referred partner';
+
+  v_result := public.partner_dashboard('all', null, 1, 0, null, null, 'newest');
+  assert jsonb_array_length(v_result -> 'orders') = 1, 'p_limit must page the order list';
+  assert (v_result -> 'orders_page' ->> 'total')::int = 3, 'paged total must count every attributed order';
+  assert (v_result -> 'orders_page' ->> 'has_more')::boolean is true, 'has_more must be true when more rows exist';
 
   -- A verified address that belongs to no partner gets nothing. This is the real access
   -- gate: sign-up is open, so anyone can hold a session.
@@ -179,10 +225,16 @@ begin
   -- Grants, not just behaviour. Postgres gives EXECUTE to PUBLIC on every new function and
   -- Supabase's default privileges add anon in `public`, so "grant to authenticated" alone
   -- leaves this reachable with the anon key.
-  assert not has_function_privilege('anon', 'public.partner_dashboard()', 'execute'),
-    'anon must not be able to execute partner_dashboard';
-  assert has_function_privilege('authenticated', 'public.partner_dashboard()', 'execute'),
-    'authenticated must be able to execute partner_dashboard';
+  assert not has_function_privilege(
+    'anon',
+    'public.partner_dashboard(text, text, integer, integer, timestamp with time zone, timestamp with time zone, text)',
+    'execute'
+  ), 'anon must not be able to execute partner_dashboard';
+  assert has_function_privilege(
+    'authenticated',
+    'public.partner_dashboard(text, text, integer, integer, timestamp with time zone, timestamp with time zone, text)',
+    'execute'
+  ), 'authenticated must be able to execute partner_dashboard';
   -- The redirect runs on the anon key, so this one has to stay open.
   assert has_function_privilege('anon', 'public.track_referral_click(text)', 'execute'),
     'anon must be able to execute track_referral_click';

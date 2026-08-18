@@ -6,7 +6,8 @@ import ProgressRail from "@/components/ProgressRail";
 import RegistrationSection from "@/sections/RegistrationSection";
 import VerificationSection from "@/sections/VerificationSection";
 import WheelSection from "@/sections/WheelSection";
-import { claimPrize, enrollDoctorInSequence, listWheelPrizes, updateTask } from "@/lib/api";
+import { claimPrize, enrollDoctorInSequence, getPartnerInvitation, listWheelPrizes, updateTask } from "@/lib/api";
+import { PARTNER_REFERRER_KEY } from "@/lib/constants";
 import {
   clearExperienceState,
   INITIAL_STATE,
@@ -23,7 +24,7 @@ import type {
   WheelPrize,
 } from "@/lib/types";
 
-export default function RegistrationExperience() {
+export default function RegistrationExperience({ referrerSlug = "" }: { referrerSlug?: string }) {
   const [state, setState] = useState<ExperienceState>(INITIAL_STATE);
   const [screen, setScreen] = useState<Screen>(1);
   const [isHydrated, setIsHydrated] = useState(false);
@@ -32,6 +33,7 @@ export default function RegistrationExperience() {
   const [wheelLoading, setWheelLoading] = useState(false);
   const [wheelError, setWheelError] = useState<string | null>(null);
   const [emailDelivery, setEmailDelivery] = useState<RegistrationEmailDelivery>({ status: "idle" });
+  const [invitation, setInvitation] = useState<{ slug: string; fullName: string } | null>(null);
 
   const dateLabel = useMemo(
     () => new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date()),
@@ -44,6 +46,28 @@ export default function RegistrationExperience() {
     setScreen(resolveScreen(saved));
     setIsHydrated(true);
   }, []);
+
+  useEffect(() => {
+    const fromQuery = referrerSlug.trim().toLowerCase();
+    const stored = typeof window === "undefined" ? "" : window.sessionStorage.getItem(PARTNER_REFERRER_KEY) ?? "";
+    const slug = fromQuery || stored;
+    if (!slug) return;
+
+    let cancelled = false;
+    getPartnerInvitation(slug)
+      .then((invite) => {
+        if (cancelled || !invite) return;
+        window.sessionStorage.setItem(PARTNER_REFERRER_KEY, invite.routing_slug);
+        setInvitation({ slug: invite.routing_slug, fullName: invite.full_name });
+      })
+      .catch(() => {
+        // Invalid or unreachable slug: register with no referrer rather than blocking the booth.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [referrerSlug]);
 
   useEffect(() => {
     if (isHydrated) saveExperienceState(state);
@@ -82,6 +106,12 @@ export default function RegistrationExperience() {
   }, [screen]);
 
   function handleRegistered(registration: Registration) {
+    try {
+      window.sessionStorage.removeItem(PARTNER_REFERRER_KEY);
+    } catch {
+      // sessionStorage is best-effort on restricted booth devices.
+    }
+    setInvitation(null);
     setState((current) => ({
       ...current,
       registration,
@@ -155,6 +185,7 @@ export default function RegistrationExperience() {
       <RegistrationSection
         key={registrationResetKey}
         active={screen === 1}
+        invitedBy={invitation}
         onRegistered={handleRegistered}
       />
       <VerificationSection

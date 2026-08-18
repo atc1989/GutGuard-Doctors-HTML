@@ -12,6 +12,7 @@ export type Registration = {
   specialty: string;
   location: string;
   registeredAt: number;
+  referrerSlug?: string;
 };
 
 export type RegistrationPayload = Omit<Registration, "id" | "registeredAt">;
