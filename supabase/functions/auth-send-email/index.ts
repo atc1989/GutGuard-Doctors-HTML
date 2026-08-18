@@ -26,9 +26,6 @@ Deno.serve(async (req) => {
       };
     };
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const type = email_data.email_action_type || "magiclink";
-    const confirmUrl = `${supabaseUrl}/auth/v1/verify?token=${email_data.token_hash ?? ""}&type=${type}&redirect_to=${encodeURIComponent(email_data.redirect_to || "")}`;
     const from =
       Deno.env.get("PROPOSAL_FROM_EMAIL") ??
       "GutGuard <gutguardhq@gutguard.ph>";
@@ -41,9 +38,9 @@ Deno.serve(async (req) => {
         to: [user.email],
         subject: "Your GutGuard sign-in code",
         html: `<h2>Your GutGuard sign-in code</h2>
-<p>Enter this code to continue:</p>
+<p>Enter this code on the partner portal. Do not share it.</p>
 <p style="font-size:24px;letter-spacing:4px"><strong>${email_data.token ?? ""}</strong></p>
-<p>Or <a href="${confirmUrl}">sign in with this link</a>. It expires shortly and can only be used once.</p>`,
+<p>This code expires shortly and can only be used once.</p>`,
       }),
     });
 

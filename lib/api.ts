@@ -800,7 +800,7 @@ export async function verifyPartnerOtp(email: string, token: string): Promise<vo
   let session = null;
   let lastError: Error | null = null;
 
-  for (const type of ["email", "signup", "magiclink"] as const) {
+  for (const type of ["magiclink", "email", "signup"] as const) {
     const { data, error } = await supabase.auth.verifyOtp({
       email: normalizedEmail,
       token: normalizedToken,

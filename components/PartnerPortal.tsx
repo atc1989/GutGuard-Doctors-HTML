@@ -153,19 +153,30 @@ export default function PartnerPortal() {
 
     try {
       await verifyPartnerOtp(email, code);
-      setView("signing-in");
-      setNotice("Signing you in…");
-      await load();
     } catch (caught) {
-      // Covers both a wrong code and a verified address with no partner row. Signing out
-      // on the second case stops a non-partner account from sitting in a broken half-state.
-      await signOutPartner();
       const nextError = getVerificationError(caught);
       setError(nextError);
       if (nextError.expired) setResendRemaining(0);
       setView("code");
       setNotice("");
       requestAnimationFrame(() => codeInputRef.current?.focus());
+      requestPendingRef.current = false;
+      setBusyAction(null);
+      return;
+    }
+
+    try {
+      setView("signing-in");
+      setNotice("Signing you in…");
+      await load();
+    } catch {
+      await signOutPartner();
+      setError({
+        field: "form",
+        message: "You signed in, but the partner dashboard could not load. Sign in again in a moment.",
+      });
+      setView("email");
+      setNotice("");
     } finally {
       requestPendingRef.current = false;
       setBusyAction(null);
