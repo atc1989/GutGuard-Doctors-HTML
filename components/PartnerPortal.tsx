@@ -593,6 +593,9 @@ function getVerificationError(error: unknown): NonNullable<AuthError> {
 
 function getSendError(error: unknown): NonNullable<AuthError> {
   const message = error instanceof Error ? error.message.toLowerCase() : "";
+  if (message.includes("email rate limit") || message.includes("over_email_send_rate_limit")) {
+    return { field: "form", message: "Too many sign-in emails were sent. Wait a few minutes and try again." };
+  }
   if (
     message.includes("rate") ||
     message.includes("too many") ||
@@ -607,6 +610,9 @@ function getSendError(error: unknown): NonNullable<AuthError> {
 
 function getResendError(error: unknown): NonNullable<AuthError> {
   const message = error instanceof Error ? error.message.toLowerCase() : "";
+  if (message.includes("email rate limit") || message.includes("over_email_send_rate_limit")) {
+    return { field: "code", message: "Too many sign-in emails were sent. Wait a few minutes and try again." };
+  }
   if (
     message.includes("rate") ||
     message.includes("too many") ||

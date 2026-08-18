@@ -22,5 +22,8 @@ export const supabase = isSupabaseConfigured ? createClient(supabaseUrl!, supaba
  * schema too, where they do not exist.
  */
 export const supabaseShop = isSupabaseConfigured
-  ? createClient(supabaseUrl!, supabaseAnonKey!, { db: { schema: SHOP_SCHEMA } })
+  ? createClient(supabaseUrl!, supabaseAnonKey!, {
+      db: { schema: SHOP_SCHEMA },
+      auth: { persistSession: false, autoRefreshToken: false, storageKey: "gg-shop" },
+    })
   : null;
