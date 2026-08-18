@@ -1944,8 +1944,8 @@ function BuyBar({ route }) {
           <span className="bb-meta">{GROW.phase} protocol <span className="bb-tag">Most popular</span></span>
         </div>
         <div className="bb-price">
-          <span className="bb-amt">₱{GROW.price.toLocaleString("en-PH")}</span>
-          <span className="bb-sub">₱{GROW.perCap} per capsule</span>
+          <span className="bb-amt">₱{GROW.perCap} / capsule</span>
+          <span className="bb-sub">{GROW.phase} protocol · ₱{GROW.price.toLocaleString("en-PH")} total</span>
         </div>
         <a className="btn-primary bb-cta" tabIndex={shown ? 0 : -1} href="/shop#flagship">Compare Protocols <Arrow /></a>
       </div>
