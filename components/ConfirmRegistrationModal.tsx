@@ -5,6 +5,7 @@ import type { RegistrationPayload } from "@/lib/types";
 type ConfirmRegistrationModalProps = {
   open: boolean;
   payload: RegistrationPayload | null;
+  invitedByName?: string | null;
   submitting: boolean;
   error?: string | null;
   onCancel: () => void;
@@ -26,6 +27,7 @@ const REVIEW_FIELDS: Array<{
 export default function ConfirmRegistrationModal({
   open,
   payload,
+  invitedByName,
   submitting,
   error,
   onCancel,
@@ -63,6 +65,12 @@ export default function ConfirmRegistrationModal({
               <dd>{payload[field.key]}</dd>
             </div>
           ))}
+          {invitedByName ? (
+            <div className="confirm-row">
+              <dt>Invited by</dt>
+              <dd>{invitedByName}</dd>
+            </div>
+          ) : null}
         </dl>
 
         <div className="confirm-actions">
