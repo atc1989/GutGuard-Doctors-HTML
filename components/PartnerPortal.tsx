@@ -26,8 +26,23 @@ const QR_RENDER_PX = 1024;
 
 type PartnerQrMode = "shop" | "referral" | "profile";
 type PartnerListTab = "orders" | "partners";
+type PartnerOrderFilter = "" | "pending" | "paid" | "fulfilled" | "refunded" | "cancelled";
+type PartnerQuery = {
+  limit: number;
+  offset: number;
+  status: PartnerOrderFilter;
+};
+
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 const DEFAULT_PAGE_SIZE = 10;
+const ORDER_STATUS_FILTERS: { label: string; value: PartnerOrderFilter }[] = [
+  { label: "All", value: "" },
+  { label: "Awaiting payment", value: "pending" },
+  { label: "Paid", value: "paid" },
+  { label: "Delivered", value: "fulfilled" },
+  { label: "Refunded", value: "refunded" },
+  { label: "Cancelled", value: "cancelled" },
+];
 
 const peso = (value: number) =>
   new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value);
@@ -50,13 +65,24 @@ export default function PartnerPortal() {
   const codeInputRef = useRef<HTMLInputElement>(null);
   const codeHeadingRef = useRef<HTMLHeadingElement>(null);
   const requestPendingRef = useRef(false);
-  const orderPageRef = useRef({ limit: DEFAULT_PAGE_SIZE, offset: 0 });
+  const [query, setQuery] = useState<PartnerQuery>({ limit: DEFAULT_PAGE_SIZE, offset: 0, status: "" });
+  const queryRef = useRef(query);
 
-  const load = useCallback(async (page?: { limit?: number; offset?: number }) => {
-    const limit = page?.limit ?? orderPageRef.current.limit;
-    const offset = page?.offset ?? orderPageRef.current.offset;
-    orderPageRef.current = { limit, offset };
-    const dashboard = await getPartnerDashboard({ limit, offset });
+  const load = useCallback(async (patch?: Partial<PartnerQuery>) => {
+    const next: PartnerQuery = { ...queryRef.current, ...patch };
+    if (
+      (patch?.status !== undefined || patch?.limit !== undefined) &&
+      patch.offset === undefined
+    ) {
+      next.offset = 0;
+    }
+    queryRef.current = next;
+    setQuery(next);
+    const dashboard = await getPartnerDashboard({
+      limit: next.limit,
+      offset: next.offset,
+      status: next.status || undefined,
+    });
     setData(dashboard);
     setView("dashboard");
   }, []);
@@ -247,7 +273,14 @@ export default function PartnerPortal() {
   }
 
   if (view === "dashboard" && data) {
-    return <Dashboard data={data} onSignOut={signOut} onPageChange={(limit, offset) => void load({ limit, offset })} />;
+    return (
+      <Dashboard
+        data={data}
+        statusFilter={query.status}
+        onSignOut={signOut}
+        onQueryChange={(patch) => void load(patch)}
+      />
+    );
   }
 
   if (view === "signing-in") {
@@ -368,12 +401,14 @@ export default function PartnerPortal() {
 
 function Dashboard({
   data,
+  statusFilter,
   onSignOut,
-  onPageChange,
+  onQueryChange,
 }: {
   data: PartnerDashboard;
+  statusFilter: PartnerOrderFilter;
   onSignOut: () => void;
-  onPageChange: (limit: number, offset: number) => void;
+  onQueryChange: (next: Partial<PartnerQuery>) => void;
 }) {
   const qrRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
@@ -386,7 +421,7 @@ function Dashboard({
   const conversion = data.clicks.total > 0 ? (data.totals.direct_orders / data.clicks.total) * 100 : 0;
   const orderLimit = data.orders_page.limit || DEFAULT_PAGE_SIZE;
   const orderOffset = data.orders_page.offset;
-  const orderTotal = data.orders_page.total || data.totals.orders;
+  const orderTotal = data.orders_page.total ?? data.totals.orders;
   const referredPartners = data.referred_partners;
   const visiblePartners = referredPartners.slice(partnerOffset, partnerOffset + partnerPageSize);
 
@@ -544,12 +579,41 @@ function Dashboard({
         {listTab === "orders" ? (
           <>
             <p className="shop-kicker">Your orders</p>
-            <h2>{orderTotal > 0 ? `${orderTotal} attributed` : "No orders yet"}</h2>
+            <h2>
+              {orderTotal > 0
+                ? `${orderTotal} ${statusFilter ? "matching" : "attributed"}`
+                : statusFilter
+                  ? "No matching orders"
+                  : "No orders yet"}
+            </h2>
+
+            <div className="partner-status-filters" role="tablist" aria-label="Order status">
+              {ORDER_STATUS_FILTERS.map((filter) => (
+                <button
+                  key={filter.value || "all"}
+                  type="button"
+                  role="tab"
+                  aria-selected={statusFilter === filter.value}
+                  className={statusFilter === filter.value ? "active" : undefined}
+                  onClick={() => onQueryChange({ status: filter.value, offset: 0 })}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
 
             {orderTotal === 0 ? (
               <div className="partner-empty-orders">
-                <strong>Your first referral order will appear here.</strong>
-                <p>Share your shop link or QR code to get started.</p>
+                <strong>
+                  {statusFilter
+                    ? "No orders match this status."
+                    : "Your first referral order will appear here."}
+                </strong>
+                <p>
+                  {statusFilter
+                    ? "Try another filter, or share your shop QR to start tracking."
+                    : "Share your shop link or QR code to get started."}
+                </p>
               </div>
             ) : (
               <div className="partner-orders">
@@ -564,7 +628,7 @@ function Dashboard({
                 total={orderTotal}
                 limit={orderLimit}
                 offset={orderOffset}
-                onPageChange={onPageChange}
+                onPageChange={(limit, offset) => onQueryChange({ limit, offset })}
               />
             ) : null}
 
@@ -631,7 +695,6 @@ function Stat({ label, value, note }: { label: string; value: string; note: stri
 }
 
 function OrderRow({ order }: { order: PartnerOrder }) {
-  const isPaid = order.payment_status === "paid";
   const place = [order.city, order.province].filter(Boolean).join(", ") || "Philippines";
   const via =
     order.source_type === "referred" && order.source_partner_name
@@ -647,7 +710,7 @@ function OrderRow({ order }: { order: PartnerOrder }) {
           {via}
         </span>
       </div>
-      <span className={isPaid ? "partner-badge paid" : "partner-badge"}>{statusLabel(order)}</span>
+      <span className={`partner-badge ${orderBadgeTone(order)}`}>{statusLabel(order)}</span>
       <b>{peso(order.total_amount)}</b>
     </article>
   );
@@ -767,6 +830,15 @@ function statusLabel(order: PartnerOrder) {
   if (order.payment_status === "paid") return order.status === "fulfilled" ? "Delivered" : "Paid";
   if (order.status === "cancelled") return "Cancelled";
   return "Awaiting payment";
+}
+
+function orderBadgeTone(order: PartnerOrder) {
+  const label = statusLabel(order);
+  if (label === "Delivered") return "is-delivered";
+  if (label === "Paid") return "is-paid";
+  if (label === "Refunded") return "is-refunded";
+  if (label === "Cancelled") return "is-cancelled";
+  return "is-pending";
 }
 
 function formatDate(value: string) {

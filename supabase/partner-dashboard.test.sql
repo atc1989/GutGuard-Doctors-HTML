@@ -185,6 +185,44 @@ begin
   assert (v_result -> 'orders_page' ->> 'total')::int = 3, 'paged total must count every attributed order';
   assert (v_result -> 'orders_page' ->> 'has_more')::boolean is true, 'has_more must be true when more rows exist';
 
+  insert into public.shop_orders
+    (order_code, payment_status, status, customer_name, first_name, city, province,
+     subtotal, shipping_fee, total_amount, referral_slug, referral_doctor_id)
+  values
+    ('GG-7', 'paid', 'fulfilled', 'Ava Yu', 'Ava', 'Makati', 'NCR',
+     600, 0, 600, 'dr-ana-reyes', v_ana),
+    ('GG-8', 'refunded', 'cancelled', 'Ben Sy', 'Ben', 'Pasig', 'NCR',
+     300, 0, 300, 'dr-ana-reyes', v_ana),
+    ('GG-9', 'pending', 'cancelled', 'Cora Uy', 'Cora', 'Quezon City', 'NCR',
+     200, 0, 200, 'dr-ana-reyes', v_ana);
+
+  perform set_config('request.jwt.claims', '{"email":"ANA@clinic.ph "}', true);
+
+  v_result := public.partner_dashboard('all', 'paid', 25, 0, null, null, 'newest');
+  assert (v_result -> 'orders_page' ->> 'total')::int = 2,
+    'paid filter must exclude delivered, refunded and cancelled, got ' || (v_result -> 'orders_page' ->> 'total');
+  assert not exists (
+    select 1 from jsonb_array_elements(v_result -> 'orders') e where e ->> 'order_code' = 'GG-7'
+  ), 'delivered order must not appear under paid';
+
+  v_result := public.partner_dashboard('all', 'fulfilled', 25, 0, null, null, 'newest');
+  assert (v_result -> 'orders_page' ->> 'total')::int = 1, 'delivered filter count wrong';
+  assert v_result -> 'orders' -> 0 ->> 'order_code' = 'GG-7', 'delivered filter must return the fulfilled order';
+
+  v_result := public.partner_dashboard('all', 'pending', 25, 0, null, null, 'newest');
+  assert (v_result -> 'orders_page' ->> 'total')::int = 1, 'awaiting-payment filter count wrong';
+  assert v_result -> 'orders' -> 0 ->> 'order_code' = 'GG-2', 'awaiting-payment filter must return the pending order';
+
+  v_result := public.partner_dashboard('all', 'refunded', 25, 0, null, null, 'newest');
+  assert (v_result -> 'orders_page' ->> 'total')::int = 1, 'refunded filter count wrong';
+  assert v_result -> 'orders' -> 0 ->> 'order_code' = 'GG-8', 'refunded filter must return the refunded order';
+
+  v_result := public.partner_dashboard('all', 'cancelled', 25, 0, null, null, 'newest');
+  assert (v_result -> 'orders_page' ->> 'total')::int = 1, 'cancelled filter count wrong';
+  assert v_result -> 'orders' -> 0 ->> 'order_code' = 'GG-9', 'cancelled filter must return the cancelled order';
+  assert (v_result -> 'totals' ->> 'orders')::int = 6,
+    'status filters must not shrink KPI totals, got ' || (v_result -> 'totals' ->> 'orders');
+
   -- A verified address that belongs to no partner gets nothing. This is the real access
   -- gate: sign-up is open, so anyone can hold a session.
   perform set_config('request.jwt.claims', '{"email":"stranger@example.com"}', true);
