@@ -500,6 +500,42 @@ $$;
 
 grant execute on function public.track_referral_click(text) to anon, authenticated;
 
+-- Maps partner-portal status chips onto payment_status + status.
+-- Paid and Delivered are distinct: payment_status=paid AND status=fulfilled is Delivered only.
+create or replace function public.partner_order_matches_status(
+  p_payment_status text,
+  p_order_status text,
+  p_filter text
+) returns boolean
+language sql
+immutable
+set search_path = public
+as $$
+  select case
+    when nullif(lower(trim(coalesce(p_filter, ''))), '') is null then true
+    when lower(trim(p_filter)) in ('pending', 'awaiting', 'awaiting_payment') then
+      lower(coalesce(p_payment_status, '')) not in ('paid', 'refunded')
+      and lower(coalesce(p_order_status, '')) not in ('cancelled', 'fulfilled')
+    when lower(trim(p_filter)) = 'paid' then
+      lower(coalesce(p_payment_status, '')) = 'paid'
+      and lower(coalesce(p_order_status, '')) is distinct from 'fulfilled'
+      and lower(coalesce(p_order_status, '')) is distinct from 'cancelled'
+    when lower(trim(p_filter)) in ('fulfilled', 'delivered') then
+      lower(coalesce(p_payment_status, '')) = 'paid'
+      and lower(coalesce(p_order_status, '')) = 'fulfilled'
+    when lower(trim(p_filter)) = 'refunded' then
+      lower(coalesce(p_payment_status, '')) = 'refunded'
+    when lower(trim(p_filter)) = 'cancelled' then
+      lower(coalesce(p_order_status, '')) = 'cancelled'
+      and lower(coalesce(p_payment_status, '')) is distinct from 'refunded'
+    else
+      lower(coalesce(p_payment_status, '')) = lower(trim(p_filter))
+      or lower(coalesce(p_order_status, '')) = lower(trim(p_filter))
+  end;
+$$;
+
+revoke all on function public.partner_order_matches_status(text, text, text) from public, anon, authenticated;
+
 -- Partner-facing read. Takes no partner id on purpose: the caller is whoever the
 -- Supabase Auth JWT says they are. Optional filters paginate the order list.
 --
@@ -562,11 +598,7 @@ begin
       or (v_scope = 'direct' and source.id = v_doctor.id)
       or (v_scope = 'referred' and source.referred_by_partner_id = v_doctor.id)
     )
-    and (
-      nullif(lower(trim(coalesce(p_status, ''))), '') is null
-      or lower(o.payment_status) = lower(trim(p_status))
-      or lower(o.status) = lower(trim(p_status))
-    )
+    and public.partner_order_matches_status(o.payment_status, o.status, p_status)
     and (p_date_from is null or o.created_at >= p_date_from)
     and (p_date_to is null or o.created_at < p_date_to + interval '1 day');
 
@@ -596,11 +628,7 @@ begin
         or (v_scope = 'direct' and source.id = v_doctor.id)
         or (v_scope = 'referred' and source.referred_by_partner_id = v_doctor.id)
       )
-      and (
-        nullif(lower(trim(coalesce(p_status, ''))), '') is null
-        or lower(o.payment_status) = lower(trim(p_status))
-        or lower(o.status) = lower(trim(p_status))
-      )
+      and public.partner_order_matches_status(o.payment_status, o.status, p_status)
       and (p_date_from is null or o.created_at >= p_date_from)
       and (p_date_to is null or o.created_at < p_date_to + interval '1 day')
     order by

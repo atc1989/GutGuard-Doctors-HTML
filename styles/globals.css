@@ -4525,22 +4525,26 @@
 }
 
 .partner-qr-toggle {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
   gap: 4px;
+  width: 100%;
   border: 1px solid var(--rule);
-  border-radius: var(--r-md);
+  border-radius: 999px;
   background: var(--bone);
   padding: 4px;
 }
 
 .partner-qr-toggle button {
   display: grid;
+  flex: 0 0 auto;
+  width: auto;
   gap: 3px;
   border: 0;
-  border-radius: calc(var(--r-md) - 4px);
+  border-radius: 999px;
   background: transparent;
-  padding: 11px 14px;
+  padding: 11px 16px;
   color: var(--ink-3);
   text-align: left;
   cursor: pointer;
@@ -4591,14 +4595,13 @@
 
 @media (max-width: 480px) {
   .partner-qr-toggle {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 3px;
     padding: 3px;
   }
 
   .partner-qr-toggle button {
     min-height: 58px;
-    padding: 9px 10px;
+    padding: 9px 12px;
   }
 
   .partner-qr-toggle strong {
@@ -4650,21 +4653,26 @@
   font-size: 13px;
 }
 
-.partner-list-tabs {
+.partner-list-tabs,
+.partner-status-filters {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 4px;
   width: 100%;
   border: 1px solid var(--rule);
-  border-radius: var(--r-md);
+  border-radius: 999px;
   background: var(--bone);
   padding: 4px;
 }
 
-.partner-list-tabs button {
+.partner-list-tabs button,
+.partner-status-filters button {
+  flex: 0 0 auto;
+  width: auto;
   min-height: 42px;
   border: 0;
-  border-radius: calc(var(--r-md) - 4px);
+  border-radius: 999px;
   background: transparent;
   padding: 8px 16px;
   color: var(--ink-3);
@@ -4672,10 +4680,22 @@
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  white-space: nowrap;
   cursor: pointer;
 }
 
-.partner-list-tabs button.active {
+.partner-status-filters {
+  margin: 4px 0 8px;
+}
+
+.partner-status-filters button {
+  min-height: 36px;
+  padding: 6px 14px;
+  font-size: 11px;
+}
+
+.partner-list-tabs button.active,
+.partner-status-filters button.active {
   background: var(--blue);
   color: #fff;
 }
@@ -4795,9 +4815,25 @@
   white-space: nowrap;
 }
 
-.partner-badge.paid {
-  border-color: rgba(6, 8, 169, 0.32);
+.partner-badge.is-pending {
+  border-color: rgba(20, 16, 25, 0.18);
+  color: var(--ink-3);
+}
+
+.partner-badge.is-paid {
+  border-color: rgba(59, 91, 219, 0.45);
+  color: #3b5bdb;
+}
+
+.partner-badge.is-delivered {
+  border-color: rgba(6, 8, 169, 0.4);
   color: var(--blue);
+}
+
+.partner-badge.is-refunded,
+.partner-badge.is-cancelled {
+  border-color: rgba(20, 16, 25, 0.12);
+  color: var(--ink-4);
 }
 
 @media (max-width: 560px) {
