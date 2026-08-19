@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
-import { QRCodeCanvas } from "qrcode.react";
-import { LoaderCircle } from "lucide-react";
+import { QRCodeCanvas, QRCodeSVG } from "qrcode.react";
+import { LoaderCircle, X } from "lucide-react";
 import { Logo } from "@/components/GutguardSite";
 import {
   getPartnerDashboard,
@@ -14,7 +13,7 @@ import {
   verifyPartnerOtp,
   type PartnerDashboard,
   type PartnerOrder,
-  type ReferredPartner,
+  type PartnerOrderScope,
 } from "@/lib/api";
 
 const SHOP_ORIGIN = (process.env.NEXT_PUBLIC_SHOP_URL ?? "https://shop.gutguard.ph").replace(/\/$/, "");
@@ -25,24 +24,6 @@ const PUBLIC_SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://partner
 const QR_RENDER_PX = 1024;
 
 type PartnerQrMode = "shop" | "referral" | "profile";
-type PartnerListTab = "orders" | "partners";
-type PartnerOrderFilter = "" | "pending" | "paid" | "fulfilled" | "refunded" | "cancelled";
-type PartnerQuery = {
-  limit: number;
-  offset: number;
-  status: PartnerOrderFilter;
-};
-
-const PAGE_SIZE_OPTIONS = [10, 20, 50];
-const DEFAULT_PAGE_SIZE = 10;
-const ORDER_STATUS_FILTERS: { label: string; value: PartnerOrderFilter }[] = [
-  { label: "All", value: "" },
-  { label: "Awaiting payment", value: "pending" },
-  { label: "Paid", value: "paid" },
-  { label: "Delivered", value: "fulfilled" },
-  { label: "Refunded", value: "refunded" },
-  { label: "Cancelled", value: "cancelled" },
-];
 
 const peso = (value: number) =>
   new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value);
@@ -65,24 +46,9 @@ export default function PartnerPortal() {
   const codeInputRef = useRef<HTMLInputElement>(null);
   const codeHeadingRef = useRef<HTMLHeadingElement>(null);
   const requestPendingRef = useRef(false);
-  const [query, setQuery] = useState<PartnerQuery>({ limit: DEFAULT_PAGE_SIZE, offset: 0, status: "" });
-  const queryRef = useRef(query);
 
-  const load = useCallback(async (patch?: Partial<PartnerQuery>) => {
-    const next: PartnerQuery = { ...queryRef.current, ...patch };
-    if (
-      (patch?.status !== undefined || patch?.limit !== undefined) &&
-      patch.offset === undefined
-    ) {
-      next.offset = 0;
-    }
-    queryRef.current = next;
-    setQuery(next);
-    const dashboard = await getPartnerDashboard({
-      limit: next.limit,
-      offset: next.offset,
-      status: next.status || undefined,
-    });
+  const load = useCallback(async () => {
+    const dashboard = await getPartnerDashboard();
     setData(dashboard);
     setView("dashboard");
   }, []);
@@ -273,14 +239,7 @@ export default function PartnerPortal() {
   }
 
   if (view === "dashboard" && data) {
-    return (
-      <Dashboard
-        data={data}
-        statusFilter={query.status}
-        onSignOut={signOut}
-        onQueryChange={(patch) => void load(patch)}
-      />
-    );
+    return <Dashboard data={data} onSignOut={signOut} />;
   }
 
   if (view === "signing-in") {
@@ -399,31 +358,72 @@ export default function PartnerPortal() {
   );
 }
 
-function Dashboard({
-  data,
-  statusFilter,
-  onSignOut,
-  onQueryChange,
-}: {
-  data: PartnerDashboard;
-  statusFilter: PartnerOrderFilter;
-  onSignOut: () => void;
-  onQueryChange: (next: Partial<PartnerQuery>) => void;
-}) {
+function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () => void }) {
   const qrRef = useRef<HTMLDivElement>(null);
+  const linkRef = useRef<HTMLParagraphElement>(null);
+  const posterDialogRef = useRef<HTMLDivElement>(null);
+  const posterTriggerRef = useRef<HTMLButtonElement>(null);
+  const lastOrderQueryRef = useRef("");
   const [copied, setCopied] = useState(false);
   const [qrMode, setQrMode] = useState<PartnerQrMode>("shop");
-  const [listTab, setListTab] = useState<PartnerListTab>("orders");
-  const [partnerPageSize, setPartnerPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [dashboard, setDashboard] = useState(data);
+  const [activityTab, setActivityTab] = useState<"orders" | "partners">("orders");
+  const [orderScope, setOrderScope] = useState<PartnerOrderScope>("all");
+  const [orderStatus, setOrderStatus] = useState("");
+  const [orderDateFrom, setOrderDateFrom] = useState("");
+  const [orderDateTo, setOrderDateTo] = useState("");
+  const [orderSort, setOrderSort] = useState<"newest" | "oldest">("newest");
+  const [orderOffset, setOrderOffset] = useState(0);
+  const [orderPageSize, setOrderPageSize] = useState(10);
   const [partnerOffset, setPartnerOffset] = useState(0);
+  const [partnerPageSize, setPartnerPageSize] = useState(10);
+  const [ordersBusy, setOrdersBusy] = useState(false);
+  const [ordersError, setOrdersError] = useState("");
+  const [posterOpen, setPosterOpen] = useState(false);
 
-  const link = getPartnerQrLink(data.partner.routing_slug, qrMode);
-  const conversion = data.clicks.total > 0 ? (data.totals.direct_orders / data.clicks.total) * 100 : 0;
-  const orderLimit = data.orders_page.limit || DEFAULT_PAGE_SIZE;
-  const orderOffset = data.orders_page.offset;
-  const orderTotal = data.orders_page.total ?? data.totals.orders;
-  const referredPartners = data.referred_partners;
-  const visiblePartners = referredPartners.slice(partnerOffset, partnerOffset + partnerPageSize);
+  const link = getPartnerQrLink(dashboard.partner.routing_slug, qrMode);
+  const conversion = dashboard.clicks.total > 0 ? (dashboard.totals.direct_orders / dashboard.clicks.total) * 100 : 0;
+  const visiblePartners = dashboard.referred_partners.slice(partnerOffset, partnerOffset + partnerPageSize);
+
+  useEffect(() => {
+    const queryKey = [orderScope, orderStatus, orderDateFrom, orderDateTo, orderSort, orderPageSize, orderOffset].join("|");
+    if (lastOrderQueryRef.current === queryKey) return;
+    lastOrderQueryRef.current = queryKey;
+    let cancelled = false;
+    setOrdersBusy(true);
+    setOrdersError("");
+    getPartnerDashboard({ scope: orderScope, status: orderStatus, dateFrom: orderDateFrom, dateTo: orderDateTo, sort: orderSort, limit: orderPageSize, offset: orderOffset })
+      .then((next) => { if (!cancelled) setDashboard(next); })
+      .catch(() => { if (!cancelled) setOrdersError("Orders could not be loaded. Please try again."); })
+      .finally(() => { if (!cancelled) setOrdersBusy(false); });
+    return () => { cancelled = true; };
+  }, [orderScope, orderStatus, orderDateFrom, orderDateTo, orderSort, orderPageSize, orderOffset]);
+
+  useEffect(() => {
+    if (!posterOpen) return;
+    posterDialogRef.current?.focus();
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") { setPosterOpen(false); requestAnimationFrame(() => posterTriggerRef.current?.focus()); return; }
+      if (event.key !== "Tab" || !posterDialogRef.current) return;
+      const controls = Array.from(posterDialogRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+      if (!controls.length) return;
+      const first = controls[0]; const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [posterOpen]);
+
+  function moveQrTab(event: React.KeyboardEvent<HTMLButtonElement>, mode: PartnerQrMode) {
+    const modes: PartnerQrMode[] = ["shop", "referral", "profile"];
+    const delta = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    if (!delta) return;
+    event.preventDefault();
+    const next = modes[(modes.indexOf(mode) + delta + modes.length) % modes.length];
+    setQrMode(next); setCopied(false);
+    requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-qr-mode="${next}"]`)?.focus());
+  }
 
   async function copyLink() {
     try {
@@ -431,7 +431,11 @@ function Dashboard({
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
+      // Clipboard is blocked on insecure origins and in some in-app browsers. The link is
+      // shown in full above the button, so there is still a way through.
       setCopied(false);
+      const selection = window.getSelection();
+      if (selection && linkRef.current) { const range = document.createRange(); range.selectNodeContents(linkRef.current); selection.removeAllRanges(); selection.addRange(range); }
     }
   }
 
@@ -441,13 +445,8 @@ function Dashboard({
 
     const anchor = document.createElement("a");
     anchor.href = canvas.toDataURL("image/png");
-    anchor.download = `gutguard-${qrMode}-qr-${data.partner.routing_slug}.png`;
+    anchor.download = `gutguard-${qrMode}-qr-${dashboard.partner.routing_slug}.png`;
     anchor.click();
-  }
-
-  function selectQrMode(mode: PartnerQrMode) {
-    setQrMode(mode);
-    setCopied(false);
   }
 
   return (
@@ -456,228 +455,192 @@ function Dashboard({
 
       <section className="shop-order-panel">
         <p className="shop-kicker">Partner dashboard</p>
-        <h1>{data.partner.full_name}</h1>
+        <h1>{dashboard.partner.full_name}</h1>
+        <p className="shop-lede partner-dashboard-intro">
+          Track orders placed through your shop link and through partners you referred.
+        </p>
 
         <div className="partner-stats">
-          <Stat
-            label="Direct orders"
-            value={String(data.totals.direct_orders)}
-            note={`${data.clicks.total} shop-link click${data.clicks.total === 1 ? "" : "s"}`}
-          />
-          <Stat
-            label="Referred partners"
-            value={String(data.totals.referred_partners)}
-            note="one referral level"
-          />
-          <Stat
-            label="Referred-partner orders"
-            value={String(data.totals.referred_orders)}
-            note="generated by partners you referred"
-          />
-          <Stat
-            label="Combined paid value"
-            value={peso(data.totals.paid_amount)}
-            note="gross order value, not commission"
-          />
+          <Stat label="Direct orders" value={String(dashboard.totals.direct_orders)} note={`${dashboard.clicks.total} shop-link clicks`} />
+          <Stat label="Referred partners" value={String(dashboard.totals.referred_partners)} note="one referral level" />
+          <Stat label="Referred-partner orders" value={String(dashboard.totals.referred_orders)} note="generated by partners you referred" />
+          <Stat label="Combined paid value" value={peso(dashboard.totals.paid_amount)} note="gross order value, not commission" />
         </div>
-        <p className="partner-stats-footnote">
-          Direct conversion: {data.clicks.total > 0 ? `${conversion.toFixed(1)}%` : "--"}
-          {" · "}
-          {data.clicks.last_30_days} click{data.clicks.last_30_days === 1 ? "" : "s"} in the last 30 days
-          {" · "}
-          {data.totals.paid_orders} paid order{data.totals.paid_orders === 1 ? "" : "s"}
-        </p>
+        <p className="partner-performance-detail">Direct conversion: {dashboard.clicks.total ? `${conversion.toFixed(1)}%` : "--"} · {dashboard.clicks.last_30_days} clicks in the last 30 days · {dashboard.totals.paid_orders} paid orders</p>
       </section>
 
-      <section className="shop-order-panel partner-share-panel">
-        <p className="shop-kicker">Share &amp; grow</p>
-        <h2>Your QR codes</h2>
-        <p className="shop-lede">Choose what you want people to open when they scan.</p>
+      <div className="partner-dashboard-grid">
+        <section className="shop-order-panel partner-share-panel">
+          <p className="shop-kicker">Share &amp; grow</p>
+          <h2>Your QR codes</h2>
+          <p className="shop-lede">
+            Choose what you want people to open when they scan.
+          </p>
 
-        <div className="partner-qr-toggle" role="group" aria-label="QR code type">
-          <button
-            type="button"
-            className={qrMode === "shop" ? "active" : ""}
-            aria-pressed={qrMode === "shop"}
-            onClick={() => selectQrMode("shop")}
-          >
-            <strong>Shop QR</strong>
-            <span>Track clicks &amp; orders</span>
-          </button>
-          <button
-            type="button"
-            className={qrMode === "referral" ? "active" : ""}
-            aria-pressed={qrMode === "referral"}
-            onClick={() => selectQrMode("referral")}
-          >
-            <strong>Referral QR</strong>
-            <span>Invite a partner</span>
-          </button>
-          <button
-            type="button"
-            className={qrMode === "profile" ? "active" : ""}
-            aria-pressed={qrMode === "profile"}
-            onClick={() => selectQrMode("profile")}
-          >
-            <strong>Profile QR</strong>
-            <span>Open your TikTok</span>
-          </button>
-        </div>
+          <div className="partner-qr-toggle" role="tablist" aria-label="QR code type">
+            <button
+              type="button"
+              role="tab" data-qr-mode="shop" className={qrMode === "shop" ? "active" : ""}
+              aria-selected={qrMode === "shop"}
+              tabIndex={qrMode === "shop" ? 0 : -1} onKeyDown={(event) => moveQrTab(event, "shop")}
+              onClick={() => {
+                setQrMode("shop");
+                setCopied(false);
+              }}
+            >
+              <strong>Shop QR</strong>
+            </button>
+            <button
+              type="button"
+              role="tab" data-qr-mode="referral" className={qrMode === "referral" ? "active" : ""}
+              aria-selected={qrMode === "referral"}
+              tabIndex={qrMode === "referral" ? 0 : -1} onKeyDown={(event) => moveQrTab(event, "referral")}
+              onClick={() => { setQrMode("referral"); setCopied(false); }}
+            >
+              <strong>Referral QR</strong>
+            </button>
+            <button
+              type="button"
+              role="tab" data-qr-mode="profile" className={qrMode === "profile" ? "active" : ""}
+              aria-selected={qrMode === "profile"}
+              tabIndex={qrMode === "profile" ? 0 : -1} onKeyDown={(event) => moveQrTab(event, "profile")}
+              onClick={() => {
+                setQrMode("profile");
+                setCopied(false);
+              }}
+            >
+              <strong>Profile QR</strong>
+            </button>
+          </div>
 
-        <p className="shop-lede partner-qr-hint">{qrHint(qrMode)}</p>
+          <p className="partner-qr-description" role="tabpanel">
+            {qrMode === "shop" ? "Send customers to your GutGuard shop and attribute their orders to you."
+              : qrMode === "referral" ? "Invite another partner. Their registration and future attributed orders will be connected to you."
+              : "Send visitors directly to your TikTok profile."}
+          </p>
 
-        <div className="partner-link-row">
-          <p className="partner-link">{link}</p>
-          <button type="button" className="shop-primary" onClick={copyLink}>
-            <span>{copied ? "Copied" : "Copy link"}</span>
-          </button>
-        </div>
+          <div className="partner-link-row">
+            <p className="partner-link" ref={linkRef}>{link}</p>
+            <button type="button" className="shop-primary" onClick={copyLink}>
+              <span>{copied ? "Copied" : "Copy link"}</span>
+            </button>
+            <span className="visually-hidden" aria-live="polite">{copied ? "Link copied" : ""}</span>
+          </div>
 
-        <div className="partner-qr" ref={qrRef}>
-          <QRCodeCanvas
-            key={qrMode}
-            value={link}
-            size={QR_RENDER_PX}
-            level="M"
-            marginSize={2}
-            style={{ width: "100%", height: "auto" }}
-          />
-        </div>
+          <div className="partner-qr" ref={qrRef}>
+            <QRCodeSVG
+              key={qrMode}
+              value={link}
+              size={QR_RENDER_PX}
+              level="M"
+              marginSize={2}
+              style={{ width: "100%", height: "auto" }}
+            />
+            <QRCodeCanvas className="partner-qr-download-canvas" value={link} size={QR_RENDER_PX} level="M" marginSize={4} />
+          </div>
 
-        <div className="partner-qr-actions">
-          <button type="button" className="shop-secondary" onClick={downloadQr}>
-            Download PNG
-          </button>
-          <button type="button" className="shop-secondary" onClick={() => window.print()}>
-            Preview poster
-          </button>
-        </div>
-      </section>
+          <div className="partner-qr-actions">
+            <button type="button" className="shop-secondary" onClick={downloadQr}>
+              Download PNG
+            </button>
+            <button ref={posterTriggerRef} type="button" className="shop-secondary" onClick={() => setPosterOpen(true)}>
+              Preview poster
+            </button>
+          </div>
+        </section>
 
-      <section className="shop-order-panel partner-orders-panel">
-        <div className="partner-list-tabs" role="tablist" aria-label="Dashboard lists">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={listTab === "orders"}
-            className={listTab === "orders" ? "active" : ""}
-            onClick={() => setListTab("orders")}
-          >
-            Orders {data.totals.orders}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={listTab === "partners"}
-            className={listTab === "partners" ? "active" : ""}
-            onClick={() => setListTab("partners")}
-          >
-            Referred partners {data.totals.referred_partners}
-          </button>
-        </div>
+        <section className="shop-order-panel partner-orders-panel">
+          <div className="partner-activity-tabs" role="tablist" aria-label="Dashboard activity">
+            <button type="button" role="tab" aria-selected={activityTab === "orders"} className={activityTab === "orders" ? "active" : ""} onClick={() => setActivityTab("orders")}>Orders <span>{dashboard.totals.orders}</span></button>
+            <button type="button" role="tab" aria-selected={activityTab === "partners"} className={activityTab === "partners" ? "active" : ""} onClick={() => setActivityTab("partners")}>Referred partners <span>{dashboard.totals.referred_partners}</span></button>
+          </div>
 
-        {listTab === "orders" ? (
-          <>
-            <p className="shop-kicker">Your orders</p>
-            <h2>
-              {orderTotal > 0
-                ? `${orderTotal} ${statusFilter ? "matching" : "attributed"}`
-                : statusFilter
-                  ? "No matching orders"
-                  : "No orders yet"}
-            </h2>
+          {activityTab === "orders" ? <>
+          <p className="shop-kicker">Your orders</p>
+          <h2>{dashboard.orders_page.total > 0 ? `${dashboard.orders_page.total} attributed` : "No orders yet"}</h2>
 
-            <div className="partner-status-filters" role="tablist" aria-label="Order status">
-              {ORDER_STATUS_FILTERS.map((filter) => (
-                <button
-                  key={filter.value || "all"}
-                  type="button"
-                  role="tab"
-                  aria-selected={statusFilter === filter.value}
-                  className={statusFilter === filter.value ? "active" : undefined}
-                  onClick={() => onQueryChange({ status: filter.value, offset: 0 })}
-                >
-                  {filter.label}
-                </button>
+          <div className="partner-order-toolbar">
+            <div className="partner-order-tabs" role="tablist" aria-label="Order attribution">
+              {([['all', `All ${dashboard.totals.orders}`], ['direct', `Direct ${dashboard.totals.direct_orders}`], ['referred', `Referred ${dashboard.totals.referred_orders}`]] as const).map(([value, label]) => (
+                <button key={value} type="button" role="tab" aria-selected={orderScope === value}
+                  className={orderScope === value ? "active" : ""}
+                  onClick={() => { setOrderScope(value); setOrderOffset(0); }}>{label}</button>
               ))}
             </div>
+            <label className="partner-order-filter">Status
+              <select value={orderStatus} onChange={(event) => { setOrderStatus(event.target.value); setOrderOffset(0); }}>
+                <option value="">All statuses</option><option value="paid">Paid</option>
+                <option value="pending">Awaiting payment</option><option value="fulfilled">Delivered</option>
+                <option value="cancelled">Cancelled</option><option value="refunded">Refunded</option>
+              </select>
+            </label>
+            <label className="partner-order-filter">From<input type="date" value={orderDateFrom} max={orderDateTo || undefined} onChange={(event) => { setOrderDateFrom(event.target.value); setOrderOffset(0); }} /></label>
+            <label className="partner-order-filter">To<input type="date" value={orderDateTo} min={orderDateFrom || undefined} onChange={(event) => { setOrderDateTo(event.target.value); setOrderOffset(0); }} /></label>
+            <label className="partner-order-filter">Sort<select value={orderSort} onChange={(event) => { setOrderSort(event.target.value as "newest" | "oldest"); setOrderOffset(0); }}><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select></label>
+          </div>
 
-            {orderTotal === 0 ? (
-              <div className="partner-empty-orders">
-                <strong>
-                  {statusFilter
-                    ? "No orders match this status."
-                    : "Your first referral order will appear here."}
-                </strong>
-                <p>
-                  {statusFilter
-                    ? "Try another filter, or share your shop QR to start tracking."
-                    : "Share your shop link or QR code to get started."}
-                </p>
-              </div>
-            ) : (
-              <div className="partner-orders">
-                {data.orders.map((order) => (
-                  <OrderRow key={order.order_code} order={order} />
-                ))}
-              </div>
-            )}
+          {ordersError ? <div className="partner-orders-error" role="alert">{ordersError}</div> : null}
 
-            {orderTotal > 0 ? (
-              <Pager
-                total={orderTotal}
-                limit={orderLimit}
-                offset={orderOffset}
-                onPageChange={(limit, offset) => onQueryChange({ limit, offset })}
-              />
-            ) : null}
+          {ordersBusy ? <div className="partner-orders-loading" aria-live="polite"><LoaderCircle className="partner-spinner" aria-hidden="true" /> Loading orders…</div> : dashboard.orders.length === 0 ? (
+            <div className="partner-empty-orders">
+              <strong>{orderScope === "direct" ? "No direct orders yet." : orderScope === "referred" ? "No referred-partner orders yet." : "No attributed orders yet."}</strong>
+              <p>{orderScope === "referred" ? "Orders generated by partners you referred will appear here." : "Share the matching QR code to get started."}</p>
+            </div>
+          ) : (
+            <div className="partner-orders">
+              {dashboard.orders.map((order) => (
+                <OrderRow key={order.order_code} order={order} />
+              ))}
+            </div>
+          )}
 
-            <p className="shop-note">
-              Buyer details stay private. You only see their first name and area.
-            </p>
-          </>
-        ) : (
-          <>
+          <div className="partner-pagination" aria-label="Order pages">
+            <label className="partner-pagination-size">Rows<select value={orderPageSize} onChange={(event) => { setOrderPageSize(Number(event.target.value)); setOrderOffset(0); }}><option value="10">10</option><option value="25">25</option><option value="50">50</option></select></label>
+            <button type="button" className="shop-secondary" disabled={ordersBusy || orderOffset === 0} onClick={() => setOrderOffset(Math.max(0, orderOffset - orderPageSize))}>Previous</button>
+            <span>{dashboard.orders_page.total ? `${orderOffset + 1}–${Math.min(orderOffset + dashboard.orders.length, dashboard.orders_page.total)} of ${dashboard.orders_page.total}` : "0 orders"}</span>
+            <button type="button" className="shop-secondary" disabled={ordersBusy || !dashboard.orders_page.has_more} onClick={() => setOrderOffset(orderOffset + orderPageSize)}>Next</button>
+          </div>
+
+          <p className="shop-note">
+            Buyer details stay private. You only see their first name and area.
+          </p>
+          </> : <>
             <p className="shop-kicker">Partners you referred</p>
-            <h2>
-              {referredPartners.length > 0
-                ? `${referredPartners.length} partner${referredPartners.length === 1 ? "" : "s"}`
-                : "No referred partners yet"}
-            </h2>
+            <div className="partner-section-heading">
+              <h2>{dashboard.totals.referred_partners ? `${dashboard.totals.referred_partners} partners` : "No referred partners yet"}</h2>
+            </div>
+            {ordersError ? <div className="partner-orders-error" role="alert">{ordersError}</div> : null}
+            {ordersBusy ? <div className="partner-orders-loading" aria-live="polite"><LoaderCircle className="partner-spinner" aria-hidden="true" /> Loading partners…</div> : visiblePartners.length ? <div className="partner-referred-list">{visiblePartners.map((partner) => (
+              <button type="button" key={partner.routing_slug} className="partner-referred-row" onClick={() => { setActivityTab("orders"); setOrderScope("referred"); setOrderOffset(0); }}>
+                <span><strong>{partner.full_name}</strong><small>{[partner.specialty, partner.practice_location].filter(Boolean).join(" · ") || "Partner"}</small></span>
+                <span><strong>{partner.orders}</strong><small>orders</small></span>
+                <span><strong>{peso(partner.paid_order_value)}</strong><small>paid order value</small></span>
+              </button>
+            ))}</div> : <div className="partner-empty-orders"><strong>Your referral registrations will appear here.</strong><p>Share your Referral QR to invite another GutGuard partner.</p></div>}
+            <div className="partner-pagination" aria-label="Referred partner pages">
+              <label className="partner-pagination-size">Rows<select value={partnerPageSize} onChange={(event) => { setPartnerPageSize(Number(event.target.value)); setPartnerOffset(0); }}><option value="10">10</option><option value="25">25</option><option value="50">50</option></select></label>
+              <button type="button" className="shop-secondary" disabled={ordersBusy || partnerOffset === 0} onClick={() => setPartnerOffset(Math.max(0, partnerOffset - partnerPageSize))}>Previous</button>
+              <span>{dashboard.totals.referred_partners ? `${partnerOffset + 1}–${Math.min(partnerOffset + visiblePartners.length, dashboard.totals.referred_partners)} of ${dashboard.totals.referred_partners}` : "0 partners"}</span>
+              <button type="button" className="shop-secondary" disabled={ordersBusy || partnerOffset + visiblePartners.length >= dashboard.totals.referred_partners} onClick={() => setPartnerOffset(partnerOffset + partnerPageSize)}>Next</button>
+            </div>
+          </>}
+        </section>
+      </div>
 
-            {referredPartners.length === 0 ? (
-              <div className="partner-empty-orders">
-                <strong>Share your referral QR to invite a colleague.</strong>
-                <p>Partners who register with your link appear here, one level deep.</p>
-              </div>
-            ) : (
-              <div className="partner-orders">
-                {visiblePartners.map((partner) => (
-                  <ReferredPartnerRow key={partner.routing_slug || partner.full_name} partner={partner} />
-                ))}
-              </div>
-            )}
-
-            {referredPartners.length > 0 ? (
-              <Pager
-                total={referredPartners.length}
-                limit={partnerPageSize}
-                offset={partnerOffset}
-                onPageChange={(limit, offset) => {
-                  setPartnerPageSize(limit);
-                  setPartnerOffset(offset);
-                }}
-              />
-            ) : null}
-          </>
-        )}
-      </section>
+      {/* Screen-hidden, print-only. Kept in the DOM so window.print() needs no new page. */}
+      {posterOpen ? <div className="partner-poster-modal" role="dialog" aria-modal="true" aria-labelledby="poster-title">
+        <div className="partner-poster-dialog" ref={posterDialogRef} tabIndex={-1}>
+          <div className="partner-poster-header"><div><p className="shop-kicker">Print preview</p><h2 id="poster-title">A4 QR poster</h2></div><button type="button" className="partner-poster-close" aria-label="Close poster preview" onClick={() => setPosterOpen(false)}><X aria-hidden="true" /></button></div>
+          <PosterContent mode={qrMode} link={link} partnerName={dashboard.partner.full_name} />
+          <div className="partner-poster-actions"><button type="button" className="shop-secondary" onClick={() => { setPosterOpen(false); requestAnimationFrame(() => posterTriggerRef.current?.focus()); }}>Close</button><button type="button" className="shop-primary" onClick={() => window.print()}>Print poster</button></div>
+        </div>
+      </div> : null}
 
       <div className="partner-print" aria-hidden="true">
-        <Image src="/gutguard-logo.png" alt="" width={68} height={80} />
-        <strong>{posterHeadline(qrMode)}</strong>
-        <QRCodeCanvas value={link} size={QR_RENDER_PX} level="M" marginSize={2} />
-        <span>{data.partner.full_name}</span>
+        <PosterLogo />
+        <strong>{posterTitle(qrMode)}</strong>
+        <QRCodeSVG value={link} size={QR_RENDER_PX} level="M" marginSize={4} />
+        <span>{dashboard.partner.full_name}</span>
         <small>{link}</small>
       </div>
     </main>
@@ -694,88 +657,40 @@ function Stat({ label, value, note }: { label: string; value: string; note: stri
   );
 }
 
+function PosterContent({ mode, link, partnerName }: { mode: PartnerQrMode; link: string; partnerName: string }) {
+  return <div className="partner-poster-preview" aria-label={`${posterTitle(mode)} poster preview`}>
+    <PosterLogo />
+    <strong>{posterTitle(mode)}</strong>
+    <div className="partner-poster-qr"><QRCodeSVG value={link} size={QR_RENDER_PX} level="M" marginSize={4} style={{ width: "100%", height: "auto" }} /></div>
+    <span>{partnerName}</span><small>{link}</small>
+  </div>;
+}
+
+function PosterLogo() {
+  return <div className="partner-poster-logo"><Logo h={44} /></div>;
+}
+
+function posterTitle(mode: PartnerQrMode) {
+  if (mode === "shop") return "Scan to order GutGuard";
+  if (mode === "referral") return "Scan to become a GutGuard partner";
+  return "Scan to visit my TikTok profile";
+}
+
 function OrderRow({ order }: { order: PartnerOrder }) {
-  const place = [order.city, order.province].filter(Boolean).join(", ") || "Philippines";
-  const via =
-    order.source_type === "referred" && order.source_partner_name
-      ? ` via ${order.source_partner_name}`
-      : "";
+  const isPaid = order.payment_status === "paid";
 
   return (
     <article className="partner-order">
       <div>
         <strong>{order.buyer_first_name || "A customer"}</strong>
         <span>
-          {place} - {formatDate(order.created_at)}
-          {via}
+          {[order.city, order.province].filter(Boolean).join(", ") || "Philippines"} - {formatDate(order.created_at)}
         </span>
+        <span className="partner-order-source">{order.source_type === "direct" ? "Your shop link" : `Via ${order.source_partner_name}`}</span>
       </div>
-      <span className={`partner-badge ${orderBadgeTone(order)}`}>{statusLabel(order)}</span>
+      <span className={isPaid ? "partner-badge paid" : "partner-badge"}>{statusLabel(order)}</span>
       <b>{peso(order.total_amount)}</b>
     </article>
-  );
-}
-
-function ReferredPartnerRow({ partner }: { partner: ReferredPartner }) {
-  const detail = [partner.specialty, partner.practice_location].filter(Boolean).join(" - ");
-
-  return (
-    <article className="partner-order partner-referred">
-      <div>
-        <strong>{partner.full_name}</strong>
-        <span>{detail || "GutGuard partner"}</span>
-      </div>
-      <span className="partner-badge">
-        {partner.orders} order{partner.orders === 1 ? "" : "s"}
-      </span>
-      <b>{peso(partner.paid_order_value)}</b>
-    </article>
-  );
-}
-
-function Pager({
-  total,
-  limit,
-  offset,
-  onPageChange,
-}: {
-  total: number;
-  limit: number;
-  offset: number;
-  onPageChange: (limit: number, offset: number) => void;
-}) {
-  const start = total === 0 ? 0 : offset + 1;
-  const end = Math.min(offset + limit, total);
-  const canPrev = offset > 0;
-  const canNext = offset + limit < total;
-
-  return (
-    <div className="partner-pager">
-      <label className="partner-pager-size">
-        Rows
-        <select
-          value={limit}
-          onChange={(event) => onPageChange(Number(event.target.value), 0)}
-        >
-          {PAGE_SIZE_OPTIONS.map((size) => (
-            <option key={size} value={size}>
-              {size}
-            </option>
-          ))}
-        </select>
-      </label>
-      <div className="partner-pager-nav">
-        <button type="button" disabled={!canPrev} onClick={() => onPageChange(limit, Math.max(0, offset - limit))}>
-          Previous
-        </button>
-        <span>
-          {start}-{end} of {total}
-        </span>
-        <button type="button" disabled={!canNext} onClick={() => onPageChange(limit, offset + limit)}>
-          Next
-        </button>
-      </div>
-    </div>
   );
 }
 
@@ -813,32 +728,11 @@ function getPartnerQrLink(slug: string, mode: PartnerQrMode) {
   return `${SHOP_ORIGIN}/r/${encodeURIComponent(slug)}`;
 }
 
-function qrHint(mode: PartnerQrMode) {
-  if (mode === "referral") return "Send colleagues to register as a GutGuard partner.";
-  if (mode === "profile") return "Send visitors directly to your TikTok profile.";
-  return "Send visitors to the shop with your tracking link.";
-}
-
-function posterHeadline(mode: PartnerQrMode) {
-  if (mode === "referral") return "Scan to join as a GutGuard partner";
-  if (mode === "profile") return "Scan to visit my TikTok profile";
-  return "Scan to order GutGuard";
-}
-
 function statusLabel(order: PartnerOrder) {
   if (order.payment_status === "refunded") return "Refunded";
   if (order.payment_status === "paid") return order.status === "fulfilled" ? "Delivered" : "Paid";
   if (order.status === "cancelled") return "Cancelled";
   return "Awaiting payment";
-}
-
-function orderBadgeTone(order: PartnerOrder) {
-  const label = statusLabel(order);
-  if (label === "Delivered") return "is-delivered";
-  if (label === "Paid") return "is-paid";
-  if (label === "Refunded") return "is-refunded";
-  if (label === "Cancelled") return "is-cancelled";
-  return "is-pending";
 }
 
 function formatDate(value: string) {
