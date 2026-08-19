@@ -256,8 +256,10 @@ export type ReferredPartner = {
   paid_order_value: number;
 };
 
+export type PartnerOrderScope = "all" | "direct" | "referred";
+
 export type PartnerDashboardQuery = {
-  scope?: "all" | "direct" | "referred";
+  scope?: PartnerOrderScope;
   status?: string;
   limit?: number;
   offset?: number;
@@ -920,11 +922,11 @@ export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Pr
 
   const { data, error } = await supabaseShop.rpc("partner_dashboard", {
     p_scope: query.scope ?? "all",
-    p_status: query.status ?? null,
+    p_status: query.status || null,
     p_limit: query.limit ?? DEFAULT_PARTNER_ORDER_PAGE_SIZE,
     p_offset: query.offset ?? 0,
-    p_date_from: query.dateFrom ?? null,
-    p_date_to: query.dateTo ?? null,
+    p_date_from: query.dateFrom || null,
+    p_date_to: query.dateTo || null,
     p_sort: query.sort ?? "newest",
   });
   if (error) throw error;
