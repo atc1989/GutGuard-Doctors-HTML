@@ -37,7 +37,7 @@ const CSS = `
 :where(.gg button){font-family:inherit;cursor:pointer;border:0;background:0;color:inherit;}
 .gg img{max-width:100%;display:block;}
 .gg :focus-visible{outline:2px solid var(--blue);outline-offset:3px;border-radius:3px;}
-.gg .measure :focus-visible,.gg .final :focus-visible,.gg .lca-hero.dark :focus-visible{outline-color:#F4F1EA;}
+.gg .measure :focus-visible,.gg .final :focus-visible,.gg .lca-hero.dark :focus-visible,.gg .rationale :focus-visible{outline-color:#F4F1EA;}
 .gg main:focus{outline:none;}
 .wrap{position:relative;z-index:1;max-width:var(--maxw);margin:0 auto;padding:0 clamp(20px,5vw,40px);}
 /* true-desktop: canvas grows intentionally on large displays; text stays capped by ch */
@@ -584,6 +584,12 @@ footer{padding:54px 0;border-top:1px solid var(--rule);}
 .lca-hero.dark .eyebrow{color:var(--gold-soft);}.lca-hero.dark .eyebrow::before{background:var(--gold-soft);}
 .lca-hero.dark h1{color:#F4F1EA;}.lca-hero.dark h1 em{color:var(--gold-soft);}
 .lca-hero.dark .hero-lede{color:rgba(234,241,240,.82);}
+.rationale .sec-label{color:var(--slate-mut);}.rationale .sec-label::before{background:var(--slate-mut);}
+.rationale .sec-label .num{color:var(--recovery);}
+.rationale h2.sec em{color:var(--gold-soft);}
+.rationale .layer{grid-template-columns:104px 1fr;align-items:flex-start;}
+.rationale .lyr-tag{color:var(--gold-text);}
+@media(max-width:680px){.rationale .layer{grid-template-columns:1fr;}}
 .lca-hero .narrow{max-width:760px;}
 .offer-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--rule);margin-top:44px;}
 @media(max-width:720px){.offer-grid{grid-template-columns:1fr;}}
@@ -1669,13 +1675,13 @@ function Physicians() {
         </div>
       </div></section>
 
-      <section className="section" style={{ background: "var(--slate)", position: "relative", overflow: "hidden" }}><Constellation /><div className="wrap">
+      <section className="section rationale" style={{ background: "var(--slate)", position: "relative", overflow: "hidden" }}><Constellation /><div className="wrap">
         <div className="reveal">
           <div className="sec-label" id="rationale" style={{ color: "var(--slate-mut)" }}><span className="num">02</span> The recovery rationale</div>
           <h2 className="sec" style={{ color: "#F4F1EA" }}>A layered <em>recovery</em> system — not just a probiotic.</h2>
           <p className="sec-body" style={{ color: "#B8C6D6" }}>SynBIOTIC+ pairs a spore-forming probiotic with prebiotic, postbiotic and antioxidant layers — a layered design, uncommon among probiotics, positioned as post-antibiotic gut and cellular recovery. Described as support, not the treatment or prevention of any disease.</p>
         </div>
-        <div className="layers comp-layers reveal">
+        <div className="layers reveal">
           <div className="layer"><span className="lyr-tag">Prebiotic</span><div><h3>FOS (fructo-oligosaccharides)</h3><p>Feeds beneficial microbes and supports recolonisation of the gut after antibiotic exposure.</p></div></div>
           <div className="layer"><span className="lyr-tag">Probiotic</span><div><h3>Spore-forming <i>Bacillus coagulans</i> (LactoSpore®)</h3><p>Its spore coat survives gastric acid to reach the gut, helping restore microbiome balance and resilience during and after antibiotics. Similar Bacillus and multi-strain formulations have shown benefit in antibiotic-associated diarrhoea<sup><a href="#pref1">1</a></sup>, with modulation of gut microbiota and inflammatory cytokines<sup><a href="#pref2">2</a></sup>; broader meta-analyses report a reduced risk of <i>C. difficile</i>-associated diarrhoea in patients receiving antibiotics<sup><a href="#pref3">3</a></sup>.</p></div></div>
           <div className="layer"><span className="lyr-tag">Postbiotic</span><div><h3>Urolithin-A + L-Tryptophan</h3><p>Urolithin-A supports mitochondrial renewal (mitophagy); L-tryptophan is a precursor in gut–immune and gut–brain signalling — extending recovery from the microbiome to cellular energy.</p></div></div>
