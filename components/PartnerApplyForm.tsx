@@ -152,7 +152,7 @@ export default function PartnerApplyForm({
         id="tiktokUsername"
         label="TikTok username"
         optional
-        help="Optional. Used for your profile QR code."
+        help="Used for your profile QR code."
         error="Enter a valid TikTok username, or leave this blank."
         value={values.tiktokUsername}
         hasError={errors.tiktokUsername}

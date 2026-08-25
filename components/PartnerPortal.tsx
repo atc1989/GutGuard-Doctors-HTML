@@ -322,11 +322,17 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
       setView("code");
       setNotice("Account created. Check your email for a sign-in code.");
       setError(null);
+      if (typeof window !== "undefined" && window.location.search) {
+        window.history.replaceState(null, "", "/partner");
+      }
       return;
     }
 
     setView("email");
     setNotice("");
+    if (typeof window !== "undefined" && window.location.search) {
+      window.history.replaceState(null, "", "/partner");
+    }
   }
 
   async function signOut() {
@@ -381,7 +387,7 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
           </p>
           <PartnerApplyForm invitedBy={invitation} onRegistered={handleRegistered} onSignIn={showSignIn} />
           <p className="partner-auth-trust">
-            No Facebook follow, prize wheel, or extra onboarding steps. After you submit, we email a one-time code and take you to your dashboard.
+            After you submit, we email a one-time code and open your dashboard. No Facebook follow or prize wheel.
           </p>
         </section>
       </main>

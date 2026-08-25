@@ -4110,6 +4110,7 @@
 /* Focused passwordless authentication shell. Dashboard styles below remain unchanged. */
 .partner-auth-shell {
   min-height: 100svh;
+  overflow-y: auto;
   padding-bottom: clamp(28px, 6vh, 64px);
   background-color: var(--bone);
   background-image: radial-gradient(circle at 1px 1px, rgba(20, 16, 25, 0.025) 1px, transparent 0);
@@ -4369,12 +4370,27 @@
 
 .partner-auth-card.partner-apply-card {
   width: min(520px, calc(100% - 40px));
-  margin-top: clamp(24px, 5vh, 64px);
-  padding: 36px 40px 32px;
+  margin-top: clamp(16px, 4vh, 48px);
+  padding: 28px 32px 24px;
+}
+
+.partner-auth-card.partner-apply-card h1 {
+  font-size: clamp(28px, 4.4vw, 36px);
 }
 
 .partner-apply-form {
-  gap: 12px;
+  gap: 10px;
+}
+
+.partner-auth-card.partner-apply-card .partner-form input,
+.partner-auth-card.partner-apply-card .partner-form select {
+  min-height: 46px;
+  padding: 11px 14px;
+}
+
+.partner-auth-card.partner-apply-card .partner-auth-trust {
+  margin-top: 16px;
+  padding-top: 14px;
 }
 
 .partner-invite-note {
