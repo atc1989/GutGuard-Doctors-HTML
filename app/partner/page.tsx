@@ -6,6 +6,18 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function PartnerPage() {
-  return <PartnerPortal />;
+type PartnerPageProps = {
+  searchParams: Promise<{ apply?: string | string[]; ref?: string | string[] }>;
+};
+
+function firstQueryValue(value?: string | string[]) {
+  return (Array.isArray(value) ? value[0] : value)?.trim() ?? "";
+}
+
+export default async function PartnerPage({ searchParams }: PartnerPageProps) {
+  const params = await searchParams;
+  const apply = ["1", "true", "yes"].includes(firstQueryValue(params.apply).toLowerCase());
+  const referrerSlug = firstQueryValue(params.ref).toLowerCase();
+
+  return <PartnerPortal initialView={apply ? "apply" : "email"} referrerSlug={referrerSlug} />;
 }

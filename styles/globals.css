@@ -4355,11 +4355,81 @@
   text-align: center;
 }
 
-.partner-apply-link a {
+.partner-apply-link a,
+.partner-apply-link .partner-auth-text-button {
+  display: inline;
+  min-height: 0;
+  padding: 0;
   color: var(--blue);
+  font-size: inherit;
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.partner-auth-card.partner-apply-card {
+  width: min(520px, calc(100% - 40px));
+  margin-top: clamp(24px, 5vh, 64px);
+  padding: 36px 40px 32px;
+}
+
+.partner-apply-form {
+  gap: 12px;
+}
+
+.partner-invite-note {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.partner-apply-field {
+  display: grid;
+  gap: 6px;
+}
+
+.partner-apply-field .partner-optional {
+  margin-left: 8px;
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.partner-auth-card .partner-form select {
+  width: 100%;
+  min-height: 52px;
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  background: var(--paper);
+  padding: 13px 15px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  outline: none;
+}
+
+.partner-auth-card .partner-form select:hover {
+  border-color: var(--ink-4);
+}
+
+.partner-auth-card .partner-form select:focus-visible {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(6, 8, 169, 0.14);
+}
+
+.partner-auth-card .partner-form select[aria-invalid="true"] {
+  border-color: #9d2430;
+}
+
+.partner-apply-field .partner-auth-error {
+  margin: 0;
+}
+
+.partner-apply-field .partner-field-help {
+  margin: 0;
 }
 
 .partner-auth-trust {
@@ -4412,6 +4482,11 @@
     width: calc(100% - 28px);
     margin-top: 28px;
     padding: 28px 24px;
+  }
+
+  .partner-auth-card.partner-apply-card {
+    width: calc(100% - 28px);
+    padding: 24px 20px;
   }
 
   .partner-auth-card h1 {
