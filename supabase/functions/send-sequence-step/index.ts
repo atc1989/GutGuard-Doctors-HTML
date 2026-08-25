@@ -9,6 +9,7 @@ const corsHeaders = {
 type SendSequenceStepRequest = {
   doctorId: string;
   stepNumber?: number;
+  onlyIfUnenrolled?: boolean;
 };
 
 type DoctorRegistration = {
@@ -46,7 +47,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
   try {
-    const { doctorId, stepNumber } = (await req.json()) as SendSequenceStepRequest;
+    const { doctorId, stepNumber, onlyIfUnenrolled } = (await req.json()) as SendSequenceStepRequest;
     if (!doctorId) return jsonResponse({ error: "Missing doctorId" }, 400);
 
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
@@ -87,6 +88,10 @@ Deno.serve(async (req) => {
       .single();
 
     const targetStep = stepNumber ?? (existingEnrollment ? existingEnrollment.current_step : 1);
+
+    if (onlyIfUnenrolled && existingEnrollment) {
+      return jsonResponse({ sent: false, skipped: true, reason: "already enrolled" });
+    }
 
     if (!existingEnrollment) {
       const { data: newEnrollment, error: enrollError } = await supabase

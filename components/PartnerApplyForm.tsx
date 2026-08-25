@@ -3,7 +3,7 @@
 import { useState, type FormEvent, type InputHTMLAttributes } from "react";
 import { LoaderCircle } from "lucide-react";
 import { SPECIALTIES } from "@/lib/constants";
-import { enrollDoctorInSequence, registerDoctor } from "@/lib/api";
+import { registerDoctor } from "@/lib/api";
 import type { FieldErrors, FieldName, FormValues } from "@/lib/validation";
 import {
   normalizeMobile,
@@ -14,7 +14,7 @@ import {
 
 type PartnerApplyFormProps = {
   invitedBy?: { slug: string; fullName: string } | null;
-  onRegistered: (email: string) => Promise<void>;
+  onRegistered: (email: string, doctorId: string) => Promise<void>;
   onSignIn: () => void;
 };
 
@@ -87,12 +87,7 @@ export default function PartnerApplyForm({
         location: values.location.trim(),
         referrerSlug: invitedBy?.slug,
       });
-      if (doctor.id && !String(doctor.id).startsWith("local-")) {
-        void enrollDoctorInSequence(doctor.id).catch(() => {
-          // Application already succeeded. Drip email is best-effort.
-        });
-      }
-      await onRegistered(email);
+      await onRegistered(email, doctor.id);
     } catch (error) {
       setSubmitting(false);
       setSubmitError(getRegistrationError(error));
