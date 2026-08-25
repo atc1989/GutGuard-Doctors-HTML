@@ -21,7 +21,8 @@ export function normalizeTikTokUsername(value: string | undefined) {
 export function validateField(name: FieldName, value: string | undefined) {
   const trimmed = (value ?? "").trim();
 
-  if (name === "email" && !trimmed) return true;
+  // TikTok is optional on partner applications. Empty is valid; a value must still be a handle.
+  if (name === "tiktokUsername" && !trimmed) return true;
   if (!trimmed) return false;
   if (name === "email") return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
   if (name === "mobile") return /^(09|\+639)\d{9}$/.test(normalizeMobile(trimmed));

@@ -1,8 +1,8 @@
-import RegistrationExperience from "@/components/RegistrationExperience";
+import PartnerPortal from "@/components/PartnerPortal";
 
 export const metadata = {
-  title: "Physician registration",
-  description: "Register for the Gutguard physician and clinical adopter program.",
+  title: "Apply to become a partner",
+  description: "Register for the Gutguard partner program and open your dashboard.",
 };
 
 type PhysicianRegistrationPageProps = {
@@ -14,5 +14,5 @@ export default async function PhysicianRegistrationPage({ searchParams }: Physic
   const raw = params.ref;
   const referrerSlug = (Array.isArray(raw) ? raw[0] : raw)?.trim().toLowerCase() ?? "";
 
-  return <RegistrationExperience referrerSlug={referrerSlug} />;
+  return <PartnerPortal initialView="apply" referrerSlug={referrerSlug} />;
 }
