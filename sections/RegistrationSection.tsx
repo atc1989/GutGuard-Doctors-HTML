@@ -34,6 +34,9 @@ const INITIAL_VALUES: FormValues = {
   location: "",
 };
 
+// Email is only used to deliver the proposal; specialty helps tailor it. Neither blocks registration.
+const OPTIONAL_FIELDS: FieldName[] = ["email", "specialty"];
+
 export default function RegistrationSection({
   active,
   invitedBy,
@@ -55,7 +58,7 @@ export default function RegistrationSection({
     if (errors[name]) {
       setErrors((current) => ({
         ...current,
-        [name]: !validateField(name, value),
+        [name]: !validateField(name, value, OPTIONAL_FIELDS),
       }));
     }
   }
@@ -63,7 +66,7 @@ export default function RegistrationSection({
   function handleFieldBlur(name: FieldName) {
     setErrors((current) => ({
       ...current,
-      [name]: !validateField(name, values[name]),
+      [name]: !validateField(name, values[name], OPTIONAL_FIELDS),
     }));
   }
 
@@ -86,7 +89,7 @@ export default function RegistrationSection({
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const nextErrors = validateForm(values);
+    const nextErrors = validateForm(values, OPTIONAL_FIELDS);
     if (values.specialty !== "Other") delete nextErrors.otherSpecialty;
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
