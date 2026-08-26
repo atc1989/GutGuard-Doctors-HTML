@@ -143,7 +143,7 @@ export default function PartnerApplyForm({
         onValueChange={handleValueChange}
         onFieldBlur={handleFieldBlur}
         type="text"
-        placeholder="Dr. Maria Santos"
+        placeholder="Maria Santos"
         autoComplete="name"
         required
       />

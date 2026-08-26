@@ -103,7 +103,7 @@ function redirectResponse() {
     status: 302,
     headers: {
       ...corsHeaders,
-      Location: "https://www.gutguard.ph",
+      Location: "https://www.gutguard.ph/partner",
     },
   });
 }
