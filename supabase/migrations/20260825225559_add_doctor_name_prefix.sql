@@ -2,8 +2,11 @@ alter table doctors.doctor_registrations
   add column if not exists name_prefix text not null default '';
 
 drop function if exists doctors.admin_update_doctor_registration(text, uuid, text, text, text, text, text, text, text);
+drop function if exists doctors.admin_update_doctor_registration(text, uuid, text, text, text, text, text, text, text, text);
 drop function if exists doctors.admin_list_doctor_registrations(text);
+drop function if exists doctors.register_doctor(text, text, text, text, text, text);
 drop function if exists doctors.register_doctor(text, text, text, text, text, text, text);
+drop function if exists doctors.register_doctor(text, text, text, text, text, text, text, text);
 
 create function doctors.register_doctor(
   p_full_name text,
