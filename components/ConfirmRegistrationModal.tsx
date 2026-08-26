@@ -16,12 +16,13 @@ const REVIEW_FIELDS: Array<{
   label: string;
   key: keyof RegistrationPayload;
 }> = [
+  { label: "Prefix", key: "namePrefix" },
   { label: "Name", key: "fullName" },
   { label: "Email", key: "email" },
   { label: "Mobile", key: "mobile" },
   { label: "TikTok", key: "tiktokUsername" },
   { label: "Specialty", key: "specialty" },
-  { label: "Clinic location", key: "location" },
+  { label: "City address", key: "location" },
 ];
 
 export default function ConfirmRegistrationModal({
@@ -62,7 +63,7 @@ export default function ConfirmRegistrationModal({
           {REVIEW_FIELDS.map((field) => (
             <div className="confirm-row" key={field.key}>
               <dt>{field.label}</dt>
-              <dd>{payload[field.key]}</dd>
+              <dd>{payload[field.key] || "--"}</dd>
             </div>
           ))}
           {invitedByName ? (

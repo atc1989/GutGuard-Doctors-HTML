@@ -99,7 +99,7 @@ export default function WheelSection({
       <SectionLabel number="iii.">Prize Wheel</SectionLabel>
 
       <div className="wheel-intro">
-        <p className="wheel-kicker">Congratulations{doctorName ? `, Dr. ${doctorName}` : ""}</p>
+        <p className="wheel-kicker">Congratulations{doctorName ? `, ${doctorName}` : ""}</p>
         <h1>
           Your affiliate slot is <em>confirmed.</em>
         </h1>

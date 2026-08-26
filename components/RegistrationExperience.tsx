@@ -14,6 +14,7 @@ import {
   loadExperienceState,
   saveExperienceState,
 } from "@/lib/storage";
+import { formatPrefixedName } from "@/lib/validation";
 import type {
   ExperienceState,
   Prize,
@@ -200,7 +201,7 @@ export default function RegistrationExperience({ referrerSlug = "" }: { referrer
       />
       <WheelSection
         active={screen === 3}
-        doctorName={state.registration?.fullName}
+        doctorName={formatPrefixedName(state.registration?.namePrefix, state.registration?.fullName)}
         prizes={wheelPrizes}
         loading={wheelLoading}
         error={wheelError}

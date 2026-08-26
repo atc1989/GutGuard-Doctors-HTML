@@ -16,6 +16,7 @@ type SmsBlastRequest = {
 type DoctorRegistration = {
   id: string;
   full_name: string | null;
+  name_prefix: string | null;
   mobile: string | null;
   tiktok_username: string | null;
   specialty: string | null;
@@ -91,7 +92,7 @@ Deno.serve(async (req) => {
 
     const { data: doctors, error: doctorsError } = await supabase
       .from("doctor_registrations")
-      .select("id, full_name, mobile, tiktok_username, specialty, practice_location, created_at")
+      .select("id, name_prefix, full_name, mobile, tiktok_username, specialty, practice_location, created_at")
       .in("id", cleanDoctorIds);
 
     if (doctorsError) {
@@ -356,6 +357,8 @@ async function getPrizeLabelsByDoctor(supabase: ReturnType<typeof createClient>,
 function renderDoctorTemplate(message: string, doctor: DoctorRegistration) {
   const replacements: Record<string, string> = {
     doctor_name: doctor.full_name ?? "",
+    name_prefix: doctor.name_prefix ?? "",
+    prefixed_name: formatPrefixedName(doctor.name_prefix, doctor.full_name),
     doctor_mobile: normalizeSmsMobile(doctor.mobile) || doctor.mobile || "",
     tiktok_username: doctor.tiktok_username ?? "",
     specialty: doctor.specialty ?? "",
@@ -376,6 +379,12 @@ function normalizeSmsMobile(value: string | null | undefined) {
   if (/^639\d{9}$/.test(digits)) return `0${digits.slice(2)}`;
   if (/^9\d{9}$/.test(digits)) return `0${digits}`;
   return "";
+}
+
+function formatPrefixedName(prefix?: string | null, name?: string | null) {
+  const n = (name ?? "").trim();
+  if (!n) return "";
+  return `${(prefix || "Dr.").trim()} ${n}`;
 }
 
 function formatDate(value: string | null) {

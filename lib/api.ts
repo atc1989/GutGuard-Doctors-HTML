@@ -38,6 +38,7 @@ type AdminWheelPrize = {
 type AdminDoctorRegistration = {
   id: string;
   full_name: string;
+  name_prefix: string;
   email: string;
   mobile: string;
   tiktok_username: string;
@@ -53,6 +54,7 @@ type AdminDoctorRegistration = {
 type AdminDoctorRegistrationUpdate = {
   id: string;
   full_name: string;
+  name_prefix: string;
   email: string;
   mobile: string;
   tiktok_username: string;
@@ -442,6 +444,7 @@ export async function registerDoctor(payload: RegistrationPayload) {
   if (isSupabaseConfigured && supabase) {
     const { data, error } = await supabase.rpc("register_doctor", {
       p_full_name: payload.fullName,
+      p_name_prefix: payload.namePrefix,
       p_email: payload.email,
       p_mobile: payload.mobile,
       p_tiktok_username: payload.tiktokUsername,
@@ -649,6 +652,7 @@ export async function updateDoctorRegistration(
     p_admin_password: adminPassword,
     p_doctor_id: doctor.id,
     p_full_name: doctor.full_name,
+    p_name_prefix: doctor.name_prefix,
     p_email: doctor.email,
     p_mobile: doctor.mobile,
     p_tiktok_username: doctor.tiktok_username,
@@ -1334,6 +1338,7 @@ function normalizeAdminDoctorRegistration(doctor: AdminDoctorRegistration): Admi
 
   return {
     ...doctor,
+    name_prefix: doctor.name_prefix ?? "",
     tiktok_username: tiktokUsername,
     routing_slug: routingSlug,
     redirect_url:

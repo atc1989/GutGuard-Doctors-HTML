@@ -1,4 +1,5 @@
 export type FieldName =
+  | "namePrefix"
   | "fullName"
   | "email"
   | "mobile"
@@ -18,10 +19,16 @@ export function normalizeTikTokUsername(value: string | undefined) {
   return (value ?? "").trim().replace(/^@+/, "").toLowerCase();
 }
 
+export function formatPrefixedName(prefix?: string | null, fullName?: string | null) {
+  const name = (fullName ?? "").trim();
+  if (!name) return "";
+  return `${(prefix || "Dr.").trim()} ${name}`;
+}
+
 export function validateField(name: FieldName, value: string | undefined) {
   const trimmed = (value ?? "").trim();
 
-  if (name === "email" && !trimmed) return true;
+  if ((name === "email" || name === "specialty") && !trimmed) return true;
   if (!trimmed) return false;
   if (name === "email") return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
   if (name === "mobile") return /^(09|\+639)\d{9}$/.test(normalizeMobile(trimmed));

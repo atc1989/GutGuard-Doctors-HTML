@@ -487,8 +487,8 @@ export default function Shoplet() {
             <div>
               {referralShopName ? (
                 <p className="shop-referral-welcome">
-                  {referralShopName === "Beehive"
-                    ? "Welcome to the Beehive GutGuard shop."
+                  {referralShopName === "Beehive" || referralShopName === "Ginhawa"
+                    ? `Welcome to the ${referralShopName} GutGuard shop.`
                     : `Welcome to ${referralShopName}'s GutGuard shop.`}
                 </p>
               ) : null}

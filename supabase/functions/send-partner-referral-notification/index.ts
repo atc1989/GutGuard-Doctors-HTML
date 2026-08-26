@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
 
     const { data: child } = await db
       .from("doctor_registrations")
-      .select("id, full_name, specialty, practice_location, created_at, referred_by_partner_id")
+      .select("id, name_prefix, full_name, specialty, practice_location, created_at, referred_by_partner_id")
       .eq("id", registrationId)
       .single();
     if (!child?.referred_by_partner_id) {
@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
     }
     const { data: referrer } = await db
       .from("doctor_registrations")
-      .select("id, full_name, email")
+      .select("id, name_prefix, full_name, email")
       .eq("id", child.referred_by_partner_id)
       .single();
     const recipient = String(referrer?.email ?? "").trim().toLowerCase();
@@ -65,8 +65,8 @@ Deno.serve(async (req) => {
       return json({ sent: false, duplicate: true, reason: "Notification is already in progress" });
     }
     const replacements: Record<string, string> = {
-      partner_name: referrer.full_name ?? "",
-      new_partner_name: child.full_name ?? "",
+      partner_name: formatPrefixedName(referrer.name_prefix, referrer.full_name) || (referrer.full_name ?? ""),
+      new_partner_name: formatPrefixedName(child.name_prefix, child.full_name) || (child.full_name ?? ""),
       new_partner_specialty: child.specialty ?? "",
       new_partner_location: child.practice_location ?? "",
       registered_at: new Date(child.created_at).toLocaleDateString("en-PH", {
@@ -127,6 +127,12 @@ function escapeHtml(value: string) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
+function formatPrefixedName(prefix?: string | null, name?: string | null) {
+  const n = (name ?? "").trim();
+  if (!n) return "";
+  return `${(prefix || "Dr.").trim()} ${n}`;
+}
+
 function renderBodyText(value: string) {
   return `<div style="font-family:Arial,sans-serif;color:#0F0F18;line-height:1.6">${escapeHtml(value)
     .split(/\n{2,}/)

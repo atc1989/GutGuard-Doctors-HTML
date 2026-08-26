@@ -58,6 +58,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 function getReferralShopName(slug: string, request: NextRequest) {
   const requestedShop = request.nextUrl.searchParams.get("shop")?.trim().toLowerCase();
   if (slug === "dr-grace-saraza" && requestedShop === "beehive") return "Beehive";
+  if (slug === "ginhawa") return "Ginhawa";
 
   return slug
     .split("-")

@@ -6,7 +6,7 @@ import ConfirmRegistrationModal from "@/components/ConfirmRegistrationModal";
 import { ArrowRightIcon } from "@/components/Icons";
 import { InputField, SelectField } from "@/components/FormField";
 import SectionLabel from "@/components/SectionLabel";
-import { SPECIALTIES } from "@/lib/constants";
+import { NAME_PREFIXES, SPECIALTIES } from "@/lib/constants";
 import { registerDoctor } from "@/lib/api";
 import type { FieldErrors, FieldName, FormValues } from "@/lib/validation";
 import {
@@ -24,6 +24,7 @@ type RegistrationSectionProps = {
 };
 
 const INITIAL_VALUES: FormValues = {
+  namePrefix: "",
   fullName: "",
   email: "",
   mobile: "",
@@ -68,6 +69,7 @@ export default function RegistrationSection({
 
   function buildPayload(): RegistrationPayload {
     return {
+      namePrefix: values.namePrefix.trim(),
       fullName: values.fullName.trim(),
       email: values.email.trim().toLowerCase(),
       mobile: normalizeMobile(values.mobile),
@@ -131,6 +133,18 @@ export default function RegistrationSection({
       ) : null}
 
       <form noValidate onSubmit={handleSubmit}>
+        <SelectField
+          id="namePrefix"
+          label="Prefix"
+          error="Please select a prefix."
+          value={values.namePrefix}
+          hasError={errors.namePrefix}
+          options={NAME_PREFIXES}
+          onValueChange={handleValueChange}
+          onFieldBlur={handleFieldBlur}
+          placeholder="Select prefix"
+          required
+        />
         <InputField
           id="fullName"
           label="Name"
@@ -140,7 +154,7 @@ export default function RegistrationSection({
           onValueChange={handleValueChange}
           onFieldBlur={handleFieldBlur}
           type="text"
-          placeholder="Dr. Maria Santos"
+          placeholder="Maria Santos"
           required
           autoComplete="name"
         />
@@ -195,7 +209,6 @@ export default function RegistrationSection({
           onValueChange={handleValueChange}
           onFieldBlur={handleFieldBlur}
           placeholder="Select your field"
-          required
         />
         {values.specialty === "Other" ? (
           <InputField
@@ -214,8 +227,8 @@ export default function RegistrationSection({
         ) : null}
         <InputField
           id="location"
-          label="Clinic location"
-          error="Please enter your practice location."
+          label="City address"
+          error="Please enter your city address."
           value={values.location}
           hasError={errors.location}
           onValueChange={handleValueChange}

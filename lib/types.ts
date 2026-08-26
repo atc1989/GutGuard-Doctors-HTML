@@ -5,6 +5,7 @@ export type TaskId = (typeof TASKS)[number]["id"];
 
 export type Registration = {
   id: string;
+  namePrefix: string;
   fullName: string;
   email: string;
   mobile: string;

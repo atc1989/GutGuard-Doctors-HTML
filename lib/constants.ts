@@ -8,6 +8,8 @@ export const LINKS = {
   reel: null,
 } as const;
 
+export const NAME_PREFIXES = ["Mr.", "Ms.", "Mrs.", "Mx.", "Dra.", "Dr.", "Prof.", "Atty."];
+
 export const SPECIALTIES = [
   "Internal Medicine",
   "Family Medicine",

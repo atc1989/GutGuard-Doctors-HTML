@@ -4,6 +4,8 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import Header from "@/components/Header";
 import { DownloadIcon } from "@/components/Icons";
+import { NAME_PREFIXES } from "@/lib/constants";
+import { formatPrefixedName } from "@/lib/validation";
 
 type AdminWheelPrize = {
   id?: string;
@@ -21,6 +23,7 @@ type AdminWheelPrize = {
 type AdminDoctorRegistration = {
   id: string;
   full_name: string;
+  name_prefix: string;
   email: string;
   mobile: string;
   tiktok_username: string;
@@ -109,6 +112,7 @@ type WheelApi = {
       AdminDoctorRegistration,
       | "id"
       | "full_name"
+      | "name_prefix"
       | "email"
       | "mobile"
       | "tiktok_username"
@@ -201,6 +205,8 @@ const PUBLIC_SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://partner
 const SHOP_ORIGIN = (process.env.NEXT_PUBLIC_SHOP_URL ?? "https://shop.gutguard.ph").replace(/\/$/, "");
 const PLACEHOLDER_TOKENS = [
   "{{doctor_name}}",
+  "{{name_prefix}}",
+  "{{prefixed_name}}",
   "{{doctor_email}}",
   "{{doctor_mobile}}",
   "{{tiktok_username}}",
@@ -211,6 +217,8 @@ const PLACEHOLDER_TOKENS = [
 ];
 const SMS_PLACEHOLDER_TOKENS = [
   "{{doctor_name}}",
+  "{{name_prefix}}",
+  "{{prefixed_name}}",
   "{{doctor_mobile}}",
   "{{tiktok_username}}",
   "{{specialty}}",
@@ -220,6 +228,8 @@ const SMS_PLACEHOLDER_TOKENS = [
 ];
 const REGISTRATION_EMAIL_TOKENS = [
   "{{doctor_name}}",
+  "{{name_prefix}}",
+  "{{prefixed_name}}",
   "{{doctor_email}}",
   "{{doctor_mobile}}",
   "{{tiktok_username}}",
@@ -361,6 +371,7 @@ export default function AdminWheelPage() {
     return doctors.filter((doctor) =>
       [
         doctor.full_name,
+        doctor.name_prefix,
         doctor.email,
         doctor.mobile,
         doctor.tiktok_username,
@@ -388,6 +399,7 @@ export default function AdminWheelPage() {
     return withEmail.filter((doctor) =>
       [
         doctor.full_name,
+        doctor.name_prefix,
         doctor.email,
         doctor.mobile,
         doctor.tiktok_username,
@@ -420,6 +432,7 @@ export default function AdminWheelPage() {
     return withMobile.filter((doctor) =>
       [
         doctor.full_name,
+        doctor.name_prefix,
         doctor.email,
         doctor.mobile,
         doctor.tiktok_username,
@@ -1013,6 +1026,7 @@ export default function AdminWheelPage() {
 
       const updatedDoctor = await api.updateDoctorRegistration(password, {
         id: editingDoctor.id,
+        name_prefix: editingDoctor.name_prefix.trim(),
         full_name: editingDoctor.full_name.trim(),
         email: editingDoctor.email.trim(),
         mobile: editingDoctor.mobile.trim(),
@@ -1649,7 +1663,7 @@ export default function AdminWheelPage() {
                 return (
                   <article className="admin-doctor-row" key={doctor.id}>
                     <div className="admin-doctor-primary">
-                      <strong>{doctor.full_name || "Unnamed doctor"}</strong>
+                      <strong>{formatPrefixedName(doctor.name_prefix, doctor.full_name) || "Unnamed doctor"}</strong>
                       <span>@{doctor.tiktok_username || "no-handle"}</span>
                       <div
                         className="admin-doctor-qr-toggle"
@@ -1721,6 +1735,10 @@ export default function AdminWheelPage() {
                     </div>
                     <dl className="admin-doctor-details">
                       <div>
+                        <dt>Prefix</dt>
+                        <dd>{doctor.name_prefix || "--"}</dd>
+                      </div>
+                      <div>
                         <dt>Email</dt>
                         <dd>{doctor.email || "--"}</dd>
                       </div>
@@ -1737,7 +1755,7 @@ export default function AdminWheelPage() {
                         <dd>{doctor.specialty || "--"}</dd>
                       </div>
                       <div>
-                        <dt>Clinic</dt>
+                        <dt>City address</dt>
                         <dd>{doctor.practice_location || "--"}</dd>
                       </div>
                       <div>
@@ -1939,7 +1957,7 @@ export default function AdminWheelPage() {
                         onChange={() => toggleNewsletterDoctor(doctor.id)}
                       />
                       <span>
-                        <strong>{doctor.full_name || "Unnamed doctor"}</strong>
+                        <strong>{formatPrefixedName(doctor.name_prefix, doctor.full_name) || "Unnamed doctor"}</strong>
                         <em>{doctor.email}</em>
                       </span>
                     </label>
@@ -1949,7 +1967,7 @@ export default function AdminWheelPage() {
                         <dd>@{doctor.tiktok_username || "no-handle"}</dd>
                       </div>
                       <div>
-                        <dt>Clinic</dt>
+                        <dt>City address</dt>
                         <dd>{doctor.practice_location || "--"}</dd>
                       </div>
                       <div>
@@ -2181,7 +2199,7 @@ export default function AdminWheelPage() {
                         onChange={() => toggleSmsDoctor(doctor.id)}
                       />
                       <span>
-                        <strong>{doctor.full_name || "Unnamed doctor"}</strong>
+                        <strong>{formatPrefixedName(doctor.name_prefix, doctor.full_name) || "Unnamed doctor"}</strong>
                         <em>{normalizeSmsMobile(doctor.mobile) || doctor.mobile}</em>
                       </span>
                     </label>
@@ -2191,7 +2209,7 @@ export default function AdminWheelPage() {
                         <dd>@{doctor.tiktok_username || "no-handle"}</dd>
                       </div>
                       <div>
-                        <dt>Clinic</dt>
+                        <dt>City address</dt>
                         <dd>{doctor.practice_location || "--"}</dd>
                       </div>
                       <div>
@@ -2994,6 +3012,20 @@ export default function AdminWheelPage() {
             </div>
             <div className="admin-edit-grid">
               <label>
+                Prefix
+                <select
+                  value={editingDoctor.name_prefix || ""}
+                  onChange={(event) => setEditingDoctor({ ...editingDoctor, name_prefix: event.target.value })}
+                >
+                  <option value="">Select prefix</option>
+                  {NAME_PREFIXES.map((prefix) => (
+                    <option key={prefix} value={prefix}>
+                      {prefix}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
                 Name
                 <input
                   required
@@ -3041,13 +3073,12 @@ export default function AdminWheelPage() {
               <label>
                 Specialty
                 <input
-                  required
                   value={editingDoctor.specialty}
                   onChange={(event) => setEditingDoctor({ ...editingDoctor, specialty: event.target.value })}
                 />
               </label>
               <label>
-                Clinic location
+                City address
                 <input
                   required
                   value={editingDoctor.practice_location}
@@ -3092,7 +3123,9 @@ export default function AdminWheelPage() {
               title="Step preview"
               style={{ flex: 1, border: "none", minHeight: 500 }}
               srcDoc={previewStep.html_body
-                .replace(/\{\{\s*doctor_name\s*\}\}/g, "Dr. Sample Doctor")
+                .replace(/\{\{\s*prefixed_name\s*\}\}/g, "Dr. Sample Doctor")
+                .replace(/\{\{\s*name_prefix\s*\}\}/g, "Dr.")
+                .replace(/\{\{\s*doctor_name\s*\}\}/g, "Sample Doctor")
                 .replace(/\{\{\s*doctor_email\s*\}\}/g, "doctor@clinic.com")
                 .replace(/\{\{\s*doctor_mobile\s*\}\}/g, "09171234567")
                 .replace(/\{\{\s*tiktok_username\s*\}\}/g, "gutguardph")
@@ -3138,7 +3171,9 @@ function formatSmsResult(result: SmsSendResult) {
 
 function renderNewsletterPreview(html: string) {
   const replacements: Record<string, string> = {
-    doctor_name: "Dr. Maria Santos",
+    doctor_name: "Maria Santos",
+    name_prefix: "Dr.",
+    prefixed_name: "Dr. Maria Santos",
     doctor_email: "doctor@example.com",
     doctor_mobile: "09171234567",
     tiktok_username: "gutguarddoctor",
@@ -3156,7 +3191,9 @@ function renderNewsletterPreview(html: string) {
 
 function renderSmsPreview(message: string) {
   const replacements: Record<string, string> = {
-    doctor_name: "Dr. Maria Santos",
+    doctor_name: "Maria Santos",
+    name_prefix: "Dr.",
+    prefixed_name: "Dr. Maria Santos",
     doctor_mobile: "+639171234567",
     tiktok_username: "gutguarddoctor",
     specialty: "Internal Medicine",
@@ -3193,7 +3230,9 @@ function normalizeSmsMobile(value: string | null | undefined) {
 
 function renderRegistrationEmailPreview(html: string) {
   const replacements: Record<string, string> = {
-    doctor_name: "Dr. Maria Santos",
+    doctor_name: "Maria Santos",
+    name_prefix: "Dr.",
+    prefixed_name: "Dr. Maria Santos",
     doctor_email: "doctor@example.com",
     doctor_mobile: "09171234567",
     tiktok_username: "gutguarddoctor",

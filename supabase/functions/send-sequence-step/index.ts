@@ -14,6 +14,7 @@ type SendSequenceStepRequest = {
 type DoctorRegistration = {
   id: string;
   full_name: string | null;
+  name_prefix: string | null;
   email: string | null;
   mobile: string | null;
   tiktok_username: string | null;
@@ -68,7 +69,7 @@ Deno.serve(async (req) => {
     // Fetch doctor
     const { data: doctorData, error: doctorError } = await supabase
       .from("doctor_registrations")
-      .select("id, full_name, email, mobile, tiktok_username, specialty, practice_location, routing_slug, redirect_url, created_at")
+      .select("id, name_prefix, full_name, email, mobile, tiktok_username, specialty, practice_location, routing_slug, redirect_url, created_at")
       .eq("id", doctorId)
       .single();
 
@@ -190,6 +191,8 @@ function renderTemplate(html: string, doctor: DoctorRegistration, clickUrl: stri
 
   const replacements: Record<string, string> = {
     doctor_name: doctor.full_name ?? "",
+    name_prefix: doctor.name_prefix ?? "",
+    prefixed_name: formatPrefixedName(doctor.name_prefix, doctor.full_name),
     doctor_email: doctor.email ?? "",
     doctor_mobile: doctor.mobile ?? "",
     tiktok_username: tiktokUsername,
@@ -213,6 +216,8 @@ function renderSubject(subject: string, doctor: DoctorRegistration) {
   const tiktokUsername = (doctor.tiktok_username ?? "").trim().replace(/^@+/, "").toLowerCase();
   const replacements: Record<string, string> = {
     doctor_name: doctor.full_name ?? "",
+    name_prefix: doctor.name_prefix ?? "",
+    prefixed_name: formatPrefixedName(doctor.name_prefix, doctor.full_name),
     tiktok_username: tiktokUsername,
     specialty: doctor.specialty ?? "",
     clinic_location: doctor.practice_location ?? "",
@@ -220,6 +225,12 @@ function renderSubject(subject: string, doctor: DoctorRegistration) {
   return subject.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_match, key: string) => {
     return replacements[key] ?? `{{${key}}}`;
   });
+}
+
+function formatPrefixedName(prefix?: string | null, name?: string | null) {
+  const n = (name ?? "").trim();
+  if (!n) return "";
+  return `${(prefix || "Dr.").trim()} ${n}`;
 }
 
 function formatDate(value: string | null) {

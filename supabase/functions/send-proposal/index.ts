@@ -15,6 +15,7 @@ type ProposalRequest = {
 type DoctorRegistration = {
   id: string;
   full_name: string | null;
+  name_prefix: string | null;
   email: string | null;
   mobile: string | null;
   tiktok_username: string | null;
@@ -62,7 +63,7 @@ Deno.serve(async (req) => {
     const { data: registration, error: registrationError } = await supabase
       .from("doctor_registrations")
       .select(
-        "id, full_name, email, mobile, tiktok_username, specialty, practice_location, routing_slug, redirect_url, created_at",
+        "id, name_prefix, full_name, email, mobile, tiktok_username, specialty, practice_location, routing_slug, redirect_url, created_at",
       )
       .eq("id", registrationId)
       .single();
@@ -191,6 +192,8 @@ function renderDoctorTemplate(html: string, doctor: DoctorRegistration) {
   const routingUrl = `${getSiteOrigin()}/dr/${routingSlug}`;
   const replacements: Record<string, string> = {
     doctor_name: doctor.full_name ?? "",
+    name_prefix: doctor.name_prefix ?? "",
+    prefixed_name: formatPrefixedName(doctor.name_prefix, doctor.full_name),
     doctor_email: doctor.email ?? "",
     doctor_mobile: doctor.mobile ?? "",
     tiktok_username: tiktokUsername,
@@ -243,6 +246,12 @@ function slugifyDoctorRoute(value: string | null | undefined) {
     .replace(/^-|-$/g, "");
 
   return slug || "doctor";
+}
+
+function formatPrefixedName(prefix?: string | null, name?: string | null) {
+  const n = (name ?? "").trim();
+  if (!n) return "";
+  return `${(prefix || "Dr.").trim()} ${n}`;
 }
 
 function formatDate(value: string | null) {
