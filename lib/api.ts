@@ -919,6 +919,12 @@ export async function hasPartnerSession(): Promise<boolean> {
   return true;
 }
 
+export async function getPartnerAuthEmail(): Promise<string> {
+  if (!isSupabaseConfigured || !supabase) return "";
+  const { data } = await supabase.auth.getUser();
+  return (data.user?.email ?? "").trim().toLowerCase();
+}
+
 const DEFAULT_PARTNER_ORDER_PAGE_SIZE = 10;
 
 export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Promise<PartnerDashboard> {
@@ -1196,6 +1202,7 @@ export async function getSequenceProgress(
 
 type SequenceStepSendResponse = {
   sent?: boolean;
+  skipped?: boolean;
   reason?: string;
   sendId?: string;
   step?: number;
@@ -1209,6 +1216,17 @@ export async function enrollDoctorInSequence(doctorId: string): Promise<Sequence
   if (error) throw error;
   if (!data?.sent) throw new Error(data?.reason || "Drip Campaign Step 1 was not sent.");
   return data;
+}
+
+/** Sends the welcome email once, after a new partner has verified their sign-in code. */
+export async function enrollWelcomeIfNeeded(doctorId: string): Promise<void> {
+  if (!doctorId || doctorId.startsWith("local-") || !isSupabaseConfigured || !supabase) return;
+  const { data, error } = await supabase.functions.invoke<SequenceStepSendResponse>("send-sequence-step", {
+    body: { doctorId, stepNumber: 1, onlyIfUnenrolled: true },
+  });
+  if (error) throw error;
+  if (data?.skipped) return;
+  if (!data?.sent) throw new Error(data?.reason || "Welcome email was not sent.");
 }
 
 export async function resendSequenceStep(doctorId: string, stepNumber: number): Promise<void> {
