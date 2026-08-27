@@ -8,6 +8,8 @@ import { LoaderCircle, X } from "lucide-react";
 import { Logo } from "@/components/GutguardSite";
 import PartnerApplyForm from "@/components/PartnerApplyForm";
 import {
+  enrollWelcomeIfNeeded,
+  getPartnerAuthEmail,
   getPartnerDashboard,
   getPartnerInvitation,
   hasPartnerSession,
@@ -19,7 +21,13 @@ import {
   type PartnerOrderScope,
 } from "@/lib/api";
 import { PARTNER_REFERRER_KEY } from "@/lib/constants";
-import { stashPendingPartnerSignin, takePendingPartnerSignin } from "@/lib/storage";
+import {
+  clearPendingPartnerWelcome,
+  peekPendingPartnerWelcome,
+  stashPendingPartnerSignin,
+  stashPendingPartnerWelcome,
+  takePendingPartnerSignin,
+} from "@/lib/storage";
 
 const SHOP_ORIGIN = (process.env.NEXT_PUBLIC_SHOP_URL ?? "https://shop.gutguard.ph").replace(/\/$/, "");
 const PUBLIC_SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://partners.gutguard.ph").replace(/\/$/, "");
@@ -56,6 +64,7 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
   const codeHeadingRef = useRef<HTMLHeadingElement>(null);
   const requestPendingRef = useRef(false);
   const initialViewRef = useRef(initialView);
+  const pendingWelcomeDoctorIdRef = useRef<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
   const [invitation, setInvitation] = useState<{ slug: string; fullName: string } | null>(null);
@@ -69,6 +78,20 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
     }
   }, []);
 
+  const deliverWelcomeAfterSignIn = useCallback((signedInEmail: string) => {
+    const doctorId =
+      pendingWelcomeDoctorIdRef.current || peekPendingPartnerWelcome(signedInEmail);
+    if (!doctorId) return;
+    pendingWelcomeDoctorIdRef.current = null;
+    void enrollWelcomeIfNeeded(doctorId)
+      .then(() => {
+        clearPendingPartnerWelcome();
+      })
+      .catch(() => {
+        pendingWelcomeDoctorIdRef.current = doctorId;
+      });
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -79,6 +102,7 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
           const pending = takePendingPartnerSignin();
           if (pending) {
             setEmail(pending.email);
+            if (pending.doctorId) pendingWelcomeDoctorIdRef.current = pending.doctorId;
             if (pending.otpSent) {
               setView("code");
               setNotice("Account created. Check your email for a sign-in code.");
@@ -99,6 +123,8 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
         // address is not on any registration. Let the failure land on the login screen.
         try {
           await load();
+          const signedInEmail = await getPartnerAuthEmail();
+          if (!cancelled && signedInEmail) deliverWelcomeAfterSignIn(signedInEmail);
         } catch {
           if (cancelled) return;
           await signOutPartner();
@@ -113,7 +139,7 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
     return () => {
       cancelled = true;
     };
-  }, [load]);
+  }, [load, deliverWelcomeAfterSignIn]);
 
   useEffect(() => {
     const fromQuery = referrerSlug.trim().toLowerCase();
@@ -207,6 +233,7 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
 
     try {
       await verifyPartnerOtp(email, code);
+      void deliverWelcomeAfterSignIn(email);
     } catch (caught) {
       const nextError = getVerificationError(caught);
       setError(nextError);
@@ -288,7 +315,7 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
     router.replace("/partner");
   }
 
-  async function handleRegistered(registeredEmail: string) {
+  async function handleRegistered(registeredEmail: string, doctorId: string) {
     const normalizedEmail = registeredEmail.trim().toLowerCase();
     setEmail(normalizedEmail);
     setError(null);
@@ -302,6 +329,11 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
     }
     setInvitation(null);
 
+    if (doctorId && !doctorId.startsWith("local-")) {
+      pendingWelcomeDoctorIdRef.current = doctorId;
+      stashPendingPartnerWelcome({ email: normalizedEmail, doctorId });
+    }
+
     let otpSent = false;
     try {
       await sendPartnerOtp(normalizedEmail);
@@ -311,7 +343,11 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
     }
 
     if (pathname !== "/partner") {
-      stashPendingPartnerSignin({ email: normalizedEmail, otpSent });
+      stashPendingPartnerSignin({
+        email: normalizedEmail,
+        otpSent,
+        doctorId: pendingWelcomeDoctorIdRef.current ?? undefined,
+      });
       router.replace("/partner");
       return;
     }
