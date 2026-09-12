@@ -102,6 +102,13 @@ begin
   select id into v_ana from public.doctor_registrations where routing_slug = 'dr-ana-reyes';
   select id into v_ben from public.doctor_registrations where routing_slug = 'dr-ben-cruz';
 
+  -- New QR codes carry the partner id; printed ones still carry the name-derived slug.
+  -- Both resolve to the same partner, and both record a click.
+  assert public.track_referral_click(v_ana::text) = 'dr-ana-reyes',
+    'a partner id must resolve like the routing slug';
+  select count(*) into v_clicks from public.referral_clicks;
+  assert v_clicks = 3, 'the id link must record a click, got ' || v_clicks;
+
   insert into public.shop_orders
     (order_code, payment_status, status, customer_name, first_name, city, province,
      subtotal, shipping_fee, total_amount, referral_slug, referral_doctor_id, created_at)
@@ -122,9 +129,10 @@ begin
   v_result := public.partner_dashboard();
 
   assert v_result -> 'partner' ->> 'routing_slug' = 'dr-ana-reyes', 'wrong partner resolved';
-  assert (v_result -> 'clicks' ->> 'total')::int = 2,
+  assert v_result -> 'partner' ->> 'id' = v_ana::text, 'the dashboard must expose the partner id';
+  assert (v_result -> 'clicks' ->> 'total')::int = 3,
     'click total wrong: ' || (v_result -> 'clicks' ->> 'total');
-  assert (v_result -> 'clicks' ->> 'last_30_days')::int = 2, 'click window wrong';
+  assert (v_result -> 'clicks' ->> 'last_30_days')::int = 3, 'click window wrong';
   assert (v_result -> 'totals' ->> 'orders')::int = 2,
     'order count must exclude the self-referral and the other partner, got '
     || (v_result -> 'totals' ->> 'orders');

@@ -273,7 +273,7 @@ export type PartnerDashboardQuery = {
 };
 
 export type PartnerDashboard = {
-  partner: { full_name: string; routing_slug: string; joined_at: string };
+  partner: { id: string; full_name: string; routing_slug: string; joined_at: string };
   clicks: { total: number; last_30_days: number };
   /** paid_amount is gross order value, not commission. */
   totals: {
@@ -951,6 +951,7 @@ export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Pr
 
   return {
     partner: {
+      id: String(partner.id ?? ""),
       full_name: String(partner.full_name ?? ""),
       routing_slug: String(partner.routing_slug ?? ""),
       joined_at: String(partner.joined_at ?? ""),

@@ -558,7 +558,7 @@ function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () 
   const [ordersError, setOrdersError] = useState("");
   const [posterOpen, setPosterOpen] = useState(false);
 
-  const link = getPartnerQrLink(dashboard.partner.routing_slug, qrMode);
+  const link = getPartnerQrLink(dashboard.partner, qrMode);
   const conversion = dashboard.clicks.total > 0 ? (dashboard.totals.direct_orders / dashboard.clicks.total) * 100 : 0;
   const visiblePartners = dashboard.referred_partners.slice(partnerOffset, partnerOffset + partnerPageSize);
 
@@ -894,15 +894,15 @@ function PartnerNav({ onSignOut }: { onSignOut?: () => void }) {
 }
 
 /** Mirrors getDoctorQrUrl in the admin, so printed codes match across views. */
-function getPartnerQrLink(slug: string, mode: PartnerQrMode) {
-  if (!slug) {
+function getPartnerQrLink(partner: { id: string; routing_slug: string }, mode: PartnerQrMode) {
+  if (!partner.id) {
     if (mode === "shop") return SHOP_ORIGIN;
     return `${PUBLIC_SITE_ORIGIN}/physicians/register`;
   }
-  if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${encodeURIComponent(slug)}`;
-  if (mode === "referral") return `${PUBLIC_SITE_ORIGIN}/physicians/register?ref=${encodeURIComponent(slug)}`;
-  if (slug === "dr-grace-saraza") return `${SHOP_ORIGIN}/beehive`;
-  return `${SHOP_ORIGIN}/r/${encodeURIComponent(slug)}`;
+  if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${partner.id}`;
+  if (mode === "referral") return `${PUBLIC_SITE_ORIGIN}/physicians/register?ref=${partner.id}`;
+  if (partner.routing_slug === "dr-grace-saraza") return `${SHOP_ORIGIN}/beehive`;
+  return `${SHOP_ORIGIN}/r/${partner.id}`;
 }
 
 function statusLabel(order: PartnerOrder) {

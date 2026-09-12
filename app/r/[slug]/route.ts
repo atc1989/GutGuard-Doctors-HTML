@@ -55,14 +55,14 @@ export async function GET(request: NextRequest, context: RouteContext) {
   return response;
 }
 
+/**
+ * Named shop fronts only. A partner's own name is deliberately NOT derived from the slug
+ * any more - the shop greeted every visitor with the referrer's full name.
+ */
 function getReferralShopName(slug: string, request: NextRequest) {
   const requestedShop = request.nextUrl.searchParams.get("shop")?.trim().toLowerCase();
   if (slug === "dr-grace-saraza" && requestedShop === "beehive") return "Beehive";
   if (slug === "ginhawa") return "Ginhawa";
 
-  return slug
-    .split("-")
-    .filter(Boolean)
-    .map((part) => (part.toLowerCase() === "dr" ? "Dr." : part.charAt(0).toUpperCase() + part.slice(1)))
-    .join(" ");
+  return "";
 }

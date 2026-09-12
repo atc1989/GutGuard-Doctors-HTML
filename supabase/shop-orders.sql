@@ -468,6 +468,7 @@ create trigger doctor_registrations_referrer_immutable
 before update on public.doctor_registrations
 for each row execute function public.prevent_partner_referrer_change();
 
+-- Needs public.partner_by_key from doctor-qr-redirect.sql - run that file first.
 -- Supersedes get_referral_partner for /r/[slug]: same return value, plus the click. Doing
 -- both in one call keeps the redirect at a single round trip - that link is on printed QR
 -- codes, so it is the one call that must not get slower.
@@ -481,10 +482,9 @@ declare
   v_slug text;
   v_doctor_id uuid;
 begin
+  -- p_slug is the partner id on new QR codes and the routing slug on older printed ones.
   select d.routing_slug, d.id into v_slug, v_doctor_id
-  from public.doctor_registrations d
-  where d.routing_slug = lower(trim(coalesce(p_slug, '')))
-  limit 1;
+  from public.partner_by_key(p_slug) d;
 
   -- Unknown slug: no row, no click. Counting misses would let anyone inflate a partner's
   -- numbers by hitting /r/<anything>.
@@ -639,6 +639,7 @@ begin
 
   return jsonb_build_object(
     'partner', jsonb_build_object(
+      'id', v_doctor.id,
       'full_name', v_doctor.full_name,
       'routing_slug', v_doctor.routing_slug,
       'joined_at', v_doctor.created_at

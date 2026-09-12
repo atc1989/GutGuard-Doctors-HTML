@@ -459,10 +459,9 @@ declare
   v_slug text;
   v_doctor_id uuid;
 begin
+  -- p_slug is the partner id on new QR codes and the routing slug on older printed ones.
   select d.routing_slug, d.id into v_slug, v_doctor_id
-  from public.doctor_registrations d
-  where d.routing_slug = lower(trim(coalesce(p_slug, '')))
-  limit 1;
+  from public.partner_by_key(p_slug) d;
 
   if v_slug is null then
     return null;
@@ -601,6 +600,7 @@ begin
 
   return jsonb_build_object(
     'partner', jsonb_build_object(
+      'id', v_doctor.id,
       'full_name', v_doctor.full_name,
       'routing_slug', v_doctor.routing_slug,
       'joined_at', v_doctor.created_at

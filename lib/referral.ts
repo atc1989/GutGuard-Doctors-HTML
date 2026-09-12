@@ -18,6 +18,13 @@ export function readReferralSlug(): string {
   }
 }
 
+/**
+ * The only shops that greet visitors by name. Partner shops used to greet customers with
+ * the partner's full name; cookies set before that was removed live for 30 days, so the
+ * value is checked here rather than trusted.
+ */
+export const SHOP_FRONT_NAMES = ["Beehive", "Ginhawa"];
+
 /** Reads the public shop name paired with the active referral. */
 export function readReferralShopName(): string {
   if (typeof document === "undefined" || !readReferralSlug()) return "";
@@ -26,7 +33,8 @@ export function readReferralShopName(): string {
   if (!match) return "";
 
   try {
-    return decodeURIComponent(match[1]).trim();
+    const name = decodeURIComponent(match[1]).trim();
+    return SHOP_FRONT_NAMES.includes(name) ? name : "";
   } catch {
     return "";
   }

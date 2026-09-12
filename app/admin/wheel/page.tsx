@@ -2,6 +2,7 @@
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import AdminOrders from "@/components/AdminOrders";
 import Header from "@/components/Header";
 import { DownloadIcon } from "@/components/Icons";
 import { NAME_PREFIXES } from "@/lib/constants";
@@ -268,14 +269,16 @@ function getPrizeOdds(prize: AdminWheelPrize, activeWeightTotal: number) {
 
 type DoctorQrMode = "shop" | "referral" | "profile";
 
+/**
+ * Keyed by partner id, not routing slug: the slug is the partner's name, and these URLs are
+ * printed on QR posters and shown to customers. Slug links still resolve server-side.
+ */
 function getDoctorQrUrl(doctor: AdminDoctorRegistration, mode: DoctorQrMode) {
-  if (!doctor.routing_slug) return "";
-  if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${encodeURIComponent(doctor.routing_slug)}`;
-  if (mode === "referral") {
-    return `${PUBLIC_SITE_ORIGIN}/physicians/register?ref=${encodeURIComponent(doctor.routing_slug)}`;
-  }
+  if (!doctor.id) return "";
+  if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${doctor.id}`;
+  if (mode === "referral") return `${PUBLIC_SITE_ORIGIN}/physicians/register?ref=${doctor.id}`;
   if (doctor.routing_slug === "dr-grace-saraza") return `${SHOP_ORIGIN}/beehive`;
-  return `${SHOP_ORIGIN}/r/${encodeURIComponent(doctor.routing_slug)}`;
+  return `${SHOP_ORIGIN}/r/${doctor.id}`;
 }
 
 function getDoctorQrElementId(doctorId: string, mode: DoctorQrMode) {
@@ -283,7 +286,7 @@ function getDoctorQrElementId(doctorId: string, mode: DoctorQrMode) {
 }
 
 export default function AdminWheelPage() {
-  const [activeTab, setActiveTab] = useState<"wheel" | "doctors" | "newsletter" | "sms" | "registrationEmail" | "sequence">("wheel");
+  const [activeTab, setActiveTab] = useState<"wheel" | "doctors" | "orders" | "newsletter" | "sms" | "registrationEmail" | "sequence">("wheel");
   const [password, setPassword] = useState("");
   const [prizes, setPrizes] = useState<AdminWheelPrize[]>([]);
   const [doctors, setDoctors] = useState<AdminDoctorRegistration[]>([]);
@@ -1302,6 +1305,22 @@ export default function AdminWheelPage() {
     }) : current);
   }
 
+  // Hero summary, one [status, figure, unit] row per tab.
+  const summaryByTab: Record<typeof activeTab, [string, string | number, string]> = {
+    wheel: [`${prizes.length} prizes`, activeWeightTotal, "active weight"],
+    doctors: [`${doctors.length} doctors`, doctors.length, "registrations"],
+    orders: ["website orders", "--", "shown below"],
+    newsletter: [`${selectedDoctorIds.length} selected`, selectedDoctorIds.length, "newsletter recipients"],
+    sms: [`${selectedSmsDoctorIds.length} selected`, selectedSmsDoctorIds.length, "SMS recipients"],
+    sequence: [`${sequenceSteps.length} steps`, sequenceProgress.length, "enrolled doctors"],
+    registrationEmail: [
+      registrationEmail.enabled ? "enabled" : "disabled",
+      registrationEmail.attachments.length,
+      "attachments",
+    ],
+  };
+  const summary = summaryByTab[activeTab];
+
   return (
     <main className="admin-wheel-shell">
       <Header dateLabel="Admin Wheel" />
@@ -1316,47 +1335,9 @@ export default function AdminWheelPage() {
           </h1>
         </div>
         <div className="admin-wheel-summary" aria-live="polite">
-          <span>
-            {activeTab === "wheel"
-              ? `${prizes.length} prizes`
-              : activeTab === "doctors"
-                ? `${doctors.length} doctors`
-                : activeTab === "newsletter"
-                  ? `${selectedDoctorIds.length} selected`
-                  : activeTab === "sms"
-                    ? `${selectedSmsDoctorIds.length} selected`
-                    : activeTab === "sequence"
-                      ? `${sequenceSteps.length} steps`
-                      : registrationEmail.enabled
-                        ? "enabled"
-                        : "disabled"}
-          </span>
-          <strong>
-            {activeTab === "wheel"
-              ? activeWeightTotal
-              : activeTab === "doctors"
-                ? doctors.length
-                : activeTab === "newsletter"
-                  ? selectedDoctorIds.length
-                  : activeTab === "sms"
-                    ? selectedSmsDoctorIds.length
-                    : activeTab === "sequence"
-                      ? sequenceProgress.length
-                      : registrationEmail.attachments.length}
-          </strong>
-          <span>
-            {activeTab === "wheel"
-              ? "active weight"
-              : activeTab === "doctors"
-                ? "registrations"
-                : activeTab === "newsletter"
-                  ? "newsletter recipients"
-                  : activeTab === "sms"
-                    ? "SMS recipients"
-                    : activeTab === "sequence"
-                      ? "enrolled doctors"
-                      : "attachments"}
-          </span>
+          <span>{summary[0]}</span>
+          <strong>{summary[1]}</strong>
+          <span>{summary[2]}</span>
         </div>
       </section>
 
@@ -1374,6 +1355,13 @@ export default function AdminWheelPage() {
           type="button"
         >
           Doctors
+        </button>
+        <button
+          className={activeTab === "orders" ? "active" : ""}
+          onClick={() => setActiveTab("orders")}
+          type="button"
+        >
+          Orders
         </button>
         <button
           className={activeTab === "newsletter" ? "active" : ""}
@@ -1827,6 +1815,8 @@ export default function AdminWheelPage() {
           </div>
         </section>
       ) : null}
+
+      {isUnlocked && activeTab === "orders" ? <AdminOrders password={password} partners={doctors} /> : null}
 
       {isUnlocked && activeTab === "newsletter" ? (
         <section className="admin-wheel-panel">

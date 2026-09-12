@@ -3248,7 +3248,7 @@
 
 .admin-shop-orders-table th:nth-child(2),
 .admin-shop-orders-table td:nth-child(2) {
-  width: 21%;
+  width: 19%;
 }
 
 .admin-shop-orders-table th:nth-child(3),
@@ -3261,9 +3261,10 @@
   width: 13%;
 }
 
+/* Came from: a partner's full name, so it needs more room than the Maya ref it replaced. */
 .admin-shop-orders-table th:nth-child(5),
 .admin-shop-orders-table td:nth-child(5) {
-  width: 11%;
+  width: 13%;
 }
 
 .admin-shop-orders-table th:nth-child(6),

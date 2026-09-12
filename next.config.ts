@@ -24,6 +24,12 @@ const nextConfig: NextConfig = {
         permanent: false,
       },
       {
+        // The orders admin is now a tab in the wheel admin. Bookmarks still land somewhere.
+        source: "/admin/orders",
+        destination: "/admin/wheel",
+        permanent: false,
+      },
+      {
         source: "/",
         has: [{ type: "host", value: PARTNERS_HOST }],
         destination: "/physicians/register",

@@ -85,6 +85,27 @@ alter table public.doctor_registrations
 create unique index if not exists doctor_registrations_routing_slug_key
   on public.doctor_registrations (routing_slug);
 
+-- One lookup for every public partner link: /r/<key>, /dr/<key> and ?ref=<key> all accept
+-- either the partner id or the older routing slug. New QR codes carry the id so a partner's
+-- name is not printed in the URL; slugs stay valid because printed codes are already out.
+-- Never grant this to anon/authenticated: it returns the whole row, contact details included.
+-- ponytail: sequential scan over a table of partners. Add an index if that ever matters.
+create or replace function public.partner_by_key(p_key text)
+returns setof public.doctor_registrations
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select d.*
+  from public.doctor_registrations d
+  where nullif(lower(trim(coalesce(p_key, ''))), '') is not null
+    and (d.routing_slug = lower(trim(p_key)) or d.id::text = lower(trim(p_key)))
+  limit 1;
+$$;
+
+revoke all on function public.partner_by_key(text) from public, anon, authenticated;
+
 create or replace function public.get_doctor_redirect(p_routing_slug text)
 returns text
 language sql
@@ -92,10 +113,7 @@ stable
 security definer
 set search_path = public
 as $$
-  select redirect_url
-  from public.doctor_registrations
-  where routing_slug = lower(trim(p_routing_slug))
-  limit 1;
+  select redirect_url from public.partner_by_key(p_routing_slug);
 $$;
 
 grant execute on function public.get_doctor_redirect(text) to anon, authenticated;
@@ -173,10 +191,7 @@ stable
 security definer
 set search_path = public
 as $$
-  select d.routing_slug, d.full_name
-  from public.doctor_registrations d
-  where d.routing_slug = lower(trim(coalesce(p_slug, '')))
-  limit 1;
+  select d.routing_slug, d.full_name from public.partner_by_key(p_slug) d;
 $$;
 
 grant execute on function public.get_partner_invitation(text) to anon, authenticated;
