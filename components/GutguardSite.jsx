@@ -938,6 +938,7 @@ const NAV = [
   ["Why GutGuard", "/#why-now"],
   ["How It Works", "/system"],
   ["Science", "/science"],
+  ["Stories", "/testimonials"],
   ["Shop", "/shop"],
   ["For Physicians", "/physicians"],
 ];
@@ -1087,7 +1088,7 @@ const SECTIONS = {
 
 const FOOTER_GROUPS = [
   ["Shop", [["SynBIOTIC+", "/shop"], ["Compare plans", "/shop#flagship"]]],
-  ["Learn", [["Why GutGuard", "/#why-now"], ["How It Works", "/system"], ["Science", "/science"], ["Evidence", "/#evidence"]]],
+  ["Learn", [["Why GutGuard", "/#why-now"], ["How It Works", "/system"], ["Science", "/science"], ["Member stories", "/testimonials"], ["Evidence", "/#evidence"]]],
   ["Support", [["Order help", "/shop"]]],
   ["Professionals", [["For Physicians", "/physicians"], ["Become a physician partner", "/physicians/register"], ["Partner dashboard", "/partner"], ["BioScan Login", APP_URL]]],
 ];

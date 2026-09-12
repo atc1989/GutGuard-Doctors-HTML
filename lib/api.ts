@@ -1,6 +1,8 @@
 import { PRIZES } from "@/lib/constants";
 import { pickPrizeIndex } from "@/lib/prizes";
 import { isSupabaseConfigured, supabase, supabaseShop, SHOP_SCHEMA } from "@/lib/supabase";
+import { checkImageFile, TESTIMONIAL_BUCKET } from "@/lib/testimonials";
+import type { AdminTestimonial, PublicTestimonial, TestimonialStatus } from "@/lib/testimonials";
 import type { Prize, RegistrationPayload, TaskId, WheelPrize, WheelPrizeInput } from "@/lib/types";
 
 type PrizeRow = {
@@ -1435,4 +1437,107 @@ function isMissingSupabaseFunctionError(error: unknown) {
     maybeError.code === "PGRST202" ||
     (typeof maybeError.message === "string" && maybeError.message.includes("Could not find the function"))
   );
+}
+
+/* --- Testimonials ---------------------------------------------------------- */
+
+/**
+ * Photos go straight from the browser to Storage with the anon key; the bucket caps
+ * type and size, and `checkImageFile` rejects the obvious cases before the round trip.
+ * Paths are uuid-prefixed so two members uploading `photo.jpg` cannot collide, and so
+ * an uploader cannot guess or target someone else's object.
+ */
+export async function uploadTestimonialPhoto(file: File, folder: string): Promise<string> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const rejection = checkImageFile(file);
+  if (rejection) throw new Error(rejection);
+
+  const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const path = `${folder}/${crypto.randomUUID()}.${extension}`;
+
+  const { error } = await supabase.storage.from(TESTIMONIAL_BUCKET).upload(path, file, {
+    contentType: file.type,
+    upsert: false,
+  });
+
+  if (error) throw error;
+  return path;
+}
+
+export async function submitTestimonial(input: {
+  displayName: string;
+  email: string;
+  roleLine: string;
+  story: string;
+  avatarPath: string | null;
+  photoPaths: string[];
+  videoFileId: string | null;
+}): Promise<string> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.rpc("submit_testimonial", {
+    p_display_name: input.displayName.trim(),
+    p_email: input.email.trim().toLowerCase(),
+    p_role_line: input.roleLine.trim(),
+    p_story: input.story.trim(),
+    p_avatar_path: input.avatarPath,
+    p_photo_paths: input.photoPaths,
+    p_video_file_id: input.videoFileId,
+    p_consent: true,
+  });
+
+  if (error) throw error;
+  return data as string;
+}
+
+/**
+ * Approved rows only, and never the submitter's email - that filtering lives in the
+ * security-definer function, not here, because this runs with the public anon key.
+ * Returns an empty wall rather than throwing when Supabase is unconfigured, so a
+ * preview build without env vars still renders the page.
+ */
+export async function listTestimonials(limit = 60): Promise<PublicTestimonial[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+
+  const { data, error } = await supabase.rpc("list_testimonials", { p_limit: limit });
+
+  // The wall is a public marketing page, so it renders empty rather than 500ing in the
+  // window between this deploying and the testimonials migration being applied.
+  if (error && isMissingSupabaseFunctionError(error)) return [];
+  if (error) throw error;
+  return (data ?? []) as PublicTestimonial[];
+}
+
+export async function adminListTestimonials(
+  adminPassword: string,
+  status?: TestimonialStatus,
+): Promise<AdminTestimonial[]> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.rpc("admin_list_testimonials", {
+    p_admin_password: adminPassword,
+    p_status: status ?? null,
+  });
+
+  if (error) throw error;
+  return (data ?? []) as AdminTestimonial[];
+}
+
+export async function adminReviewTestimonial(
+  adminPassword: string,
+  input: { id: string; status: TestimonialStatus; featured?: boolean; reviewNote?: string },
+): Promise<AdminTestimonial> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.rpc("admin_review_testimonial", {
+    p_admin_password: adminPassword,
+    p_id: input.id,
+    p_status: input.status,
+    p_featured: input.featured ?? false,
+    p_review_note: input.reviewNote ?? "",
+  });
+
+  if (error) throw error;
+  return (Array.isArray(data) ? data[0] : data) as AdminTestimonial;
 }

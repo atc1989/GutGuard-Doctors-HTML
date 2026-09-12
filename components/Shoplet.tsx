@@ -434,6 +434,7 @@ export default function Shoplet() {
             <Link href="/#why-now">Why GutGuard</Link>
             <Link href="/system">How It Works</Link>
             <Link href="/science">Science</Link>
+            <Link href="/testimonials">Stories</Link>
             <Link href="/shop" aria-current="page">Shop</Link>
             <Link href="/physicians">For Physicians</Link>
           </div>
@@ -474,6 +475,7 @@ export default function Shoplet() {
         <Link href="/#why-now" onClick={() => setMenuOpen(false)}>Why GutGuard</Link>
         <Link href="/system" onClick={() => setMenuOpen(false)}>How It Works</Link>
         <Link href="/science" onClick={() => setMenuOpen(false)}>Science</Link>
+        <Link href="/testimonials" onClick={() => setMenuOpen(false)}>Stories</Link>
         <Link href="/shop" aria-current="page" onClick={() => setMenuOpen(false)}>Shop</Link>
         <Link href="/physicians" onClick={() => setMenuOpen(false)}>For Physicians</Link>
         <Link className="shop-site-menu-login" href="/partner" onClick={() => setMenuOpen(false)}>Already a partner? Log in →</Link>
