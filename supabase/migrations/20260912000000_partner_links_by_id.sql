@@ -7,55 +7,67 @@
 --
 -- partner_dashboard now returns the partner id so the portal can build its own links.
 -- The sandbox mirror is updated by re-running supabase/shop-orders-sandbox.sql.
+--
+-- Schema note: production keeps these objects in `doctors`. The canonical scripts in
+-- supabase/*.sql are written against `public` for a fresh install - same code, and the
+-- migrations have targeted `doctors` since 20260818.
 
 -- One lookup for every public partner link: /r/<key>, /dr/<key> and ?ref=<key> all accept
 -- either the partner id or the older routing slug. New QR codes carry the id so a partner's
 -- name is not printed in the URL; slugs stay valid because printed codes are already out.
 -- Never grant this to anon/authenticated: it returns the whole row, contact details included.
 -- ponytail: sequential scan over a table of partners. Add an index if that ever matters.
-create or replace function public.partner_by_key(p_key text)
-returns setof public.doctor_registrations
+create or replace function doctors.partner_by_key(p_key text)
+returns setof doctors.doctor_registrations
 language sql
 stable
 security definer
-set search_path = public
+set search_path = doctors, public
 as $$
   select d.*
-  from public.doctor_registrations d
+  from doctors.doctor_registrations d
   where nullif(lower(trim(coalesce(p_key, ''))), '') is not null
     and (d.routing_slug = lower(trim(p_key)) or d.id::text = lower(trim(p_key)))
   limit 1;
 $$;
 
-revoke all on function public.partner_by_key(text) from public, anon, authenticated;
+revoke all on function doctors.partner_by_key(text) from public, anon, authenticated;
 
-create or replace function public.get_doctor_redirect(p_routing_slug text)
+drop function if exists doctors.get_doctor_redirect(text);
+
+create or replace function doctors.get_doctor_redirect(p_routing_slug text)
 returns text
 language sql
 stable
 security definer
-set search_path = public
+set search_path = doctors, public
 as $$
-  select redirect_url from public.partner_by_key(p_routing_slug);
+  select redirect_url from doctors.partner_by_key(p_routing_slug);
 $$;
 
-create or replace function public.get_partner_invitation(p_slug text)
+grant execute on function doctors.get_doctor_redirect(text) to anon, authenticated;
+
+drop function if exists doctors.get_partner_invitation(text);
+
+create or replace function doctors.get_partner_invitation(p_slug text)
 returns table (routing_slug text, full_name text)
 language sql
 stable
 security definer
-set search_path = public
+set search_path = doctors, public
 as $$
-  select d.routing_slug, d.full_name from public.partner_by_key(p_slug) d;
+  select d.routing_slug, d.full_name from doctors.partner_by_key(p_slug) d;
 $$;
 
-grant execute on function public.get_partner_invitation(text) to anon, authenticated;
+grant execute on function doctors.get_partner_invitation(text) to anon, authenticated;
 
-create or replace function public.track_referral_click(p_slug text)
+drop function if exists doctors.track_referral_click(text);
+
+create or replace function doctors.track_referral_click(p_slug text)
 returns text
 language plpgsql
 security definer
-set search_path = public
+set search_path = doctors, public
 as $$
 declare
   v_slug text;
@@ -63,7 +75,7 @@ declare
 begin
   -- p_slug is the partner id on new QR codes and the routing slug on older printed ones.
   select d.routing_slug, d.id into v_slug, v_doctor_id
-  from public.partner_by_key(p_slug) d;
+  from doctors.partner_by_key(p_slug) d;
 
   -- Unknown slug: no row, no click. Counting misses would let anyone inflate a partner's
   -- numbers by hitting /r/<anything>.
@@ -71,15 +83,17 @@ begin
     return null;
   end if;
 
-  insert into public.referral_clicks (routing_slug, doctor_id) values (v_slug, v_doctor_id);
+  insert into doctors.referral_clicks (routing_slug, doctor_id) values (v_slug, v_doctor_id);
 
   return v_slug;
 end;
 $$;
 
-grant execute on function public.track_referral_click(text) to anon, authenticated;
+grant execute on function doctors.track_referral_click(text) to anon, authenticated;
 
-create or replace function public.partner_dashboard(
+drop function if exists doctors.partner_dashboard(text, text, integer, integer, timestamptz, timestamptz, text);
+
+create or replace function doctors.partner_dashboard(
   p_scope text default 'all',
   p_status text default null,
   p_limit integer default 25,
@@ -92,11 +106,11 @@ returns jsonb
 language plpgsql
 stable
 security definer
-set search_path = public
+set search_path = doctors, public
 as $$
 declare
   v_email text;
-  v_doctor public.doctor_registrations;
+  v_doctor doctors.doctor_registrations;
   v_scope text := lower(trim(coalesce(p_scope, 'all')));
   v_limit integer := least(greatest(coalesce(p_limit, 25), 1), 100);
   v_offset integer := greatest(coalesce(p_offset, 0), 0);
@@ -116,7 +130,7 @@ begin
   end if;
 
   select * into v_doctor
-  from public.doctor_registrations
+  from doctors.doctor_registrations
   where email = v_email
   limit 1;
 
@@ -126,15 +140,15 @@ begin
   end if;
 
   select count(*) into v_order_count
-  from public.shop_orders o
-  join public.doctor_registrations source on source.id = o.referral_doctor_id
+  from doctors.shop_orders o
+  join doctors.doctor_registrations source on source.id = o.referral_doctor_id
   where (source.id = v_doctor.id or source.referred_by_partner_id = v_doctor.id)
     and (
       v_scope = 'all'
       or (v_scope = 'direct' and source.id = v_doctor.id)
       or (v_scope = 'referred' and source.referred_by_partner_id = v_doctor.id)
     )
-    and public.partner_order_matches_status(o.payment_status, o.status, p_status)
+    and doctors.partner_order_matches_status(o.payment_status, o.status, p_status)
     and (p_date_from is null or o.created_at >= p_date_from)
     and (p_date_to is null or o.created_at < p_date_to + interval '1 day');
 
@@ -156,15 +170,15 @@ begin
       'source_partner_name', source.full_name,
       'source_partner_slug', source.routing_slug
     ) as entry
-    from public.shop_orders o
-    join public.doctor_registrations source on source.id = o.referral_doctor_id
+    from doctors.shop_orders o
+    join doctors.doctor_registrations source on source.id = o.referral_doctor_id
     where (source.id = v_doctor.id or source.referred_by_partner_id = v_doctor.id)
       and (
         v_scope = 'all'
         or (v_scope = 'direct' and source.id = v_doctor.id)
         or (v_scope = 'referred' and source.referred_by_partner_id = v_doctor.id)
       )
-      and public.partner_order_matches_status(o.payment_status, o.status, p_status)
+      and doctors.partner_order_matches_status(o.payment_status, o.status, p_status)
       and (p_date_from is null or o.created_at >= p_date_from)
       and (p_date_to is null or o.created_at < p_date_to + interval '1 day')
     order by
@@ -182,10 +196,10 @@ begin
     ),
     'clicks', jsonb_build_object(
       'total', (
-        select count(*) from public.referral_clicks c where c.doctor_id = v_doctor.id
+        select count(*) from doctors.referral_clicks c where c.doctor_id = v_doctor.id
       ),
       'last_30_days', (
-        select count(*) from public.referral_clicks c
+        select count(*) from doctors.referral_clicks c
         where c.doctor_id = v_doctor.id and c.created_at >= now() - interval '30 days'
       )
     ),
@@ -207,12 +221,12 @@ begin
           coalesce(nullif(o.total_amount, 0), o.subtotal + coalesce(o.shipping_fee, 0))
         ) filter (where o.payment_status = 'paid'), 0),
         'referred_partners', (
-          select count(*) from public.doctor_registrations d
+          select count(*) from doctors.doctor_registrations d
           where d.referred_by_partner_id = v_doctor.id
         )
       )
-      from public.shop_orders o
-      join public.doctor_registrations source on source.id = o.referral_doctor_id
+      from doctors.shop_orders o
+      join doctors.doctor_registrations source on source.id = o.referral_doctor_id
       where source.id = v_doctor.id or source.referred_by_partner_id = v_doctor.id
     ),
     'orders', v_orders,
@@ -236,8 +250,8 @@ begin
             coalesce(nullif(o.total_amount, 0), o.subtotal + coalesce(o.shipping_fee, 0))
           ) filter (where o.payment_status = 'paid'), 0)
         ) as entry
-        from public.doctor_registrations child
-        left join public.shop_orders o on o.referral_doctor_id = child.id
+        from doctors.doctor_registrations child
+        left join doctors.shop_orders o on o.referral_doctor_id = child.id
         where child.referred_by_partner_id = v_doctor.id
         group by child.id
         order by child.created_at desc
@@ -251,5 +265,40 @@ $$;
 -- every new function, and Supabase's default privileges in `public` add anon on top. The
 -- grant on its own leaves this callable with the anon key. The body would still refuse
 -- (no JWT email), but an unauthenticated caller should not reach it at all.
-revoke all on function public.partner_dashboard(text, text, integer, integer, timestamptz, timestamptz, text) from public, anon;
-grant execute on function public.partner_dashboard(text, text, integer, integer, timestamptz, timestamptz, text) to authenticated;
+revoke all on function doctors.partner_dashboard(text, text, integer, integer, timestamptz, timestamptz, text) from public, anon;
+grant execute on function doctors.partner_dashboard(text, text, integer, integer, timestamptz, timestamptz, text) to authenticated;
+
+-- The sandbox mirror shares the real partner table, so it must resolve keys the same way.
+-- Guarded because the sandbox schema only exists where the mirrored shop is deployed.
+do $mirror$
+begin
+  if exists (select 1 from information_schema.schemata where schema_name = 'sandbox') then
+    execute $fn$
+      create or replace function sandbox.track_referral_click(p_slug text)
+      returns text
+      language plpgsql
+      security definer
+      set search_path = sandbox, doctors, public
+      as $$
+      declare
+        v_slug text;
+        v_doctor_id uuid;
+      begin
+        select d.routing_slug, d.id into v_slug, v_doctor_id
+        from doctors.partner_by_key(p_slug) d;
+
+        if v_slug is null then
+          return null;
+        end if;
+
+        insert into sandbox.referral_clicks (routing_slug, doctor_id) values (v_slug, v_doctor_id);
+
+        return v_slug;
+      end;
+      $$;
+    $fn$;
+
+    execute 'grant execute on function sandbox.track_referral_click(text) to anon, authenticated';
+  end if;
+end
+$mirror$;
