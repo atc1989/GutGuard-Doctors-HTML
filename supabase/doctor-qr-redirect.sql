@@ -86,18 +86,25 @@ create unique index if not exists doctor_registrations_routing_slug_key
   on public.doctor_registrations (routing_slug);
 
 -- One lookup for every public partner link: /r/<key>, /dr/<key> and ?ref=<key> all accept
--- the last 8 characters of the partner id (what the links print), the full id, or the older
--- routing slug. The slug is the partner's name, so it is no longer put on new QR codes, but
--- it keeps resolving because printed codes are already out there.
+-- the last 5 characters of the partner id (what the links print), the last 8 from before the
+-- key was shortened, the full id, or the older routing slug. The slug is the partner's name,
+-- so it is no longer put on new QR codes, but it keeps resolving because printed codes are
+-- already out there.
 -- Never grant this to anon/authenticated: it returns the whole row, contact details included.
 -- ponytail: sequential scan over a table of partners. Add an index if that ever matters.
 
--- The LAST 8 characters, not the first: seeded rows share a prefix (4fbb1000-...-0000000N)
--- and differ only in the tail, while the tail of a v4 uuid is fully random. 8 hex characters
--- is 4.3 billion keys, and this index makes a collision impossible rather than merely
--- unlikely - a collision would silently misattribute someone's orders. The cost is that one
--- registration in a few hundred thousand fails and has to be retried; if that ever actually
--- happens, widen the links to 10 characters.
+-- The LAST characters, not the first: seeded rows share a prefix (4fbb1000-...-0000000N)
+-- and differ only in the tail, while the tail of a v4 uuid is fully random.
+--
+-- 5 characters is only a million keys, so collisions are a real event rather than a
+-- theoretical one - at 500 partners there is a ~11% chance two tails match. These indexes
+-- make a collision impossible rather than merely unlikely, because a collision would
+-- silently misattribute someone's orders; register_doctor picks an id whose key is free,
+-- so a partner never sees the failure. The 8-character index stays for links already handed
+-- out before the key was shortened.
+create unique index if not exists doctor_registrations_link_key_5
+  on public.doctor_registrations (right(id::text, 5));
+
 create unique index if not exists doctor_registrations_link_key
   on public.doctor_registrations (right(id::text, 8));
 
@@ -114,6 +121,7 @@ as $$
     and (
       d.routing_slug = lower(trim(p_key))
       or d.id::text = lower(trim(p_key))
+      or right(d.id::text, 5) = lower(trim(p_key))
       or right(d.id::text, 8) = lower(trim(p_key))
     )
   limit 1;
@@ -164,7 +172,19 @@ begin
     limit 1;
   end if;
 
+  -- Pick an id whose 5-character link key is not taken. Same loop the shop order codes use.
+  -- ponytail: two registrations racing here can still collide and raise; at these volumes
+  -- that is rarer than the collision itself, and the caller can simply retry.
+  loop
+    v_doctor_id := gen_random_uuid();
+    exit when not exists (
+      select 1 from public.doctor_registrations d
+      where right(d.id::text, 5) = right(v_doctor_id::text, 5)
+    );
+  end loop;
+
   insert into public.doctor_registrations (
+    id,
     full_name,
     email,
     mobile,
@@ -176,6 +196,7 @@ begin
     referred_by_partner_id
   )
   values (
+    v_doctor_id,
     trim(p_full_name),
     coalesce(nullif(lower(trim(coalesce(p_email, ''))), ''), ''),
     trim(p_mobile),

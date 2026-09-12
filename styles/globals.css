@@ -5556,7 +5556,8 @@
 
 .tm-hero h1 em {
   font-style: normal;
-  font-weight: 600;
+  /* Matches the h1's own weight - the blue is what sets this clause apart, not weight. */
+  font-weight: 400;
   color: var(--blue);
 }
 

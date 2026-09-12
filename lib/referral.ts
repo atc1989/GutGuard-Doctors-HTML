@@ -41,11 +41,11 @@ export function readReferralShopName(): string {
 }
 
 /**
- * What a partner's public links are keyed by: the last 8 characters of their id. Short
+ * What a partner's public links are keyed by: the last 5 characters of their id. Short
  * enough to read off a poster, and not their name. The tail, not the head - seeded rows
- * share a prefix. A unique index on the same 8 characters keeps it unambiguous;
- * partner_by_key resolves it.
+ * share a prefix. A unique index on the same 5 characters keeps it unambiguous, and
+ * register_doctor only hands out ids whose key is free; partner_by_key resolves it.
  */
 export function partnerLinkKey(partnerId: string) {
-  return partnerId.slice(-8);
+  return partnerId.slice(-5);
 }
