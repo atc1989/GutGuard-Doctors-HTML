@@ -22,7 +22,7 @@
       --rule:       #D8D2C2;
       --rule-soft:  #E5E0D2;
 
-      --serif:      'Fraunces', 'Times New Roman', serif;
+      --serif:      var(--font-fraunces), 'Fraunces', 'Times New Roman', serif;
       --sans:       'Inter Tight', system-ui, sans-serif;
 
       /* Radius scale. Applied to the shop surface only - the registration
@@ -5518,10 +5518,14 @@
 .tm-page {
   position: relative;
   z-index: 1;
-  max-width: 1240px;
+  /* Max-width and inline padding deliberately mirror .shop-site-nav-inner so the logo
+     and "Log in" sit on the same left and right edges as the content below them. They
+     were 1240/40px against the masthead's 1320/32px, which pushed the whole header 48px
+     wider than the page on each side. */
+  max-width: 1320px;
   margin: 0 auto;
   /* Clears the fixed masthead, matching .shop-hero. */
-  padding: 108px clamp(20px, 5vw, 40px) 80px;
+  padding: 108px clamp(18px, 5vw, 32px) 80px;
 }
 
 .tm-page.narrow {

@@ -6,6 +6,7 @@ import AdminOrders from "@/components/AdminOrders";
 import Header from "@/components/Header";
 import { DownloadIcon } from "@/components/Icons";
 import { NAME_PREFIXES } from "@/lib/constants";
+import { partnerLinkKey } from "@/lib/referral";
 import { formatPrefixedName } from "@/lib/validation";
 
 type AdminWheelPrize = {
@@ -270,15 +271,17 @@ function getPrizeOdds(prize: AdminWheelPrize, activeWeightTotal: number) {
 type DoctorQrMode = "shop" | "referral" | "profile";
 
 /**
- * Keyed by partner id, not routing slug: the slug is the partner's name, and these URLs are
- * printed on QR posters and shown to customers. Slug links still resolve server-side.
+ * Keyed by partnerLinkKey, not routing slug: the slug is the partner's name, and these URLs
+ * are printed on QR posters and shown to customers. Slug links still resolve server-side.
  */
 function getDoctorQrUrl(doctor: AdminDoctorRegistration, mode: DoctorQrMode) {
   if (!doctor.id) return "";
-  if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${doctor.id}`;
-  if (mode === "referral") return `${PUBLIC_SITE_ORIGIN}/physicians/register?ref=${doctor.id}`;
+
+  const key = partnerLinkKey(doctor.id);
+  if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${key}`;
+  if (mode === "referral") return `${PUBLIC_SITE_ORIGIN}/physicians/register?ref=${key}`;
   if (doctor.routing_slug === "dr-grace-saraza") return `${SHOP_ORIGIN}/beehive`;
-  return `${SHOP_ORIGIN}/r/${doctor.id}`;
+  return `${SHOP_ORIGIN}/r/${key}`;
 }
 
 function getDoctorQrElementId(doctorId: string, mode: DoctorQrMode) {

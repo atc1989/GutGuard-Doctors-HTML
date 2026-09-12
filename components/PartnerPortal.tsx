@@ -21,6 +21,7 @@ import {
   type PartnerOrderScope,
 } from "@/lib/api";
 import { PARTNER_REFERRER_KEY } from "@/lib/constants";
+import { partnerLinkKey } from "@/lib/referral";
 import {
   clearPendingPartnerWelcome,
   peekPendingPartnerWelcome,
@@ -899,10 +900,11 @@ function getPartnerQrLink(partner: { id: string; routing_slug: string }, mode: P
     if (mode === "shop") return SHOP_ORIGIN;
     return `${PUBLIC_SITE_ORIGIN}/physicians/register`;
   }
-  if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${partner.id}`;
-  if (mode === "referral") return `${PUBLIC_SITE_ORIGIN}/physicians/register?ref=${partner.id}`;
+  const key = partnerLinkKey(partner.id);
+  if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${key}`;
+  if (mode === "referral") return `${PUBLIC_SITE_ORIGIN}/physicians/register?ref=${key}`;
   if (partner.routing_slug === "dr-grace-saraza") return `${SHOP_ORIGIN}/beehive`;
-  return `${SHOP_ORIGIN}/r/${partner.id}`;
+  return `${SHOP_ORIGIN}/r/${key}`;
 }
 
 function statusLabel(order: PartnerOrder) {

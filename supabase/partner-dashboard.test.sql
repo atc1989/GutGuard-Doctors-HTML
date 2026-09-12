@@ -106,8 +106,11 @@ begin
   -- Both resolve to the same partner, and both record a click.
   assert public.track_referral_click(v_ana::text) = 'dr-ana-reyes',
     'a partner id must resolve like the routing slug';
+  -- The 8-character key is what the QR codes and the portal actually print.
+  assert public.track_referral_click(right(v_ana::text, 8)) = 'dr-ana-reyes',
+    'the short link key must resolve to the same partner';
   select count(*) into v_clicks from public.referral_clicks;
-  assert v_clicks = 3, 'the id link must record a click, got ' || v_clicks;
+  assert v_clicks = 4, 'the id links must record a click each, got ' || v_clicks;
 
   insert into public.shop_orders
     (order_code, payment_status, status, customer_name, first_name, city, province,
@@ -130,9 +133,9 @@ begin
 
   assert v_result -> 'partner' ->> 'routing_slug' = 'dr-ana-reyes', 'wrong partner resolved';
   assert v_result -> 'partner' ->> 'id' = v_ana::text, 'the dashboard must expose the partner id';
-  assert (v_result -> 'clicks' ->> 'total')::int = 3,
+  assert (v_result -> 'clicks' ->> 'total')::int = 4,
     'click total wrong: ' || (v_result -> 'clicks' ->> 'total');
-  assert (v_result -> 'clicks' ->> 'last_30_days')::int = 3, 'click window wrong';
+  assert (v_result -> 'clicks' ->> 'last_30_days')::int = 4, 'click window wrong';
   assert (v_result -> 'totals' ->> 'orders')::int = 2,
     'order count must exclude the self-referral and the other partner, got '
     || (v_result -> 'totals' ->> 'orders');

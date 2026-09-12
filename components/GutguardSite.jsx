@@ -23,7 +23,7 @@ const CSS = `
   --heat:#FF5E3A;--heat-brick:#BF4A2B;--heat-text:#B5431F;--heat-soft:rgba(255,94,58,.12);
   --recovery:#2F86C9;--recovery-deep:#1E6FB8;--recovery-soft:rgba(47,134,201,.12);
   --slate:#0E1A2B;--slate-2:#15263B;--slate-line:#22354E;--slate-mut:#8598AE;
-  --serif:'Fraunces',Georgia,serif;--sans:'Inter Tight',system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,monospace;
+  --serif:var(--font-fraunces),'Fraunces',Georgia,serif;--sans:'Inter Tight',system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,monospace;
   --maxw:1240px;--seam:linear-gradient(90deg,var(--heat),var(--gold),var(--recovery));
   --ease:cubic-bezier(.22,1,.36,1);--ease-io:cubic-bezier(.65,0,.35,1);
 }
