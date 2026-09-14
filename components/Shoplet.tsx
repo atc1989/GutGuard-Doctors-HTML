@@ -565,7 +565,7 @@ export default function Shoplet() {
               <>
                 <p className="shop-options-label">
                   <span>When you&apos;re ready</span>
-                  <em>₱125 → ₱100 / cap</em>
+                  <em>₱133 → ₱90 / cap</em>
                 </p>
                 <div className="shop-options protocol">
                   {TIERS.map((item) => (

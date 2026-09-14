@@ -21,14 +21,14 @@ export type CatalogTrial = {
 
 export const TIERS: CatalogTier[] = [
   // price is the exact amount charged; perCap is a rounded display value.
-  { id: "start", name: "Start", phase: "30-day", days: 30, caps: 40, perCap: 125, price: 4999 },
-  { id: "grow", name: "Grow", phase: "60-day", days: 60, caps: 120, perCap: 117, price: 13999, tag: "Popular" },
-  { id: "peak", name: "Peak", phase: "90-day", days: 90, caps: 400, perCap: 100, price: 39999, tag: "Best rate" },
+  { id: "start", name: "Start", phase: "30-day", days: 30, caps: 30, perCap: 133, price: 3999 },
+  { id: "grow", name: "Grow", phase: "60-day", days: 60, caps: 90, perCap: 122, price: 10999, tag: "Popular" },
+  { id: "peak", name: "Peak", phase: "90-day", days: 90, caps: 330, perCap: 90, price: 29999, tag: "Best rate" },
 ];
 
 export const TRIALS: CatalogTrial[] = [
-  { id: "trial-blister", name: "Blister Trial", caps: 10, price: 1299, image: "/shop/blister.png" },
-  { id: "trial-bottle", name: "Bottle Trial", caps: 30, price: 3799, image: "/shop/bottle.png" },
+  { id: "trial-blister", name: "Blister Trial", caps: 10, price: 1499, image: "/shop/blister.png" },
+  { id: "trial-bottle", name: "Bottle Trial", caps: 30, price: 4299, image: "/shop/bottle.png" },
 ];
 
 export const MAX_QTY_PER_LINE = 20;
