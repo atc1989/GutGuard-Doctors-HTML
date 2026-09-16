@@ -462,6 +462,8 @@ export async function registerDoctor(payload: RegistrationPayload) {
       ...payload,
     };
 
+    void notifyAdminRegistration(registration.id);
+
     if (payload.referrerSlug) {
       void notifyPartnerReferral(registration.id);
     }
@@ -499,6 +501,18 @@ async function notifyPartnerReferral(registrationId: string) {
     });
   } catch {
     // Registration already succeeded. The referrer email is best-effort.
+  }
+}
+
+async function notifyAdminRegistration(registrationId: string) {
+  if (!isSupabaseConfigured || !supabase || registrationId.startsWith("local-")) return;
+
+  try {
+    await supabase.functions.invoke("notify-admin-registration", {
+      body: { registrationId },
+    });
+  } catch {
+    // Registration already succeeded. The admin alert is best-effort.
   }
 }
 

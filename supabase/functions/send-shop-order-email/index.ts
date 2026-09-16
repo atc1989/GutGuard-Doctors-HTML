@@ -49,6 +49,9 @@ Deno.serve(async (req) => {
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
     const fromEmail = Deno.env.get("SHOP_ORDER_FROM_EMAIL") ?? "GutGuard Orders <onboarding@resend.dev>";
     const replyTo = Deno.env.get("SHOP_ORDER_REPLY_TO") ?? undefined;
+    // ponytail: admins ride along as BCC on the customer's email. An order with no valid
+    // customer email still skips (see below); give admins their own send if that ever happens.
+    const adminBcc = (Deno.env.get("ADMIN_NOTIFY_EMAILS") ?? "").split(",").map((v) => v.trim()).filter(Boolean);
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -94,6 +97,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         from: fromEmail,
         to: [email],
+        bcc: adminBcc.length ? adminBcc : undefined,
         subject,
         html: renderEmail(order, kind, dbSchema),
         reply_to: replyTo,
