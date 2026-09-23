@@ -243,6 +243,13 @@ export type PartnerOrder = {
   payment_status: ShopPaymentStatus;
   total_amount: number;
   buyer_first_name: string;
+  /** Buyer contact, shown in full to the partner. See 20260924000000 for the scope caveat. */
+  buyer_name: string;
+  buyer_email: string;
+  buyer_mobile: string;
+  address: string;
+  barangay: string;
+  zip: string;
   city: string;
   province: string;
   source_type: "direct" | "referred";
@@ -1020,6 +1027,13 @@ function normalizePartnerOrder(entry: unknown): PartnerOrder {
     payment_status: (order.payment_status ?? "pending") as ShopPaymentStatus,
     total_amount: Number(order.total_amount ?? 0),
     buyer_first_name: String(order.buyer_first_name ?? ""),
+    // Older rows predate these keys, so fall back rather than render "undefined".
+    buyer_name: String(order.buyer_name ?? order.buyer_first_name ?? ""),
+    buyer_email: String(order.buyer_email ?? ""),
+    buyer_mobile: String(order.buyer_mobile ?? ""),
+    address: String(order.address ?? ""),
+    barangay: String(order.barangay ?? ""),
+    zip: String(order.zip ?? ""),
     city: String(order.city ?? ""),
     province: String(order.province ?? ""),
     source_type: order.source_type === "referred" ? "referred" : "direct",
