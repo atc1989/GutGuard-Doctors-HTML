@@ -644,6 +644,25 @@ export async function getDoctorRegistrations(adminPassword: string): Promise<Adm
   return ((data ?? []) as AdminDoctorRegistration[]).map(normalizeAdminDoctorRegistration);
 }
 
+/**
+ * Admin "log in as this doctor": returns a one-time magic link that opens the partner
+ * portal as that partner. The link is not emailed - open it in a new tab (or a private
+ * window, since it replaces any partner session already held by this browser profile).
+ */
+export async function adminImpersonateDoctor(
+  adminPassword: string,
+  email: string,
+): Promise<{ actionLink: string; fullName: string }> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.functions.invoke("admin-impersonate", {
+    body: { adminPassword, email, redirectTo: partnerAuthRedirectTo() },
+  });
+
+  if (error) throw new Error(await getSupabaseFunctionErrorMessage(error));
+  return data as { actionLink: string; fullName: string };
+}
+
 export async function updateDoctorRegistration(
   adminPassword: string,
   doctor: AdminDoctorRegistrationUpdate,

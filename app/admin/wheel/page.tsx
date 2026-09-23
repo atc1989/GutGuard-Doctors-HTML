@@ -108,6 +108,10 @@ type WheelApi = {
     prize: Omit<AdminWheelPrize, "id">,
   ) => Promise<AdminWheelPrize>;
   getDoctorRegistrations?: (adminPassword: string) => Promise<AdminDoctorRegistration[]>;
+  adminImpersonateDoctor?: (
+    adminPassword: string,
+    email: string,
+  ) => Promise<{ actionLink: string; fullName: string }>;
   updateDoctorRegistration?: (
     adminPassword: string,
     doctor: Pick<
@@ -354,6 +358,7 @@ export default function AdminWheelPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [impersonatingId, setImpersonatingId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [newsletterToast, setNewsletterToast] = useState<{
@@ -1065,6 +1070,38 @@ export default function AdminWheelPage() {
     }
   }
 
+  async function loginAsDoctor(doctor: AdminDoctorRegistration) {
+    setError(null);
+    setNotice(null);
+
+    if (!doctor.email) {
+      setError("This doctor has no email address, so there is no account to open.");
+      return;
+    }
+    if (!window.confirm(`Open the partner portal as ${doctor.full_name || doctor.email}?
+
+This signs you in as them and is recorded in the impersonation log. Any partner session in this browser is replaced.`)) {
+      return;
+    }
+
+    setImpersonatingId(doctor.id);
+    try {
+      const api = await loadWheelApi();
+      if (!api.adminImpersonateDoctor) {
+        throw new Error("Missing adminImpersonateDoctor helper in lib/api.ts.");
+      }
+
+      const { actionLink } = await api.adminImpersonateDoctor(password, doctor.email);
+      // Opened rather than followed, so this admin tab keeps its own state.
+      window.open(actionLink, "_blank", "noopener,noreferrer");
+      setNotice(`Opened the partner portal as ${doctor.full_name || doctor.email}.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to open that partner account.");
+    } finally {
+      setImpersonatingId("");
+    }
+  }
+
   function downloadDoctorQr(doctor: AdminDoctorRegistration, qrUrl: string, mode: DoctorQrMode) {
     setError(null);
     setNotice(null);
@@ -1761,6 +1798,14 @@ export default function AdminWheelPage() {
                     <div className="admin-doctor-row-actions">
                       <button type="button" onClick={() => openDoctorEditor(doctor)}>
                         Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => loginAsDoctor(doctor)}
+                        disabled={!doctor.email || impersonatingId === doctor.id}
+                        title={doctor.email ? "Open the partner portal as this doctor" : "No email on this registration"}
+                      >
+                        {impersonatingId === doctor.id ? "Opening…" : "Log in as"}
                       </button>
                     </div>
                   </article>
