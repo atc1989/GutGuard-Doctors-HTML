@@ -3276,7 +3276,7 @@ function renderRegistrationEmailPreview(html: string) {
     tiktok_username: "gutguarddoctor",
     specialty: "Internal Medicine",
     clinic_location: "Makati City",
-    routing_url: "https://gut-guard-doctors-html.vercel.app/dr/maria-santos",
+    routing_url: `${PUBLIC_SITE_ORIGIN}/dr/maria-santos`,
     redirect_url: "https://www.tiktok.com/@gutguarddoctor",
     registered_at: "Jun 12, 2026",
   };
