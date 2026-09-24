@@ -103,7 +103,7 @@ function redirectResponse() {
     status: 302,
     headers: {
       ...corsHeaders,
-      Location: "https://www.gutguard.ph/partner",
+      Location: `${(Deno.env.get("PUBLIC_SITE_URL") ?? "https://partners.gutguard.ph").replace(/\/$/, "")}/partner`,
     },
   });
 }
