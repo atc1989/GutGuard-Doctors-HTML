@@ -560,6 +560,48 @@ export default function AdminWheelPage() {
     return () => window.clearTimeout(timeout);
   }, [newsletterToast]);
 
+  useEffect(() => {
+    loadWheelApi().then((api) => {
+      if ((api as any).checkAdminSession) {
+        (api as any).checkAdminSession().then((authenticated: boolean) => {
+          if (authenticated) {
+            setIsUnlocked(true);
+            loadAdminData().catch(() => setIsUnlocked(false));
+          }
+        });
+      }
+    });
+  }, []);
+
+  async function loadAdminData() {
+    const api = await loadWheelApi();
+    if (!api.getWheelPrizes) {
+      throw new Error("Missing getWheelPrizes helper in lib/api.ts.");
+    }
+
+    const [loadedPrizes, loadedDoctors, loadedNewsletterHistory, loadedSmsHistory, loadedRegistrationEmail, loadedSequence] = await Promise.all([
+      api.getWheelPrizes(""),
+      api.getDoctorRegistrations ? api.getDoctorRegistrations("") : Promise.resolve([]),
+      api.getNewsletterSendHistory ? api.getNewsletterSendHistory("") : Promise.resolve([]),
+      api.getSmsBlastHistory ? api.getSmsBlastHistory("") : Promise.resolve([]),
+      api.getRegistrationEmailSettings
+        ? api.getRegistrationEmailSettings("")
+        : Promise.resolve(emptyRegistrationEmailSettings),
+      api.getSequenceSteps ? api.getSequenceSteps("") : Promise.resolve([]),
+    ]);
+    setPrizes(loadedPrizes.sort((a, b) => a.sort_order - b.sort_order));
+    setDoctors(loadedDoctors);
+    setNewsletterHistory(loadedNewsletterHistory);
+    setSmsHistory(loadedSmsHistory);
+    setRegistrationEmail(loadedRegistrationEmail);
+    setRegistrationEmailFileName(loadedRegistrationEmail.html ? "Saved registration email HTML" : "");
+    setSequenceSteps(loadedSequence.sort((a, b) => a.step_number - b.step_number));
+    setDoctorPage(1);
+    setNewsletterPage(1);
+    setSmsPage(1);
+    setIsUnlocked(true);
+  }
+
   async function handleUnlock(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -567,35 +609,19 @@ export default function AdminWheelPage() {
     setIsLoading(true);
 
     try {
-      const api = await loadWheelApi();
-      if (!api.getWheelPrizes) {
-        throw new Error("Missing getWheelPrizes helper in lib/api.ts.");
+      if (password) {
+        const api = await loadWheelApi();
+        if ((api as any).adminLogin) {
+          await (api as any).adminLogin(password);
+          setPassword("");
+        }
       }
 
-      const [loadedPrizes, loadedDoctors, loadedNewsletterHistory, loadedSmsHistory, loadedRegistrationEmail, loadedSequence] = await Promise.all([
-        api.getWheelPrizes(password),
-        api.getDoctorRegistrations ? api.getDoctorRegistrations(password) : Promise.resolve([]),
-        api.getNewsletterSendHistory ? api.getNewsletterSendHistory(password) : Promise.resolve([]),
-        api.getSmsBlastHistory ? api.getSmsBlastHistory(password) : Promise.resolve([]),
-        api.getRegistrationEmailSettings
-          ? api.getRegistrationEmailSettings(password)
-          : Promise.resolve(emptyRegistrationEmailSettings),
-        api.getSequenceSteps ? api.getSequenceSteps(password) : Promise.resolve([]),
-      ]);
-      setPrizes(loadedPrizes.sort((a, b) => a.sort_order - b.sort_order));
-      setDoctors(loadedDoctors);
-      setNewsletterHistory(loadedNewsletterHistory);
-      setSmsHistory(loadedSmsHistory);
-      setRegistrationEmail(loadedRegistrationEmail);
-      setRegistrationEmailFileName(loadedRegistrationEmail.html ? "Saved registration email HTML" : "");
-      setSequenceSteps(loadedSequence.sort((a, b) => a.step_number - b.step_number));
-      setDoctorPage(1);
-      setNewsletterPage(1);
-      setSmsPage(1);
-      setIsUnlocked(true);
+      await loadAdminData();
       setNotice("Admin data loaded.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to load wheel prizes.");
+      setIsUnlocked(false);
     } finally {
       setIsLoading(false);
     }

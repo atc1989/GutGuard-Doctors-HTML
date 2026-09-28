@@ -1,9 +1,11 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Header from "@/components/Header";
 import {
   addTikTokExternalOrderReference,
+  adminLogin,
+  checkAdminSession,
   getTikTokExternalOrderReferences,
   getTikTokOrderDetail,
   getTikTokOrders,
@@ -47,6 +49,14 @@ export default function AdminTikTokPage() {
   const [password, setPassword] = useState("");
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    checkAdminSession().then((authenticated) => {
+      if (authenticated) {
+        setIsUnlocked(true);
+      }
+    });
+  }, []);
 
   const [timeMode, setTimeMode] = useState<TikTokOrdersFilters["timeMode"]>("create_time");
   const [startDate, setStartDate] = useState(defaultRange.start);
@@ -96,6 +106,15 @@ export default function AdminTikTokPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (password) {
+      try {
+        await adminLogin(password);
+        setPassword("");
+      } catch (err) {
+        setListError(err instanceof Error ? err.message : "Invalid admin password.");
+        return;
+      }
+    }
     await fetchOrders();
   }
 
@@ -114,7 +133,7 @@ export default function AdminTikTokPage() {
         pageToken: pageToken.trim() || undefined,
         ...overrides,
       };
-      const response = await getTikTokOrders(password, filters);
+      const response = await getTikTokOrders("", filters);
       setListResult(response);
       setIsUnlocked(true);
       setPageToken(filters.pageToken ?? "");
