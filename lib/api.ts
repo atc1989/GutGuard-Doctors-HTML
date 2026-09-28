@@ -243,6 +243,13 @@ export type PartnerOrder = {
   payment_status: ShopPaymentStatus;
   total_amount: number;
   buyer_first_name: string;
+  /** Buyer contact, shown in full to the partner. See 20260924000000 for the scope caveat. */
+  buyer_name: string;
+  buyer_email: string;
+  buyer_mobile: string;
+  address: string;
+  barangay: string;
+  zip: string;
   city: string;
   province: string;
   source_type: "direct" | "referred";
@@ -663,6 +670,25 @@ export async function getDoctorRegistrations(_adminPassword?: string): Promise<A
   return ((data.doctors ?? []) as AdminDoctorRegistration[]).map(normalizeAdminDoctorRegistration);
 }
 
+/**
+ * Admin "log in as this doctor": returns a one-time magic link that opens the partner
+ * portal as that partner. The link is not emailed - open it in a new tab (or a private
+ * window, since it replaces any partner session already held by this browser profile).
+ */
+export async function adminImpersonateDoctor(
+  adminPassword: string,
+  email: string,
+): Promise<{ actionLink: string; fullName: string }> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.functions.invoke("admin-impersonate", {
+    body: { adminPassword, email, redirectTo: partnerAuthRedirectTo() },
+  });
+
+  if (error) throw new Error(await getSupabaseFunctionErrorMessage(error));
+  return data as { actionLink: string; fullName: string };
+}
+
 export async function updateDoctorRegistration(
   _adminPassword: string,
   doctor: AdminDoctorRegistrationUpdate,
@@ -1015,6 +1041,13 @@ function normalizePartnerOrder(entry: unknown): PartnerOrder {
     payment_status: (order.payment_status ?? "pending") as ShopPaymentStatus,
     total_amount: Number(order.total_amount ?? 0),
     buyer_first_name: String(order.buyer_first_name ?? ""),
+    // Older rows predate these keys, so fall back rather than render "undefined".
+    buyer_name: String(order.buyer_name ?? order.buyer_first_name ?? ""),
+    buyer_email: String(order.buyer_email ?? ""),
+    buyer_mobile: String(order.buyer_mobile ?? ""),
+    address: String(order.address ?? ""),
+    barangay: String(order.barangay ?? ""),
+    zip: String(order.zip ?? ""),
     city: String(order.city ?? ""),
     province: String(order.province ?? ""),
     source_type: order.source_type === "referred" ? "referred" : "direct",
