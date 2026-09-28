@@ -28,6 +28,9 @@ import {
   stashPendingPartnerSignin,
   stashPendingPartnerWelcome,
   takePendingPartnerSignin,
+  saveOtpSentAt,
+  loadOtpSentAt,
+  clearOtpSentAt,
 } from "@/lib/storage";
 
 const SHOP_ORIGIN = (process.env.NEXT_PUBLIC_SHOP_URL ?? "https://shop.gutguard.ph").replace(/\/$/, "");
@@ -172,6 +175,17 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
     return () => window.clearInterval(timer);
   }, [resendRemaining]);
 
+  // Restore the resend cooldown from sessionStorage so a page reload cannot
+  // reset the counter to zero and let the user bypass the 60-second wait.
+  useEffect(() => {
+    if (!email) return;
+    const sentAt = loadOtpSentAt(email);
+    if (!sentAt) return;
+    const elapsed = Math.floor((Date.now() - sentAt) / 1000);
+    const remaining = Math.max(0, RESEND_COOLDOWN_SECONDS - elapsed);
+    if (remaining > 0) setResendRemaining(remaining);
+  }, [email]);
+
   useEffect(() => {
     if (view !== "code") return;
     requestAnimationFrame(() => {
@@ -208,6 +222,7 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
       await sendPartnerOtp(normalizedEmail);
       setCode("");
       setResendRemaining(RESEND_COOLDOWN_SECONDS);
+      saveOtpSentAt(normalizedEmail);
       setView("code");
       setNotice("Code sent. Check your email.");
     } catch (caught) {
@@ -275,6 +290,7 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
       await sendPartnerOtp(email);
       setCode("");
       setResendRemaining(RESEND_COOLDOWN_SECONDS);
+      saveOtpSentAt(email);
       setNotice("A new code was sent.");
       requestAnimationFrame(() => codeInputRef.current?.focus());
     } catch (caught) {
@@ -287,6 +303,7 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
   }
 
   function changeEmail() {
+    clearOtpSentAt();
     setView("email");
     setCode("");
     setError(null);
@@ -339,6 +356,7 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
     try {
       await sendPartnerOtp(normalizedEmail);
       otpSent = true;
+      saveOtpSentAt(normalizedEmail);
     } catch (caught) {
       setError(getSendError(caught));
     }
