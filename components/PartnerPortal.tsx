@@ -799,7 +799,7 @@ function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () 
           <p className="shop-note">
             Buyer contact details are shown so you can follow up on your own orders. Treat them as confidential.
           </p>
-          </> : <>
+          </> : activityTab === "partners" ? <>
             <p className="shop-kicker">Partners you referred</p>
             <div className="partner-section-heading">
               <h2>{dashboard.totals.referred_partners ? `${dashboard.totals.referred_partners} partners` : "No referred partners yet"}</h2>
