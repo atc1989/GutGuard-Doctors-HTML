@@ -1295,14 +1295,13 @@ export async function enrollWelcomeIfNeeded(doctorId: string): Promise<void> {
   if (!data?.sent) throw new Error(data?.reason || "Welcome email was not sent.");
 }
 
-export async function resendSequenceStep(doctorId: string, stepNumber: number): Promise<void> {
+export async function resendSequenceStep(doctorId: string, stepNumber: number): Promise<SequenceStepSendResponse> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
   const { data, error } = await supabase.functions.invoke<SequenceStepSendResponse>("send-sequence-step", {
     body: { doctorId, stepNumber },
   });
   if (error) throw error;
-  if (!data?.sent) throw new Error(data?.reason || `Step ${stepNumber} was not sent.`);
-  return data;
+  return data ?? { sent: true };
 }
 
 // ─── Registration Email Settings ───────────────────────────────────────────

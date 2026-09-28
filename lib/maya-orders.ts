@@ -79,14 +79,13 @@ export async function applyPaymentToOrder(
   if (error) throw new Error("Could not persist payment");
 
   if (!wasPaid && next.paymentStatus === "paid") {
-    await supabase.functions
-      .invoke("send-shop-order-email", {
+    try {
+      await supabase.functions.invoke("send-shop-order-email", {
         body: { orderId: order.id, kind: "paid", schema: SHOP_SCHEMA },
-      })
-      .catch(() => undefined);
-
-    // E-Points Referral Pass-Up (1-Level)
-    await processOrderPoints(supabase, order.id).catch(console.error);
+      });
+    } catch {
+      // Best-effort receipt notification
+    }
   }
 
   return { changed: true, paymentStatus: next.paymentStatus };
