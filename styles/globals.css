@@ -4707,11 +4707,6 @@
   }
 }
 
-.partner-orders {
-  width: 100%;
-  border-top: 1px solid var(--rule);
-}
-
 /* Keep the final orders panel clear of the viewport edge whether it is empty or
    grows into a populated order table. */
 .partner-dashboard-shell {
@@ -4874,12 +4869,6 @@
 .partner-orders-error {
   border-color: #b42318;
   color: #b42318;
-}
-
-.partner-order-source {
-  display: block;
-  margin-top: 3px;
-  color: var(--blue) !important;
 }
 
 .partner-pagination {
@@ -5123,28 +5112,91 @@
   }
 }
 
-.partner-order {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(84px, auto);
-  align-items: center;
-  gap: 14px;
-  border-bottom: 1px solid var(--rule);
-  padding: 14px 0;
+/* The order list carries buyer contact columns, so it is wider than the panel on small
+   screens. It scrolls inside this wrapper rather than the page scrolling sideways. */
+.partner-orders-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border-top: 1px solid var(--rule);
 }
 
-.partner-order strong {
+.partner-orders-table {
+  width: 100%;
+  /* Eight columns including contact details and a full address. Below this the columns
+     shred into slivers, so scroll the wrapper instead. */
+  min-width: 1000px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.partner-orders-table th,
+.partner-orders-table td {
+  border-bottom: 1px solid var(--rule);
+  padding: 12px 14px 12px 0;
+  vertical-align: top;
+}
+
+.partner-orders-table thead th {
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.partner-order-row th[scope="row"] {
+  font-weight: inherit;
+}
+
+.partner-order-row strong {
   display: block;
   font-size: 15px;
 }
 
-.partner-order span {
+.partner-order-row span,
+.partner-order-row td {
   color: var(--ink-3);
   font-size: 12px;
   font-weight: 700;
 }
 
-.partner-order b {
+.partner-order-row a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+/* The longest column: let it wrap instead of stretching the row to one line. */
+.partner-order-address {
+  min-width: 220px;
+  text-wrap: pretty;
+}
+
+/* A phone number and a date are single tokens to a reader - wrapping them mid-value
+   ("+63 917 / 123 / 4567") is unreadable, so they keep their own line instead. */
+.partner-orders-table .nowrap {
+  white-space: nowrap;
+}
+
+/* An email has few natural break points, so allow breaking anywhere. min-width, not
+   max-width: in an auto-layout table a max-width on a cell is only a hint, and the
+   address column otherwise squeezes this one down to a four-line sliver. */
+.partner-order-email {
+  min-width: 22ch;
+  overflow-wrap: anywhere;
+}
+
+.partner-order-source {
+  min-width: 11ch;
+}
+
+.partner-orders-table .numeric {
   text-align: right;
+  padding-right: 0;
+  white-space: nowrap;
+}
+
+.partner-order-row b {
   font-size: 15px;
 }
 
