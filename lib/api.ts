@@ -303,6 +303,9 @@ export type PartnerInvitation = {
   full_name: string;
 };
 
+export type PartnerOrderScope = "all" | "direct" | "referred";
+export type PartnerDashboardQuery = { scope?: PartnerOrderScope; status?: string; limit?: number; offset?: number; dateFrom?: string; dateTo?: string; sort?: "newest" | "oldest" };
+
 export type TikTokOrderTimeMode = "create_time" | "update_time";
 
 export type TikTokOrdersFilters = {
@@ -1344,6 +1347,33 @@ export async function sendRegistrationEmailTest(
     throw new Error(data.error || "Failed to send registration email test.");
   }
   return (await res.json()) as RegistrationEmailTestResponse;
+}
+
+export async function getPartnerReferralEmailSettings(adminPassword: string): Promise<RegistrationEmailSettings> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
+    body: { action: "get", templateKind: "partner-referral", adminPassword },
+  });
+  if (error) throw error;
+  return (data as RegistrationEmailSettingsResponse).settings;
+}
+
+export async function savePartnerReferralEmailSettings(adminPassword: string, settings: RegistrationEmailSettings): Promise<RegistrationEmailSettings> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
+    body: { action: "save", templateKind: "partner-referral", adminPassword, settings },
+  });
+  if (error) throw error;
+  return (data as RegistrationEmailSettingsResponse).settings;
+}
+
+export async function sendPartnerReferralEmailTest(adminPassword: string, testEmail: string): Promise<RegistrationEmailTestResponse> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
+    body: { action: "test", templateKind: "partner-referral", adminPassword, testEmail },
+  });
+  if (error) throw error;
+  return data as RegistrationEmailTestResponse;
 }
 
 function mapClaimedPrize(row: PrizeRow | null | undefined): Prize {

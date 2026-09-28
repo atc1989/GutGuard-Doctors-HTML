@@ -122,6 +122,11 @@ export default function RegistrationExperience({ referrerSlug = "" }: { referrer
       window.alert("Registration saved, but email verification could not be recorded.");
     });
     void deliverRegistrationEmail(registration);
+    if (registration.referrerSlug) {
+      void sendPartnerReferralNotification(registration.id).catch((error) => {
+        console.error("Partner referral notification failed without affecting registration:", error);
+      });
+    }
     setScreen(2);
   }
 
@@ -188,6 +193,8 @@ export default function RegistrationExperience({ referrerSlug = "" }: { referrer
         active={screen === 1}
         invitedBy={invitation}
         onRegistered={handleRegistered}
+        invitation={invitation}
+        invitationInvalid={invitationInvalid}
       />
       <VerificationSection
         active={screen === 2}
