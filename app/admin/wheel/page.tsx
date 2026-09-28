@@ -255,7 +255,7 @@ const emptyRegistrationEmailSettings: RegistrationEmailSettings = {
 };
 
 async function loadWheelApi(): Promise<WheelApi> {
-  const api = (await import("@/lib/api")) as WheelApi;
+  const api = (await import("@/lib/api")) as unknown as WheelApi;
   return api;
 }
 

@@ -1292,12 +1292,13 @@ export async function enrollWelcomeIfNeeded(doctorId: string): Promise<void> {
   if (!data?.sent) throw new Error(data?.reason || "Welcome email was not sent.");
 }
 
-export async function resendSequenceStep(doctorId: string, stepNumber: number): Promise<void> {
+export async function resendSequenceStep(doctorId: string, stepNumber: number): Promise<SequenceStepSendResponse> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-  const { error } = await supabase.functions.invoke("send-sequence-step", {
+  const { data, error } = await supabase.functions.invoke<SequenceStepSendResponse>("send-sequence-step", {
     body: { doctorId, stepNumber },
   });
   if (error) throw error;
+  return data ?? { sent: true };
 }
 
 // ─── Registration Email Settings ───────────────────────────────────────────

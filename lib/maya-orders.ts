@@ -81,11 +81,13 @@ export async function applyPaymentToOrder(
   // Only on the pending -> paid transition, so a webhook and a reconcile racing each
   // other cannot both send the receipt.
   if (!wasPaid && next.paymentStatus === "paid") {
-    await supabase.functions
-      .invoke("send-shop-order-email", {
+    try {
+      await supabase.functions.invoke("send-shop-order-email", {
         body: { orderId: order.id, kind: "paid", schema: SHOP_SCHEMA },
-      })
-      .catch(() => undefined);
+      });
+    } catch {
+      // Best-effort receipt notification
+    }
   }
 
   return { changed: true, paymentStatus: next.paymentStatus };
