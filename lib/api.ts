@@ -293,6 +293,18 @@ export type PartnerDashboard = {
     direct_paid_amount: number;
     referred_paid_amount: number;
   };
+  points: {
+    current_cycle: number;
+    points_in_cycle: number;
+    lifetime_points: number;
+  };
+  rebates: Array<{
+    cycle_number: number;
+    milestone_pts: number;
+    rebate_amount: number;
+    status: string;
+    created_at: string;
+  }>;
   orders: PartnerOrder[];
   orders_page: { total: number; limit: number; offset: number; has_more: boolean };
   referred_partners: ReferredPartner[];
@@ -891,6 +903,12 @@ export async function getPublicShopOrder(orderCode: string): Promise<PublicShopO
  * shouldCreateUser stays true in the proxy (see app/api/auth/send-otp/route.ts)
  * for the same reason as before: partner rows predate the auth system.
  */
+function partnerAuthRedirectTo() {
+  if (typeof window !== "undefined") return `${window.location.origin}/partner`;
+  const site = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://partners.gutguard.ph").replace(/\/$/, "");
+  return `${site}/partner`;
+}
+
 export async function sendPartnerOtp(email: string): Promise<void> {
   if (!isSupabaseConfigured) throw new Error("Supabase is not configured.");
 
@@ -919,36 +937,21 @@ export async function verifyPartnerOtp(email: string, token: string): Promise<vo
   const normalizedEmail = email.trim().toLowerCase();
   const normalizedToken = token.trim();
 
-  // Supabase normally verifies a numeric email OTP with type "email". On a partner's
-  // first-ever login, however, signInWithOtp creates the auth user and sends the Confirm
-  // signup template; some hosted Auth versions classify that token as "signup" (and older
-  // passwordless flows as "magiclink"). Try the canonical type first, then the two exact
-  // email-flow variants. A failed verification does not consume the token.
-  let session = null;
-  let lastError: Error | null = null;
+  // "email" is GoTrue's unified type for a numeric email OTP - it covers both a
+  // returning partner's magic-link code and a first-ever login's signup-confirmation
+  // code, so one call verifies both cases. A failed verification does not consume the token.
+  const { data, error } = await supabase.auth.verifyOtp({
+    email: normalizedEmail,
+    token: normalizedToken,
+    type: "email",
+  });
 
-  for (const type of ["magiclink", "email", "signup"] as const) {
-    const { data, error } = await supabase.auth.verifyOtp({
-      email: normalizedEmail,
-      token: normalizedToken,
-      type,
-    });
-
-    if (!error) {
-      session = data.session;
-      lastError = null;
-      break;
-    }
-
-    lastError = error;
-  }
-
-  if (lastError) throw lastError;
+  if (error) throw error;
 
   // supabaseShop is a second createClient (see lib/supabase.ts) and was built before this
   // session existed, so it is still anonymous in this tab until it is handed the session.
   // Without this the first dashboard read fails and only starts working after a reload.
-  if (session) await supabaseShop.auth.setSession(session);
+  if (data.session) await supabaseShop.auth.setSession(data.session);
 }
 
 export async function signOutPartner(): Promise<void> {
@@ -993,6 +996,7 @@ export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Pr
   const partner = (row.partner ?? {}) as Record<string, unknown>;
   const clicks = (row.clicks ?? {}) as Record<string, unknown>;
   const totals = (row.totals ?? {}) as Record<string, unknown>;
+  const points = (row.points ?? { current_cycle: 1, points_in_cycle: 0, lifetime_points: 0 }) as Record<string, unknown>;
   const ordersPage = (row.orders_page ?? {}) as Record<string, unknown>;
 
   return {
@@ -1016,6 +1020,21 @@ export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Pr
       direct_paid_amount: Number(totals.direct_paid_amount ?? 0),
       referred_paid_amount: Number(totals.referred_paid_amount ?? 0),
     },
+    points: {
+      current_cycle: Number(points.current_cycle ?? 1),
+      points_in_cycle: Number(points.points_in_cycle ?? 0),
+      lifetime_points: Number(points.lifetime_points ?? 0),
+    },
+    rebates: (Array.isArray(row.rebates) ? row.rebates : []).map((entry) => {
+      const rebateRow = (entry ?? {}) as Record<string, unknown>;
+      return {
+        cycle_number: Number(rebateRow.cycle_number ?? 1),
+        milestone_pts: Number(rebateRow.milestone_pts ?? 0),
+        rebate_amount: Number(rebateRow.rebate_amount ?? 0),
+        status: String(rebateRow.status ?? "unlocked"),
+        created_at: String(rebateRow.created_at ?? ""),
+      };
+    }),
     orders: (Array.isArray(row.orders) ? row.orders : []).map(normalizePartnerOrder),
     orders_page: {
       total: Number(ordersPage.total ?? 0),
