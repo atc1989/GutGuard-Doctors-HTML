@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
-import { callTikTokAdminApi, type TikTokAdminAction } from "@/lib/api";
+import { serverCallTikTokAdminApi } from "@/lib/admin-server-api";
+import type { TikTokAdminAction } from "@/lib/api";
 
 export async function POST(req: NextRequest) {
   const adminPassword = await getAdminPasswordFromSession();
@@ -14,7 +15,7 @@ export async function POST(req: NextRequest) {
       payload: Record<string, unknown>;
     };
 
-    const result = await callTikTokAdminApi(adminPassword, action, payload);
+    const result = await serverCallTikTokAdminApi(adminPassword, action, payload);
     return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json(

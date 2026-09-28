@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
-import { sendSmsBlast } from "@/lib/api";
+import { serverSendSmsBlast } from "@/lib/admin-server-api";
 
 export async function POST(req: NextRequest) {
   const adminPassword = await getAdminPasswordFromSession();
@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const { doctorIds, title, message } = await req.json();
-    const result = await sendSmsBlast(adminPassword, doctorIds, title, message);
+    const result = await serverSendSmsBlast(adminPassword, doctorIds, title, message);
     return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json(

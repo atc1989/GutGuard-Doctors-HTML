@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
 import {
-  getRegistrationEmailSettings,
-  saveRegistrationEmailSettings,
-  sendRegistrationEmailTest,
-} from "@/lib/api";
+  serverGetRegistrationEmailSettings,
+  serverSaveRegistrationEmailSettings,
+  serverSendRegistrationEmailTest,
+} from "@/lib/admin-server-api";
 
 export async function GET() {
   const adminPassword = await getAdminPasswordFromSession();
@@ -13,7 +13,7 @@ export async function GET() {
   }
 
   try {
-    const settings = await getRegistrationEmailSettings(adminPassword);
+    const settings = await serverGetRegistrationEmailSettings(adminPassword);
     return NextResponse.json({ settings });
   } catch (error) {
     return NextResponse.json(
@@ -32,15 +32,15 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     if (body.action === "test") {
-      const result = await sendRegistrationEmailTest(adminPassword, body.testEmail);
+      const result = await serverSendRegistrationEmailTest(adminPassword, body.testEmail);
       return NextResponse.json(result);
     }
 
-    const saved = await saveRegistrationEmailSettings(adminPassword, body.settings);
-    return NextResponse.json({ settings: saved });
+    const settings = await serverSaveRegistrationEmailSettings(adminPassword, body.settings);
+    return NextResponse.json({ settings });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Registration email action failed." },
+      { error: error instanceof Error ? error.message : "Failed to save registration email settings." },
       { status: 500 },
     );
   }

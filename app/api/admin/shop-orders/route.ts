@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
-import { adminGetShopOrder, adminListShopOrders, adminUpdateShopOrder } from "@/lib/api";
+import {
+  serverAdminGetShopOrder,
+  serverAdminListShopOrders,
+  serverAdminUpdateShopOrder,
+} from "@/lib/admin-server-api";
 
 export async function GET(req: NextRequest) {
   const adminPassword = await getAdminPasswordFromSession();
@@ -11,11 +15,11 @@ export async function GET(req: NextRequest) {
   const orderId = req.nextUrl.searchParams.get("orderId");
   try {
     if (orderId) {
-      const order = await adminGetShopOrder(adminPassword, orderId);
+      const order = await serverAdminGetShopOrder(adminPassword, orderId);
       return NextResponse.json({ order });
     }
 
-    const orders = await adminListShopOrders(adminPassword);
+    const orders = await serverAdminListShopOrders(adminPassword);
     return NextResponse.json({ orders });
   } catch (error) {
     return NextResponse.json(
@@ -33,7 +37,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const update = await req.json();
-    const saved = await adminUpdateShopOrder(adminPassword, update);
+    const saved = await serverAdminUpdateShopOrder(adminPassword, update);
     return NextResponse.json({ order: saved });
   } catch (error) {
     return NextResponse.json(

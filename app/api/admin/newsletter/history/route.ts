@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
-import { getNewsletterSendHistory } from "@/lib/api";
+import { serverGetNewsletterSendHistory } from "@/lib/admin-server-api";
 
 export async function GET() {
   const adminPassword = await getAdminPasswordFromSession();
@@ -9,7 +9,7 @@ export async function GET() {
   }
 
   try {
-    const history = await getNewsletterSendHistory(adminPassword);
+    const history = await serverGetNewsletterSendHistory(adminPassword);
     return NextResponse.json({ history });
   } catch (error) {
     return NextResponse.json(

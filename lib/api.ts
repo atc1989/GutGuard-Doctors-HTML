@@ -23,7 +23,7 @@ type PrizeRow = {
   claim_count?: number;
 };
 
-type AdminWheelPrize = {
+export type AdminWheelPrize = {
   id?: string;
   label: string;
   note: string;
@@ -37,7 +37,7 @@ type AdminWheelPrize = {
   claim_count?: number;
 };
 
-type AdminDoctorRegistration = {
+export type AdminDoctorRegistration = {
   id: string;
   full_name: string;
   name_prefix: string;
@@ -53,7 +53,7 @@ type AdminDoctorRegistration = {
   prize_claimed_at?: string | null;
 };
 
-type AdminDoctorRegistrationUpdate = {
+export type AdminDoctorRegistrationUpdate = {
   id: string;
   full_name: string;
   name_prefix: string;
@@ -65,7 +65,7 @@ type AdminDoctorRegistrationUpdate = {
   practice_location: string;
 };
 
-type NewsletterSendHistory = {
+export type NewsletterSendHistory = {
   id: string;
   doctor_id: string;
   newsletter_id?: string | null;
@@ -86,7 +86,7 @@ type NewsletterSendResult = {
   error?: string | null;
 };
 
-type SmsSendHistory = {
+export type SmsSendHistory = {
   id: string;
   doctor_id: string;
   sms_campaign_id?: string | null;
@@ -107,14 +107,14 @@ type SmsSendResult = {
   error?: string | null;
 };
 
-type NewsletterResponse = {
+export type NewsletterResponse = {
   sent: number;
   failed: number;
   skipped: number;
   results: NewsletterSendResult[];
 };
 
-type SmsBlastResponse = {
+export type SmsBlastResponse = {
   sent: number;
   failed: number;
   skipped: number;
