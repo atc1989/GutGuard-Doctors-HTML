@@ -563,7 +563,7 @@ function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () 
   const [copied, setCopied] = useState(false);
   const [qrMode, setQrMode] = useState<PartnerQrMode>("shop");
   const [dashboard, setDashboard] = useState(data);
-  const [activityTab, setActivityTab] = useState<"orders" | "partners">("orders");
+  const [activityTab, setActivityTab] = useState<"orders" | "partners" | "rebates">("orders");
   const [orderScope, setOrderScope] = useState<PartnerOrderScope>("all");
   const [orderStatus, setOrderStatus] = useState("");
   const [orderDateFrom, setOrderDateFrom] = useState("");
@@ -749,6 +749,7 @@ function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () 
           <div className="partner-activity-tabs" role="tablist" aria-label="Dashboard activity">
             <button type="button" role="tab" aria-selected={activityTab === "orders"} className={activityTab === "orders" ? "active" : ""} onClick={() => setActivityTab("orders")}>Orders <span>{dashboard.totals.orders}</span></button>
             <button type="button" role="tab" aria-selected={activityTab === "partners"} className={activityTab === "partners" ? "active" : ""} onClick={() => setActivityTab("partners")}>Referred partners <span>{dashboard.totals.referred_partners}</span></button>
+            <button type="button" role="tab" aria-selected={activityTab === "rebates"} className={activityTab === "rebates" ? "active" : ""} onClick={() => setActivityTab("rebates")}>Rebate History <span>{dashboard.rebates.length}</span></button>
           </div>
 
           {activityTab === "orders" ? <>
@@ -835,7 +836,53 @@ function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () 
               <span>{dashboard.totals.referred_partners ? `${partnerOffset + 1}–${Math.min(partnerOffset + visiblePartners.length, dashboard.totals.referred_partners)} of ${dashboard.totals.referred_partners}` : "0 partners"}</span>
               <button type="button" className="shop-secondary" disabled={ordersBusy || partnerOffset + visiblePartners.length >= dashboard.totals.referred_partners} onClick={() => setPartnerOffset(partnerOffset + partnerPageSize)}>Next</button>
             </div>
-          </>}
+          </> : activityTab === "rebates" ? <>
+            <p className="shop-kicker">Rebate History & Points</p>
+            <div className="partner-section-heading">
+              <h2>Cycle {dashboard.points.current_cycle} Progress</h2>
+            </div>
+            
+            <div className="partner-epoints-progress" style={{ margin: "24px 0", background: "var(--paper)", padding: "24px", borderRadius: "var(--r-md)", border: "1px solid var(--rule)" }}>
+               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                  <strong style={{ color: "var(--ink)", fontFamily: "var(--font-ui)", fontSize: "16px" }}>{dashboard.points.points_in_cycle} E-Points</strong>
+                  <span style={{ color: "var(--ink-3)", fontFamily: "var(--font-ui)", fontSize: "14px" }}>Target: 1500</span>
+               </div>
+               <div style={{ background: "var(--bone-soft)", height: "12px", borderRadius: "999px", overflow: "hidden" }}>
+                  <div style={{ background: "var(--blue)", height: "100%", width: `${Math.min(100, (dashboard.points.points_in_cycle / 1500) * 100)}%`, transition: "width 0.6s ease" }}></div>
+               </div>
+               <p style={{ marginTop: "12px", fontSize: "14px", color: "var(--ink-2)", fontFamily: "var(--font-ui)" }}>
+                 {1500 - dashboard.points.points_in_cycle > 0 
+                    ? `Earn ${1500 - dashboard.points.points_in_cycle} more points to complete Cycle ${dashboard.points.current_cycle}!`
+                    : `Cycle ${dashboard.points.current_cycle} completed!`}
+               </p>
+            </div>
+
+            <div className="partner-section-heading">
+              <h2>{dashboard.rebates.length ? `${dashboard.rebates.length} Unlocked Milestones` : "No rebates yet"}</h2>
+            </div>
+            
+            {dashboard.rebates.length > 0 ? (
+              <div className="partner-referred-list">
+                 {dashboard.rebates.map((rebate, idx) => (
+                    <div key={idx} className="partner-referred-row" style={{ display: "flex", justifyContent: "space-between", padding: "16px", borderBottom: "1px solid var(--rule-soft)", alignItems: "center" }}>
+                       <span>
+                          <strong style={{ display: "block", color: "var(--ink)", fontFamily: "var(--font-ui)", fontSize: "15px" }}>Cycle {rebate.cycle_number} Milestone</strong>
+                          <small style={{ color: "var(--ink-3)", fontFamily: "var(--font-ui)", fontSize: "13px" }}>{rebate.milestone_pts} Points Reached</small>
+                       </span>
+                       <span style={{ textAlign: "right" }}>
+                          <strong style={{ display: "block", color: "var(--gold)", fontFamily: "var(--font-display)", fontSize: "18px" }}>{peso(rebate.rebate_amount)}</strong>
+                          <small style={{ color: "var(--ink-3)", fontFamily: "var(--font-ui)", fontSize: "13px" }}>{formatDate(rebate.created_at)}</small>
+                       </span>
+                    </div>
+                 ))}
+              </div>
+            ) : (
+              <div className="partner-empty-orders">
+                 <strong>No milestones unlocked yet.</strong>
+                 <p>Earn points from your direct referrals and their orders!</p>
+              </div>
+            )}
+          </> : null}
         </section>
       </div>
 
