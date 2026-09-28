@@ -1,4 +1,6 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.106.2";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.106.2";
+
+type AdminClient = SupabaseClient<any, "public", any>;
 
 const BUCKET = "registration-email-assets";
 const MAX_ATTACHMENTS = 5;
@@ -43,6 +45,7 @@ type RequestPayload = {
   adminPassword?: string;
   settings?: SettingsPayload;
   testEmail?: string;
+  templateKind?: "registration" | "partner-referral";
 };
 
 Deno.serve(async (req) => {
@@ -55,7 +58,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { action, adminPassword, settings, testEmail } = (await req.json()) as RequestPayload;
+    const { action, adminPassword, settings, testEmail, templateKind = "registration" } = (await req.json()) as RequestPayload;
     if (!adminPassword) return jsonResponse({ error: "Missing admin password" }, 400);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -72,7 +75,7 @@ Deno.serve(async (req) => {
     if (adminError) return jsonResponse({ error: "Invalid admin password" }, 401);
 
     if (action === "save") {
-      const saved = await saveSettings(supabase, settings);
+      const saved = await saveSettings(supabase, settings, templateKind);
       return jsonResponse({ settings: mapSettings(saved) });
     }
 
@@ -81,33 +84,46 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "Enter a valid test email." }, 400);
       }
 
-      const saved = await getSettings(supabase);
-      const result = await sendTestEmail(supabase, saved, testEmail);
+      const saved = await getSettings(supabase, templateKind);
+      const result = await sendTestEmail(supabase, saved, testEmail, templateKind);
       return jsonResponse(result);
     }
 
-    const saved = await getSettings(supabase);
+    const saved = await getSettings(supabase, templateKind);
     return jsonResponse({ settings: mapSettings(saved) });
   } catch (error) {
     return jsonResponse({ error: error instanceof Error ? error.message : "Unexpected error" }, 500);
   }
 });
 
-async function getSettings(supabase: ReturnType<typeof createClient>) {
+async function getSettings(supabase: AdminClient, kind: "registration" | "partner-referral"): Promise<Record<string, unknown>> {
+  const table = kind === "partner-referral" ? "partner_referral_email_settings" : "registration_email_settings";
+  const columns = kind === "partner-referral"
+    ? "id, enabled, subject, reply_to, body_text, html_template, updated_at"
+    : "id, enabled, subject, reply_to, body_text, html_template, attachments, updated_at";
   const { data, error } = await supabase
-    .from("registration_email_settings")
-    .select("id, enabled, subject, reply_to, body_text, html_template, attachments, updated_at")
+    .from(table)
+    .select(columns)
     .eq("id", 1)
     .single();
 
   if (error) throw new Error(`Registration email settings could not be loaded: ${error.message}`);
-  return data;
+  return data as unknown as Record<string, unknown>;
 }
 
-async function saveSettings(supabase: ReturnType<typeof createClient>, settings: SettingsPayload | undefined) {
+async function saveSettings(supabase: AdminClient, settings: SettingsPayload | undefined, kind: "registration" | "partner-referral") {
   if (!settings) throw new Error("Missing registration email settings.");
 
-  const current = await getSettings(supabase);
+  const current = await getSettings(supabase, kind);
+  if (kind === "partner-referral") {
+    const { data, error } = await supabase.from("partner_referral_email_settings").upsert({
+      id: 1, enabled: Boolean(settings.enabled), subject: (settings.subject ?? "").trim(),
+      reply_to: (settings.replyTo ?? "").trim(), body_text: (settings.bodyText ?? "").trim(),
+      html_template: stripScriptTags(settings.html ?? "").trim(), updated_at: new Date().toISOString(),
+    }).select("id, enabled, subject, reply_to, body_text, html_template, updated_at").single();
+    if (error) throw new Error(`Partner referral email settings could not be saved: ${error.message}`);
+    return data;
+  }
   const currentAttachments = parseAttachments(current.attachments);
   const nextAttachments = await resolveAttachments(supabase, currentAttachments, settings.attachments ?? []);
   const nextPaths = new Set(nextAttachments.map((attachment) => attachment.path));
@@ -139,7 +155,7 @@ async function saveSettings(supabase: ReturnType<typeof createClient>, settings:
 }
 
 async function resolveAttachments(
-  supabase: ReturnType<typeof createClient>,
+  supabase: AdminClient,
   current: AttachmentRecord[],
   input: AttachmentInput[],
 ) {
@@ -184,7 +200,7 @@ async function resolveAttachments(
   return next;
 }
 
-async function sendTestEmail(supabase: ReturnType<typeof createClient>, settings: Record<string, unknown>, testEmail: string) {
+async function sendTestEmail(supabase: AdminClient, settings: Record<string, unknown>, testEmail: string, kind: "registration" | "partner-referral") {
   const resendApiKey = Deno.env.get("RESEND_API_KEY");
   const fromEmail =
     Deno.env.get("REGISTRATION_FROM_EMAIL") ??
@@ -209,15 +225,15 @@ async function sendTestEmail(supabase: ReturnType<typeof createClient>, settings
     body: JSON.stringify({
       from: fromEmail,
       to: [testEmail],
-      subject,
-      html: renderTemplate(html, sampleDoctor()),
+      subject: kind === "partner-referral" ? renderReferralTemplate(subject) : subject,
+      html: kind === "partner-referral" ? renderReferralTemplate(html) : renderTemplate(html, sampleDoctor()),
       reply_to: String(settings.reply_to ?? "").trim() || undefined,
       attachments,
     }),
   });
   const resendBody = await resendResponse.json();
 
-  await supabase.from("registration_email_sends").insert({
+  if (kind === "registration") await supabase.from("registration_email_sends").insert({
     email: testEmail,
     subject,
     status: resendResponse.ok ? "test" : "failed",
@@ -232,7 +248,16 @@ async function sendTestEmail(supabase: ReturnType<typeof createClient>, settings
   return { sent: true, resendId: resendBody.id };
 }
 
-async function fetchAttachments(supabase: ReturnType<typeof createClient>, attachments: AttachmentRecord[]) {
+function renderReferralTemplate(value: string) {
+  const replacements: Record<string, string> = {
+    partner_name: "Dr. Najeeb Mapantas", new_partner_name: "Dr. Maria Santos",
+    new_partner_specialty: "Internal Medicine", new_partner_location: "Makati City",
+    registered_at: formatDate(new Date().toISOString()), dashboard_url: `${getSiteOrigin()}/partner`,
+  };
+  return value.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, key: string) => key in replacements ? escapeHtml(replacements[key]) : match);
+}
+
+async function fetchAttachments(supabase: AdminClient, attachments: AttachmentRecord[]) {
   const results = [];
 
   for (const attachment of attachments) {

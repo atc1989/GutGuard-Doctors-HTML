@@ -162,7 +162,10 @@ type WheelApi = {
   deleteSequenceStep?: (adminPassword: string, stepId: string) => Promise<void>;
   reorderSequenceSteps?: (adminPassword: string, stepIds: string[]) => Promise<void>;
   getSequenceProgress?: (adminPassword: string) => Promise<{ progress: SequenceProgress[]; totalSteps: number }>;
-  resendSequenceStep?: (doctorId: string, stepNumber: number) => Promise<void>;
+  resendSequenceStep?: (
+    doctorId: string,
+    stepNumber: number,
+  ) => Promise<{ sent?: boolean; reason?: string; sendId?: string; step?: number }>;
 };
 
 type SequenceAttachment = {
