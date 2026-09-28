@@ -124,3 +124,56 @@ export function clearPendingPartnerWelcome() {
     // localStorage is best-effort on restricted browsers.
   }
 }
+
+// ─── OTP Resend Cooldown ──────────────────────────────────────────────────────
+//
+// Persisting the OTP send timestamp means the 60-second resend countdown
+// survives a page reload. Without this, refreshing resets the counter to zero
+// and a user can bypass the UI cooldown with a simple refresh.
+
+const OTP_SENT_AT_KEY = "gg:partner:otp-sent-at";
+
+/** Record the moment an OTP was sent so the countdown can be restored on reload. */
+export function saveOtpSentAt(email: string): void {
+  try {
+    window.sessionStorage.setItem(
+      OTP_SENT_AT_KEY,
+      JSON.stringify({ email: email.trim().toLowerCase(), at: Date.now() }),
+    );
+  } catch {
+    // sessionStorage is best-effort on restricted browsers.
+  }
+}
+
+/**
+ * Return the timestamp (ms) of the last OTP send for this email, or null if
+ * the record is absent, expired, or belongs to a different email address.
+ */
+export function loadOtpSentAt(email: string): number | null {
+  if (typeof window === "undefined") return null;
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return null;
+
+  try {
+    const raw = window.sessionStorage.getItem(OTP_SENT_AT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { email?: unknown; at?: unknown };
+    if (
+      typeof parsed.email !== "string" ||
+      parsed.email.trim().toLowerCase() !== normalized
+    )
+      return null;
+    return typeof parsed.at === "number" ? parsed.at : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Remove the stored OTP timestamp (e.g. when the user changes their email). */
+export function clearOtpSentAt(): void {
+  try {
+    window.sessionStorage.removeItem(OTP_SENT_AT_KEY);
+  } catch {
+    // best-effort.
+  }
+}

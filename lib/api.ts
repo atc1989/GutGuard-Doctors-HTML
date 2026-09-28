@@ -839,31 +839,33 @@ export async function getPublicShopOrder(orderCode: string): Promise<PublicShopO
 /**
  * Partner sign-in, step 1: email a 6-digit code.
  *
- * shouldCreateUser stays true even though only registered partners may see data. Partner
- * rows predate this login and have no auth.users entry, so `false` would lock every one of
- * them out permanently. Access is gated by partner_dashboard(), which checks the verified
- * address against doctor_registrations - and leaving account creation open means the sign-in
- * form cannot be used to test whether an address is a registered partner.
+ * The request goes through /api/auth/send-otp — a server-side proxy that is
+ * intercepted by middleware.ts before it reaches Supabase. This ensures the
+ * Upstash sliding-window rate limits (per IP and per email) are enforced even
+ * when the client reloads or opens multiple tabs.
  *
- * Requires {{ .Token }} in the Supabase "Magic Link" email template, or the mail arrives
- * with a link and no code to type. emailRedirectTo must be on the project's URI allow
- * list; without it GoTrue uses Site URL (currently the Gema /my-account host).
+ * shouldCreateUser stays true in the proxy (see app/api/auth/send-otp/route.ts)
+ * for the same reason as before: partner rows predate the auth system.
  */
-function partnerAuthRedirectTo() {
-  if (typeof window !== "undefined") return `${window.location.origin}/partner`;
-  const site = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://partners.gutguard.ph").replace(/\/$/, "");
-  return `${site}/partner`;
-}
-
 export async function sendPartnerOtp(email: string): Promise<void> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  if (!isSupabaseConfigured) throw new Error("Supabase is not configured.");
 
-  const { error } = await supabase.auth.signInWithOtp({
-    email: email.trim().toLowerCase(),
-    options: { shouldCreateUser: true, emailRedirectTo: partnerAuthRedirectTo() },
+  const response = await fetch("/api/auth/send-otp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: email.trim().toLowerCase() }),
   });
 
-  if (error) throw error;
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    // Preserve the HTTP status on the thrown Error so PartnerPortal's
+    // getSendError / getResendError handlers can detect rate-limit messages
+    // via their existing "rate" / "too many" / "429" text matching.
+    throw Object.assign(
+      new Error(body?.error ?? "We couldn't send a sign-in code. Please try again."),
+      { status: response.status },
+    );
+  }
 }
 
 /** Partner sign-in, step 2: exchange the code for a session. */
