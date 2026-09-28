@@ -303,9 +303,6 @@ export type PartnerInvitation = {
   full_name: string;
 };
 
-export type PartnerOrderScope = "all" | "direct" | "referred";
-export type PartnerDashboardQuery = { scope?: PartnerOrderScope; status?: string; limit?: number; offset?: number; dateFrom?: string; dateTo?: string; sort?: "newest" | "oldest" };
-
 export type TikTokOrderTimeMode = "create_time" | "update_time";
 
 export type TikTokOrdersFilters = {
@@ -498,6 +495,10 @@ export async function getPartnerInvitation(slug: string): Promise<PartnerInvitat
   if (!routing_slug) return null;
 
   return { routing_slug, full_name };
+}
+
+export async function sendPartnerReferralNotification(registrationId: string) {
+  return notifyPartnerReferral(registrationId);
 }
 
 async function notifyPartnerReferral(registrationId: string) {

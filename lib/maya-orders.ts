@@ -178,16 +178,19 @@ async function checkMilestones(supabase: ShopAdminClient, partnerId: string) {
 
     for (const ms of milestones) {
       if (cyclePts >= ms.pts) {
-        await supabase
-          .from("milestone_unlocks")
-          .insert({
-            partner_id: partnerId,
-            cycle_number: cycle,
-            milestone_pts: ms.pts,
-            rebate_amount: ms.rebate,
-            status: "unlocked",
-          })
-          .catch(() => undefined); // Catch unique constraint errors quietly
+        try {
+          await supabase
+            .from("milestone_unlocks")
+            .insert({
+              partner_id: partnerId,
+              cycle_number: cycle,
+              milestone_pts: ms.pts,
+              rebate_amount: ms.rebate,
+              status: "unlocked",
+            });
+        } catch {
+          // Catch unique constraint errors quietly
+        }
       }
     }
   }
