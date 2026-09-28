@@ -897,6 +897,12 @@ export async function getPublicShopOrder(orderCode: string): Promise<PublicShopO
  * shouldCreateUser stays true in the proxy (see app/api/auth/send-otp/route.ts)
  * for the same reason as before: partner rows predate the auth system.
  */
+function partnerAuthRedirectTo() {
+  if (typeof window !== "undefined") return `${window.location.origin}/partner`;
+  const site = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://partners.gutguard.ph").replace(/\/$/, "");
+  return `${site}/partner`;
+}
+
 export async function sendPartnerOtp(email: string): Promise<void> {
   if (!isSupabaseConfigured) throw new Error("Supabase is not configured.");
 
