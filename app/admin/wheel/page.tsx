@@ -2,8 +2,12 @@
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import AdminOrders from "@/components/AdminOrders";
 import Header from "@/components/Header";
 import { DownloadIcon } from "@/components/Icons";
+import { NAME_PREFIXES } from "@/lib/constants";
+import { partnerLinkKey } from "@/lib/referral";
+import { formatPrefixedName } from "@/lib/validation";
 
 type AdminWheelPrize = {
   id?: string;
@@ -21,6 +25,7 @@ type AdminWheelPrize = {
 type AdminDoctorRegistration = {
   id: string;
   full_name: string;
+  name_prefix: string;
   email: string;
   mobile: string;
   tiktok_username: string;
@@ -103,12 +108,17 @@ type WheelApi = {
     prize: Omit<AdminWheelPrize, "id">,
   ) => Promise<AdminWheelPrize>;
   getDoctorRegistrations?: (adminPassword: string) => Promise<AdminDoctorRegistration[]>;
+  adminImpersonateDoctor?: (
+    adminPassword: string,
+    email: string,
+  ) => Promise<{ actionLink: string; fullName: string }>;
   updateDoctorRegistration?: (
     adminPassword: string,
     doctor: Pick<
       AdminDoctorRegistration,
       | "id"
       | "full_name"
+      | "name_prefix"
       | "email"
       | "mobile"
       | "tiktok_username"
@@ -197,13 +207,15 @@ const emptyPrize: AdminWheelPrize = {
   sort_order: 0,
 };
 const PAGE_SIZE_OPTIONS = [10, 20, 100];
-const PUBLIC_SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://gut-guard-doctors-html.vercel.app").replace(
+const PUBLIC_SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://partners.gutguard.ph").replace(
   /\/$/,
   "",
 );
 const SHOP_ORIGIN = (process.env.NEXT_PUBLIC_SHOP_URL ?? "https://shop.gutguard.ph").replace(/\/$/, "");
 const PLACEHOLDER_TOKENS = [
   "{{doctor_name}}",
+  "{{name_prefix}}",
+  "{{prefixed_name}}",
   "{{doctor_email}}",
   "{{doctor_mobile}}",
   "{{tiktok_username}}",
@@ -214,6 +226,8 @@ const PLACEHOLDER_TOKENS = [
 ];
 const SMS_PLACEHOLDER_TOKENS = [
   "{{doctor_name}}",
+  "{{name_prefix}}",
+  "{{prefixed_name}}",
   "{{doctor_mobile}}",
   "{{tiktok_username}}",
   "{{specialty}}",
@@ -223,6 +237,8 @@ const SMS_PLACEHOLDER_TOKENS = [
 ];
 const REGISTRATION_EMAIL_TOKENS = [
   "{{doctor_name}}",
+  "{{name_prefix}}",
+  "{{prefixed_name}}",
   "{{doctor_email}}",
   "{{doctor_mobile}}",
   "{{tiktok_username}}",
@@ -259,13 +275,20 @@ function getPrizeOdds(prize: AdminWheelPrize, activeWeightTotal: number) {
   return (prize.chance_weight / activeWeightTotal) * 100;
 }
 
-type DoctorQrMode = "shop" | "profile";
+type DoctorQrMode = "shop" | "referral" | "profile";
 
+/**
+ * Keyed by partnerLinkKey, not routing slug: the slug is the partner's name, and these URLs
+ * are printed on QR posters and shown to customers. Slug links still resolve server-side.
+ */
 function getDoctorQrUrl(doctor: AdminDoctorRegistration, mode: DoctorQrMode) {
-  if (!doctor.routing_slug) return "";
-  if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${encodeURIComponent(doctor.routing_slug)}`;
+  if (!doctor.id) return "";
+
+  const key = partnerLinkKey(doctor.id);
+  if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${key}`;
+  if (mode === "referral") return `${PUBLIC_SITE_ORIGIN}/physicians/register?ref=${key}`;
   if (doctor.routing_slug === "dr-grace-saraza") return `${SHOP_ORIGIN}/beehive`;
-  return `${SHOP_ORIGIN}/r/${encodeURIComponent(doctor.routing_slug)}`;
+  return `${SHOP_ORIGIN}/r/${key}`;
 }
 
 function getDoctorQrElementId(doctorId: string, mode: DoctorQrMode) {
@@ -273,7 +296,7 @@ function getDoctorQrElementId(doctorId: string, mode: DoctorQrMode) {
 }
 
 export default function AdminWheelPage() {
-  const [activeTab, setActiveTab] = useState<"wheel" | "doctors" | "newsletter" | "sms" | "registrationEmail" | "sequence">("wheel");
+  const [activeTab, setActiveTab] = useState<"wheel" | "doctors" | "orders" | "newsletter" | "sms" | "registrationEmail" | "sequence">("wheel");
   const [password, setPassword] = useState("");
   const [prizes, setPrizes] = useState<AdminWheelPrize[]>([]);
   const [doctors, setDoctors] = useState<AdminDoctorRegistration[]>([]);
@@ -338,6 +361,7 @@ export default function AdminWheelPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [impersonatingId, setImpersonatingId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [newsletterToast, setNewsletterToast] = useState<{
@@ -361,6 +385,7 @@ export default function AdminWheelPage() {
     return doctors.filter((doctor) =>
       [
         doctor.full_name,
+        doctor.name_prefix,
         doctor.email,
         doctor.mobile,
         doctor.tiktok_username,
@@ -388,6 +413,7 @@ export default function AdminWheelPage() {
     return withEmail.filter((doctor) =>
       [
         doctor.full_name,
+        doctor.name_prefix,
         doctor.email,
         doctor.mobile,
         doctor.tiktok_username,
@@ -420,6 +446,7 @@ export default function AdminWheelPage() {
     return withMobile.filter((doctor) =>
       [
         doctor.full_name,
+        doctor.name_prefix,
         doctor.email,
         doctor.mobile,
         doctor.tiktok_username,
@@ -536,6 +563,48 @@ export default function AdminWheelPage() {
     return () => window.clearTimeout(timeout);
   }, [newsletterToast]);
 
+  useEffect(() => {
+    loadWheelApi().then((api) => {
+      if ((api as any).checkAdminSession) {
+        (api as any).checkAdminSession().then((authenticated: boolean) => {
+          if (authenticated) {
+            setIsUnlocked(true);
+            loadAdminData().catch(() => setIsUnlocked(false));
+          }
+        });
+      }
+    });
+  }, []);
+
+  async function loadAdminData() {
+    const api = await loadWheelApi();
+    if (!api.getWheelPrizes) {
+      throw new Error("Missing getWheelPrizes helper in lib/api.ts.");
+    }
+
+    const [loadedPrizes, loadedDoctors, loadedNewsletterHistory, loadedSmsHistory, loadedRegistrationEmail, loadedSequence] = await Promise.all([
+      api.getWheelPrizes(""),
+      api.getDoctorRegistrations ? api.getDoctorRegistrations("") : Promise.resolve([]),
+      api.getNewsletterSendHistory ? api.getNewsletterSendHistory("") : Promise.resolve([]),
+      api.getSmsBlastHistory ? api.getSmsBlastHistory("") : Promise.resolve([]),
+      api.getRegistrationEmailSettings
+        ? api.getRegistrationEmailSettings("")
+        : Promise.resolve(emptyRegistrationEmailSettings),
+      api.getSequenceSteps ? api.getSequenceSteps("") : Promise.resolve([]),
+    ]);
+    setPrizes(loadedPrizes.sort((a, b) => a.sort_order - b.sort_order));
+    setDoctors(loadedDoctors);
+    setNewsletterHistory(loadedNewsletterHistory);
+    setSmsHistory(loadedSmsHistory);
+    setRegistrationEmail(loadedRegistrationEmail);
+    setRegistrationEmailFileName(loadedRegistrationEmail.html ? "Saved registration email HTML" : "");
+    setSequenceSteps(loadedSequence.sort((a, b) => a.step_number - b.step_number));
+    setDoctorPage(1);
+    setNewsletterPage(1);
+    setSmsPage(1);
+    setIsUnlocked(true);
+  }
+
   async function handleUnlock(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -543,35 +612,19 @@ export default function AdminWheelPage() {
     setIsLoading(true);
 
     try {
-      const api = await loadWheelApi();
-      if (!api.getWheelPrizes) {
-        throw new Error("Missing getWheelPrizes helper in lib/api.ts.");
+      if (password) {
+        const api = await loadWheelApi();
+        if ((api as any).adminLogin) {
+          await (api as any).adminLogin(password);
+          setPassword("");
+        }
       }
 
-      const [loadedPrizes, loadedDoctors, loadedNewsletterHistory, loadedSmsHistory, loadedRegistrationEmail, loadedSequence] = await Promise.all([
-        api.getWheelPrizes(password),
-        api.getDoctorRegistrations ? api.getDoctorRegistrations(password) : Promise.resolve([]),
-        api.getNewsletterSendHistory ? api.getNewsletterSendHistory(password) : Promise.resolve([]),
-        api.getSmsBlastHistory ? api.getSmsBlastHistory(password) : Promise.resolve([]),
-        api.getRegistrationEmailSettings
-          ? api.getRegistrationEmailSettings(password)
-          : Promise.resolve(emptyRegistrationEmailSettings),
-        api.getSequenceSteps ? api.getSequenceSteps(password) : Promise.resolve([]),
-      ]);
-      setPrizes(loadedPrizes.sort((a, b) => a.sort_order - b.sort_order));
-      setDoctors(loadedDoctors);
-      setNewsletterHistory(loadedNewsletterHistory);
-      setSmsHistory(loadedSmsHistory);
-      setRegistrationEmail(loadedRegistrationEmail);
-      setRegistrationEmailFileName(loadedRegistrationEmail.html ? "Saved registration email HTML" : "");
-      setSequenceSteps(loadedSequence.sort((a, b) => a.step_number - b.step_number));
-      setDoctorPage(1);
-      setNewsletterPage(1);
-      setSmsPage(1);
-      setIsUnlocked(true);
+      await loadAdminData();
       setNotice("Admin data loaded.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to load wheel prizes.");
+      setIsUnlocked(false);
     } finally {
       setIsLoading(false);
     }
@@ -1013,6 +1066,7 @@ export default function AdminWheelPage() {
 
       const updatedDoctor = await api.updateDoctorRegistration(password, {
         id: editingDoctor.id,
+        name_prefix: editingDoctor.name_prefix.trim(),
         full_name: editingDoctor.full_name.trim(),
         email: editingDoctor.email.trim(),
         mobile: editingDoctor.mobile.trim(),
@@ -1042,6 +1096,38 @@ export default function AdminWheelPage() {
       setNotice("Doctor QR link copied.");
     } catch {
       setError("Unable to copy the QR link. Please copy it from the text field instead.");
+    }
+  }
+
+  async function loginAsDoctor(doctor: AdminDoctorRegistration) {
+    setError(null);
+    setNotice(null);
+
+    if (!doctor.email) {
+      setError("This doctor has no email address, so there is no account to open.");
+      return;
+    }
+    if (!window.confirm(`Open the partner portal as ${doctor.full_name || doctor.email}?
+
+This signs you in as them and is recorded in the impersonation log. Any partner session in this browser is replaced.`)) {
+      return;
+    }
+
+    setImpersonatingId(doctor.id);
+    try {
+      const api = await loadWheelApi();
+      if (!api.adminImpersonateDoctor) {
+        throw new Error("Missing adminImpersonateDoctor helper in lib/api.ts.");
+      }
+
+      const { actionLink } = await api.adminImpersonateDoctor(password, doctor.email);
+      // Opened rather than followed, so this admin tab keeps its own state.
+      window.open(actionLink, "_blank", "noopener,noreferrer");
+      setNotice(`Opened the partner portal as ${doctor.full_name || doctor.email}.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to open that partner account.");
+    } finally {
+      setImpersonatingId("");
     }
   }
 
@@ -1288,6 +1374,22 @@ export default function AdminWheelPage() {
     }) : current);
   }
 
+  // Hero summary, one [status, figure, unit] row per tab.
+  const summaryByTab: Record<typeof activeTab, [string, string | number, string]> = {
+    wheel: [`${prizes.length} prizes`, activeWeightTotal, "active weight"],
+    doctors: [`${doctors.length} doctors`, doctors.length, "registrations"],
+    orders: ["website orders", "--", "shown below"],
+    newsletter: [`${selectedDoctorIds.length} selected`, selectedDoctorIds.length, "newsletter recipients"],
+    sms: [`${selectedSmsDoctorIds.length} selected`, selectedSmsDoctorIds.length, "SMS recipients"],
+    sequence: [`${sequenceSteps.length} steps`, sequenceProgress.length, "enrolled doctors"],
+    registrationEmail: [
+      registrationEmail.enabled ? "enabled" : "disabled",
+      registrationEmail.attachments.length,
+      "attachments",
+    ],
+  };
+  const summary = summaryByTab[activeTab];
+
   return (
     <main className="admin-wheel-shell">
       <Header dateLabel="Admin Wheel" />
@@ -1302,47 +1404,9 @@ export default function AdminWheelPage() {
           </h1>
         </div>
         <div className="admin-wheel-summary" aria-live="polite">
-          <span>
-            {activeTab === "wheel"
-              ? `${prizes.length} prizes`
-              : activeTab === "doctors"
-                ? `${doctors.length} doctors`
-                : activeTab === "newsletter"
-                  ? `${selectedDoctorIds.length} selected`
-                  : activeTab === "sms"
-                    ? `${selectedSmsDoctorIds.length} selected`
-                    : activeTab === "sequence"
-                      ? `${sequenceSteps.length} steps`
-                      : registrationEmail.enabled
-                        ? "enabled"
-                        : "disabled"}
-          </span>
-          <strong>
-            {activeTab === "wheel"
-              ? activeWeightTotal
-              : activeTab === "doctors"
-                ? doctors.length
-                : activeTab === "newsletter"
-                  ? selectedDoctorIds.length
-                  : activeTab === "sms"
-                    ? selectedSmsDoctorIds.length
-                    : activeTab === "sequence"
-                      ? sequenceProgress.length
-                      : registrationEmail.attachments.length}
-          </strong>
-          <span>
-            {activeTab === "wheel"
-              ? "active weight"
-              : activeTab === "doctors"
-                ? "registrations"
-                : activeTab === "newsletter"
-                  ? "newsletter recipients"
-                  : activeTab === "sms"
-                    ? "SMS recipients"
-                    : activeTab === "sequence"
-                      ? "enrolled doctors"
-                      : "attachments"}
-          </span>
+          <span>{summary[0]}</span>
+          <strong>{summary[1]}</strong>
+          <span>{summary[2]}</span>
         </div>
       </section>
 
@@ -1360,6 +1424,13 @@ export default function AdminWheelPage() {
           type="button"
         >
           Doctors
+        </button>
+        <button
+          className={activeTab === "orders" ? "active" : ""}
+          onClick={() => setActiveTab("orders")}
+          type="button"
+        >
+          Orders
         </button>
         <button
           className={activeTab === "newsletter" ? "active" : ""}
@@ -1649,7 +1720,7 @@ export default function AdminWheelPage() {
                 return (
                   <article className="admin-doctor-row" key={doctor.id}>
                     <div className="admin-doctor-primary">
-                      <strong>{doctor.full_name || "Unnamed doctor"}</strong>
+                      <strong>{formatPrefixedName(doctor.name_prefix, doctor.full_name) || "Unnamed doctor"}</strong>
                       <span>@{doctor.tiktok_username || "no-handle"}</span>
                       <div
                         className="admin-doctor-qr-toggle"
@@ -1663,6 +1734,14 @@ export default function AdminWheelPage() {
                           onClick={() => setDoctorQrModes((current) => ({ ...current, [doctor.id]: "shop" }))}
                         >
                           Shop referral
+                        </button>
+                        <button
+                          type="button"
+                          className={qrMode === "referral" ? "active" : ""}
+                          aria-pressed={qrMode === "referral"}
+                          onClick={() => setDoctorQrModes((current) => ({ ...current, [doctor.id]: "referral" }))}
+                        >
+                          Partner invite
                         </button>
                         <button
                           type="button"
@@ -1683,7 +1762,13 @@ export default function AdminWheelPage() {
                             marginSize={2}
                           />
                           <div>
-                            <small>{qrMode === "shop" ? "Shop referral route" : "TikTok redirect route"}</small>
+                            <small>
+                              {qrMode === "shop"
+                                ? "Shop referral route"
+                                : qrMode === "referral"
+                                  ? "Partner registration invite"
+                                  : "TikTok redirect route"}
+                            </small>
                             <code>{qrUrl}</code>
                             <div className="admin-doctor-qr-actions">
                               <button type="button" onClick={() => copyDoctorQrUrl(qrUrl)}>
@@ -1707,6 +1792,10 @@ export default function AdminWheelPage() {
                     </div>
                     <dl className="admin-doctor-details">
                       <div>
+                        <dt>Prefix</dt>
+                        <dd>{doctor.name_prefix || "--"}</dd>
+                      </div>
+                      <div>
                         <dt>Email</dt>
                         <dd>{doctor.email || "--"}</dd>
                       </div>
@@ -1723,7 +1812,7 @@ export default function AdminWheelPage() {
                         <dd>{doctor.specialty || "--"}</dd>
                       </div>
                       <div>
-                        <dt>Clinic</dt>
+                        <dt>City address</dt>
                         <dd>{doctor.practice_location || "--"}</dd>
                       </div>
                       <div>
@@ -1738,6 +1827,14 @@ export default function AdminWheelPage() {
                     <div className="admin-doctor-row-actions">
                       <button type="button" onClick={() => openDoctorEditor(doctor)}>
                         Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => loginAsDoctor(doctor)}
+                        disabled={!doctor.email || impersonatingId === doctor.id}
+                        title={doctor.email ? "Open the partner portal as this doctor" : "No email on this registration"}
+                      >
+                        {impersonatingId === doctor.id ? "Opening…" : "Log in as"}
                       </button>
                     </div>
                   </article>
@@ -1795,6 +1892,8 @@ export default function AdminWheelPage() {
           </div>
         </section>
       ) : null}
+
+      {isUnlocked && activeTab === "orders" ? <AdminOrders password={password} partners={doctors} /> : null}
 
       {isUnlocked && activeTab === "newsletter" ? (
         <section className="admin-wheel-panel">
@@ -1925,7 +2024,7 @@ export default function AdminWheelPage() {
                         onChange={() => toggleNewsletterDoctor(doctor.id)}
                       />
                       <span>
-                        <strong>{doctor.full_name || "Unnamed doctor"}</strong>
+                        <strong>{formatPrefixedName(doctor.name_prefix, doctor.full_name) || "Unnamed doctor"}</strong>
                         <em>{doctor.email}</em>
                       </span>
                     </label>
@@ -1935,7 +2034,7 @@ export default function AdminWheelPage() {
                         <dd>@{doctor.tiktok_username || "no-handle"}</dd>
                       </div>
                       <div>
-                        <dt>Clinic</dt>
+                        <dt>City address</dt>
                         <dd>{doctor.practice_location || "--"}</dd>
                       </div>
                       <div>
@@ -2167,7 +2266,7 @@ export default function AdminWheelPage() {
                         onChange={() => toggleSmsDoctor(doctor.id)}
                       />
                       <span>
-                        <strong>{doctor.full_name || "Unnamed doctor"}</strong>
+                        <strong>{formatPrefixedName(doctor.name_prefix, doctor.full_name) || "Unnamed doctor"}</strong>
                         <em>{normalizeSmsMobile(doctor.mobile) || doctor.mobile}</em>
                       </span>
                     </label>
@@ -2177,7 +2276,7 @@ export default function AdminWheelPage() {
                         <dd>@{doctor.tiktok_username || "no-handle"}</dd>
                       </div>
                       <div>
-                        <dt>Clinic</dt>
+                        <dt>City address</dt>
                         <dd>{doctor.practice_location || "--"}</dd>
                       </div>
                       <div>
@@ -2980,6 +3079,20 @@ export default function AdminWheelPage() {
             </div>
             <div className="admin-edit-grid">
               <label>
+                Prefix
+                <select
+                  value={editingDoctor.name_prefix || ""}
+                  onChange={(event) => setEditingDoctor({ ...editingDoctor, name_prefix: event.target.value })}
+                >
+                  <option value="">Select prefix</option>
+                  {NAME_PREFIXES.map((prefix) => (
+                    <option key={prefix} value={prefix}>
+                      {prefix}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
                 Name
                 <input
                   required
@@ -3027,13 +3140,12 @@ export default function AdminWheelPage() {
               <label>
                 Specialty
                 <input
-                  required
                   value={editingDoctor.specialty}
                   onChange={(event) => setEditingDoctor({ ...editingDoctor, specialty: event.target.value })}
                 />
               </label>
               <label>
-                Clinic location
+                City address
                 <input
                   required
                   value={editingDoctor.practice_location}
@@ -3078,6 +3190,8 @@ export default function AdminWheelPage() {
               title="Step preview"
               style={{ flex: 1, border: "none", minHeight: 500 }}
               srcDoc={previewStep.html_body
+                .replace(/\{\{\s*prefixed_name\s*\}\}/g, "Dr. Sample Doctor")
+                .replace(/\{\{\s*name_prefix\s*\}\}/g, "Dr.")
                 .replace(/\{\{\s*doctor_name\s*\}\}/g, "Sample Doctor")
                 .replace(/\{\{\s*doctor_email\s*\}\}/g, "doctor@clinic.com")
                 .replace(/\{\{\s*doctor_mobile\s*\}\}/g, "09171234567")
@@ -3124,7 +3238,9 @@ function formatSmsResult(result: SmsSendResult) {
 
 function renderNewsletterPreview(html: string) {
   const replacements: Record<string, string> = {
-    doctor_name: "Dr. Maria Santos",
+    doctor_name: "Maria Santos",
+    name_prefix: "Dr.",
+    prefixed_name: "Dr. Maria Santos",
     doctor_email: "doctor@example.com",
     doctor_mobile: "09171234567",
     tiktok_username: "gutguarddoctor",
@@ -3142,7 +3258,9 @@ function renderNewsletterPreview(html: string) {
 
 function renderSmsPreview(message: string) {
   const replacements: Record<string, string> = {
-    doctor_name: "Dr. Maria Santos",
+    doctor_name: "Maria Santos",
+    name_prefix: "Dr.",
+    prefixed_name: "Dr. Maria Santos",
     doctor_mobile: "+639171234567",
     tiktok_username: "gutguarddoctor",
     specialty: "Internal Medicine",
@@ -3179,13 +3297,15 @@ function normalizeSmsMobile(value: string | null | undefined) {
 
 function renderRegistrationEmailPreview(html: string) {
   const replacements: Record<string, string> = {
-    doctor_name: "Dr. Maria Santos",
+    doctor_name: "Maria Santos",
+    name_prefix: "Dr.",
+    prefixed_name: "Dr. Maria Santos",
     doctor_email: "doctor@example.com",
     doctor_mobile: "09171234567",
     tiktok_username: "gutguarddoctor",
     specialty: "Internal Medicine",
     clinic_location: "Makati City",
-    routing_url: "https://gut-guard-doctors-html.vercel.app/dr/maria-santos",
+    routing_url: `${PUBLIC_SITE_ORIGIN}/dr/maria-santos`,
     redirect_url: "https://www.tiktok.com/@gutguarddoctor",
     registered_at: "Jun 12, 2026",
   };

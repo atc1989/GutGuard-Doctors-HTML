@@ -5,6 +5,7 @@ export type TaskId = (typeof TASKS)[number]["id"];
 
 export type Registration = {
   id: string;
+  namePrefix: string;
   fullName: string;
   email: string;
   mobile: string;
@@ -13,6 +14,7 @@ export type Registration = {
   location: string;
   referrerSlug?: string;
   registeredAt: number;
+  referrerSlug?: string;
 };
 
 export type RegistrationPayload = Omit<Registration, "id" | "registeredAt">;

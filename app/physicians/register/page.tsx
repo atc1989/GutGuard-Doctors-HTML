@@ -1,13 +1,18 @@
-import RegistrationExperience from "@/components/RegistrationExperience";
-import { cookies } from "next/headers";
+import PartnerPortal from "@/components/PartnerPortal";
 
 export const metadata = {
-  title: "Physician registration",
-  description: "Register for the Gutguard physician and clinical adopter program.",
+  title: "Apply to become a partner",
+  description: "Register for the Gutguard partner program and open your dashboard.",
 };
 
-export default async function PhysicianRegistrationPage({ searchParams }: { searchParams: Promise<{ ref?: string; invitation?: string }> }) {
+type PhysicianRegistrationPageProps = {
+  searchParams: Promise<{ ref?: string | string[] }>;
+};
+
+export default async function PhysicianRegistrationPage({ searchParams }: PhysicianRegistrationPageProps) {
   const params = await searchParams;
-  const cookieSlug = (await cookies()).get("gg_partner_ref")?.value ?? "";
-  return <RegistrationExperience initialReferrerSlug={params.ref ?? cookieSlug} initialInvitationInvalid={params.invitation === "invalid"} />;
+  const raw = params.ref;
+  const referrerSlug = (Array.isArray(raw) ? raw[0] : raw)?.trim().toLowerCase() ?? "";
+
+  return <PartnerPortal initialView="apply" referrerSlug={referrerSlug} />;
 }

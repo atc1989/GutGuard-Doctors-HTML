@@ -3,6 +3,7 @@
 import ActionButton from "@/components/ActionButton";
 import { ArrowRightIcon } from "@/components/Icons";
 import type { Registration } from "@/lib/types";
+import { formatPrefixedName } from "@/lib/validation";
 
 type RevealSectionProps = {
   active: boolean;
@@ -27,7 +28,7 @@ export default function RevealSection({
         <span className="reveal-flourish-label">With our compliments</span>
       </div>
       <p className="reveal-name">
-        Registered to <strong>{registration?.fullName ?? "--"}</strong>
+        Registered to <strong>{formatPrefixedName(registration?.namePrefix, registration?.fullName) || "--"}</strong>
       </p>
       <div className="prize">{prize ?? "--"}</div>
       <p className="prize-note">

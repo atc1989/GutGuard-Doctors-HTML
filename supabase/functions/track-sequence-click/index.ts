@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
     return htmlResponse("<h2>Server error.</h2>", 500);
   }
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const supabase = createClient(supabaseUrl, serviceRoleKey, { db: { schema: "doctors" } });
 
   // Fetch the send record
   const { data: sendRecord, error: sendError } = await supabase
@@ -103,7 +103,7 @@ function redirectResponse() {
     status: 302,
     headers: {
       ...corsHeaders,
-      Location: "https://www.gutguard.ph",
+      Location: `${(Deno.env.get("PUBLIC_SITE_URL") ?? "https://partners.gutguard.ph").replace(/\/$/, "")}/partner`,
     },
   });
 }

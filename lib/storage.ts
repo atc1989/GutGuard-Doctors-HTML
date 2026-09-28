@@ -1,5 +1,19 @@
-import { LOCAL_KEY } from "@/lib/constants";
+import { LOCAL_KEY, PARTNER_PENDING_SIGNIN_KEY, PARTNER_PENDING_WELCOME_KEY } from "@/lib/constants";
 import type { ExperienceState } from "@/lib/types";
+
+export type PendingPartnerSignin = {
+  email: string;
+  otpSent: boolean;
+  doctorId?: string;
+};
+
+export type PendingPartnerWelcome = {
+  email: string;
+  doctorId: string;
+};
+
+const PENDING_SIGNIN_MAX_AGE_MS = 10 * 60 * 1000;
+const PENDING_WELCOME_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 
 export const INITIAL_STATE: ExperienceState = {
   registration: null,
@@ -34,5 +48,132 @@ export function clearExperienceState() {
     window.localStorage.removeItem(LOCAL_KEY);
   } catch {
     // Local persistence is best-effort for booth devices with restricted storage.
+  }
+}
+
+export function stashPendingPartnerSignin(pending: PendingPartnerSignin) {
+  try {
+    window.sessionStorage.setItem(
+      PARTNER_PENDING_SIGNIN_KEY,
+      JSON.stringify({ ...pending, at: Date.now() }),
+    );
+  } catch {
+    // sessionStorage is best-effort on restricted browsers.
+  }
+}
+
+export function takePendingPartnerSignin(): PendingPartnerSignin | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.sessionStorage.getItem(PARTNER_PENDING_SIGNIN_KEY);
+    window.sessionStorage.removeItem(PARTNER_PENDING_SIGNIN_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as { email?: unknown; otpSent?: unknown; doctorId?: unknown; at?: unknown };
+    const email = typeof parsed.email === "string" ? parsed.email.trim().toLowerCase() : "";
+    const at = typeof parsed.at === "number" ? parsed.at : 0;
+    if (!email || !at || Date.now() - at > PENDING_SIGNIN_MAX_AGE_MS) return null;
+
+    const doctorId = typeof parsed.doctorId === "string" ? parsed.doctorId.trim() : "";
+    return { email, otpSent: parsed.otpSent === true, doctorId: doctorId || undefined };
+  } catch {
+    return null;
+  }
+}
+
+export function stashPendingPartnerWelcome(pending: PendingPartnerWelcome) {
+  if (!pending.doctorId || pending.doctorId.startsWith("local-")) return;
+  try {
+    window.localStorage.setItem(
+      PARTNER_PENDING_WELCOME_KEY,
+      JSON.stringify({ ...pending, email: pending.email.trim().toLowerCase(), at: Date.now() }),
+    );
+  } catch {
+    // localStorage is best-effort on restricted browsers.
+  }
+}
+
+export function peekPendingPartnerWelcome(email: string): string | null {
+  if (typeof window === "undefined") return null;
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return null;
+
+  try {
+    const raw = window.localStorage.getItem(PARTNER_PENDING_WELCOME_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { email?: unknown; doctorId?: unknown; at?: unknown };
+    const storedEmail = typeof parsed.email === "string" ? parsed.email.trim().toLowerCase() : "";
+    const doctorId = typeof parsed.doctorId === "string" ? parsed.doctorId.trim() : "";
+    const at = typeof parsed.at === "number" ? parsed.at : 0;
+    if (!storedEmail || storedEmail !== normalized || !doctorId || doctorId.startsWith("local-")) return null;
+    if (!at || Date.now() - at > PENDING_WELCOME_MAX_AGE_MS) {
+      window.localStorage.removeItem(PARTNER_PENDING_WELCOME_KEY);
+      return null;
+    }
+    return doctorId;
+  } catch {
+    return null;
+  }
+}
+
+export function clearPendingPartnerWelcome() {
+  try {
+    window.localStorage.removeItem(PARTNER_PENDING_WELCOME_KEY);
+  } catch {
+    // localStorage is best-effort on restricted browsers.
+  }
+}
+
+// ─── OTP Resend Cooldown ──────────────────────────────────────────────────────
+//
+// Persisting the OTP send timestamp means the 60-second resend countdown
+// survives a page reload. Without this, refreshing resets the counter to zero
+// and a user can bypass the UI cooldown with a simple refresh.
+
+const OTP_SENT_AT_KEY = "gg:partner:otp-sent-at";
+
+/** Record the moment an OTP was sent so the countdown can be restored on reload. */
+export function saveOtpSentAt(email: string): void {
+  try {
+    window.sessionStorage.setItem(
+      OTP_SENT_AT_KEY,
+      JSON.stringify({ email: email.trim().toLowerCase(), at: Date.now() }),
+    );
+  } catch {
+    // sessionStorage is best-effort on restricted browsers.
+  }
+}
+
+/**
+ * Return the timestamp (ms) of the last OTP send for this email, or null if
+ * the record is absent, expired, or belongs to a different email address.
+ */
+export function loadOtpSentAt(email: string): number | null {
+  if (typeof window === "undefined") return null;
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return null;
+
+  try {
+    const raw = window.sessionStorage.getItem(OTP_SENT_AT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { email?: unknown; at?: unknown };
+    if (
+      typeof parsed.email !== "string" ||
+      parsed.email.trim().toLowerCase() !== normalized
+    )
+      return null;
+    return typeof parsed.at === "number" ? parsed.at : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Remove the stored OTP timestamp (e.g. when the user changes their email). */
+export function clearOtpSentAt(): void {
+  try {
+    window.sessionStorage.removeItem(OTP_SENT_AT_KEY);
+  } catch {
+    // best-effort.
   }
 }
