@@ -317,7 +317,7 @@ function renderBodyText(value: string) {
 }
 
 function getSiteOrigin() {
-  return (Deno.env.get("PUBLIC_SITE_URL") ?? "https://gut-guard-doctors-html.vercel.app").replace(/\/$/, "");
+  return (Deno.env.get("PUBLIC_SITE_URL") ?? "https://partners.gutguard.ph").replace(/\/$/, "");
 }
 
 function base64ToUint8Array(value: string) {

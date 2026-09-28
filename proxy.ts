@@ -35,7 +35,7 @@ function getLimiters(): { ip: Ratelimit | null; em: Ratelimit | null } {
   return { ip: ipLimiter, em: emailLimiter };
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   // Only gate the OTP proxy route; everything else passes through.
   if (req.nextUrl.pathname !== "/api/auth/send-otp") {
     return NextResponse.next();

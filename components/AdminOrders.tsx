@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
+  adminImpersonateDoctor,
   adminListShopOrders,
   adminUpdateShopOrder,
   type ShopOrder,
@@ -21,13 +22,14 @@ const ORDER_STATUSES: ShopOrderStatus[] = [
 const PAYMENT_STATUSES: ShopPaymentStatus[] = ["pending", "review", "paid", "failed", "refunded"];
 
 /** Only what the referral column needs, so this does not depend on the admin doctor type. */
-type PartnerLike = { id: string; full_name: string };
+type PartnerLike = { id: string; full_name: string; email: string };
 
 export default function AdminOrders({ password, partners }: { password: string; partners: PartnerLike[] }) {
   const [orders, setOrders] = useState<ShopOrder[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<ShopOrder | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isImpersonating, setIsImpersonating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -36,6 +38,38 @@ export default function AdminOrders({ password, partners }: { password: string; 
     () => new Map(partners.map((partner) => [partner.id, partner.full_name])),
     [partners],
   );
+  const partnerEmails = useMemo(
+    () => new Map(partners.map((partner) => [partner.id, partner.email])),
+    [partners],
+  );
+
+  // The buyer has no account - shop checkout is a guest flow keyed by order code - so the
+  // only account reachable from an order is the partner who referred it.
+  const referralPartnerEmail = selectedOrder?.referral_doctor_id
+    ? partnerEmails.get(selectedOrder.referral_doctor_id) ?? ""
+    : "";
+
+  async function loginAsReferralPartner(email: string) {
+    setError(null);
+    setNotice(null);
+
+    if (!window.confirm(`Open the partner portal as ${email}?
+
+This signs you in as them and is recorded in the impersonation log. Any partner session in this browser is replaced.`)) {
+      return;
+    }
+
+    setIsImpersonating(true);
+    try {
+      const { actionLink, fullName } = await adminImpersonateDoctor(password, email);
+      window.open(actionLink, "_blank", "noopener,noreferrer");
+      setNotice(`Opened the partner portal as ${fullName || email}.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to open that partner account.");
+    } finally {
+      setIsImpersonating(false);
+    }
+  }
 
   const loadOrders = useCallback(async () => {
     setIsLoading(true);
@@ -313,6 +347,16 @@ export default function AdminOrders({ password, partners }: { password: string; 
               <button type="button" onClick={() => setSelectedOrder(null)}>
                 Cancel
               </button>
+              {referralPartnerEmail ? (
+                <button
+                  type="button"
+                  onClick={() => loginAsReferralPartner(referralPartnerEmail)}
+                  disabled={isImpersonating}
+                  title="Open the partner portal as the partner who referred this order"
+                >
+                  {isImpersonating ? "Opening…" : "Log in as partner"}
+                </button>
+              ) : null}
               <button type="submit" disabled={isSaving}>
                 {isSaving ? "Saving" : "Save order"}
               </button>
