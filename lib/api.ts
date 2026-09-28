@@ -676,17 +676,19 @@ export async function getDoctorRegistrations(_adminPassword?: string): Promise<A
  * window, since it replaces any partner session already held by this browser profile).
  */
 export async function adminImpersonateDoctor(
-  adminPassword: string,
-  email: string,
+  _adminPassword?: string,
+  email?: string,
 ): Promise<{ actionLink: string; fullName: string }> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-
-  const { data, error } = await supabase.functions.invoke("admin-impersonate", {
-    body: { adminPassword, email, redirectTo: partnerAuthRedirectTo() },
+  const res = await fetch("/api/admin/impersonate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
   });
-
-  if (error) throw new Error(await getSupabaseFunctionErrorMessage(error));
-  return data as { actionLink: string; fullName: string };
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Impersonation failed.");
+  }
+  return (await res.json()) as { actionLink: string; fullName: string };
 }
 
 export async function updateDoctorRegistration(
