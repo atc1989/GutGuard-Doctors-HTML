@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
-import { sendNewsletter } from "@/lib/api";
+import { serverSendNewsletter } from "@/lib/admin-server-api";
 
 export async function POST(req: NextRequest) {
   const adminPassword = await getAdminPasswordFromSession();
@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const { doctorIds, subject, html } = await req.json();
-    const result = await sendNewsletter(adminPassword, doctorIds, subject, html);
+    const result = await serverSendNewsletter(adminPassword, doctorIds, subject, html);
     return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json(

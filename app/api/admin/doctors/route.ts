@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
-import { getDoctorRegistrations, updateDoctorRegistration } from "@/lib/api";
+import { serverGetDoctorRegistrations, serverUpdateDoctorRegistration } from "@/lib/admin-server-api";
 
 export async function GET() {
   const adminPassword = await getAdminPasswordFromSession();
@@ -9,7 +9,7 @@ export async function GET() {
   }
 
   try {
-    const doctors = await getDoctorRegistrations(adminPassword);
+    const doctors = await serverGetDoctorRegistrations(adminPassword);
     return NextResponse.json({ doctors });
   } catch (error) {
     return NextResponse.json(
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const doctor = await req.json();
-    const updated = await updateDoctorRegistration(adminPassword, doctor);
+    const updated = await serverUpdateDoctorRegistration(adminPassword, doctor);
     return NextResponse.json({ doctor: updated });
   } catch (error) {
     return NextResponse.json(

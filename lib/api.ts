@@ -23,7 +23,7 @@ type PrizeRow = {
   claim_count?: number;
 };
 
-type AdminWheelPrize = {
+export type AdminWheelPrize = {
   id?: string;
   label: string;
   note: string;
@@ -37,7 +37,7 @@ type AdminWheelPrize = {
   claim_count?: number;
 };
 
-type AdminDoctorRegistration = {
+export type AdminDoctorRegistration = {
   id: string;
   full_name: string;
   name_prefix: string;
@@ -53,7 +53,7 @@ type AdminDoctorRegistration = {
   prize_claimed_at?: string | null;
 };
 
-type AdminDoctorRegistrationUpdate = {
+export type AdminDoctorRegistrationUpdate = {
   id: string;
   full_name: string;
   name_prefix: string;
@@ -65,7 +65,7 @@ type AdminDoctorRegistrationUpdate = {
   practice_location: string;
 };
 
-type NewsletterSendHistory = {
+export type NewsletterSendHistory = {
   id: string;
   doctor_id: string;
   newsletter_id?: string | null;
@@ -86,7 +86,7 @@ type NewsletterSendResult = {
   error?: string | null;
 };
 
-type SmsSendHistory = {
+export type SmsSendHistory = {
   id: string;
   doctor_id: string;
   sms_campaign_id?: string | null;
@@ -107,14 +107,14 @@ type SmsSendResult = {
   error?: string | null;
 };
 
-type NewsletterResponse = {
+export type NewsletterResponse = {
   sent: number;
   failed: number;
   skipped: number;
   results: NewsletterSendResult[];
 };
 
-type SmsBlastResponse = {
+export type SmsBlastResponse = {
   sent: number;
   failed: number;
   skipped: number;
@@ -509,6 +509,10 @@ export async function getPartnerInvitation(slug: string): Promise<PartnerInvitat
   return { routing_slug, full_name };
 }
 
+export async function sendPartnerReferralNotification(registrationId: string) {
+  return notifyPartnerReferral(registrationId);
+}
+
 async function notifyPartnerReferral(registrationId: string) {
   if (!isSupabaseConfigured || !supabase || registrationId.startsWith("local-")) return;
 
@@ -688,17 +692,19 @@ export async function getDoctorRegistrations(_adminPassword?: string): Promise<A
  * window, since it replaces any partner session already held by this browser profile).
  */
 export async function adminImpersonateDoctor(
-  adminPassword: string,
-  email: string,
+  _adminPassword?: string,
+  email?: string,
 ): Promise<{ actionLink: string; fullName: string }> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-
-  const { data, error } = await supabase.functions.invoke("admin-impersonate", {
-    body: { adminPassword, email, redirectTo: partnerAuthRedirectTo() },
+  const res = await fetch("/api/admin/impersonate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
   });
-
-  if (error) throw new Error(await getSupabaseFunctionErrorMessage(error));
-  return data as { actionLink: string; fullName: string };
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Impersonation failed.");
+  }
+  return (await res.json()) as { actionLink: string; fullName: string };
 }
 
 export async function updateDoctorRegistration(
@@ -1309,12 +1315,13 @@ export async function enrollWelcomeIfNeeded(doctorId: string): Promise<void> {
   if (!data?.sent) throw new Error(data?.reason || "Welcome email was not sent.");
 }
 
-export async function resendSequenceStep(doctorId: string, stepNumber: number): Promise<void> {
+export async function resendSequenceStep(doctorId: string, stepNumber: number): Promise<SequenceStepSendResponse> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-  const { error } = await supabase.functions.invoke("send-sequence-step", {
+  const { data, error } = await supabase.functions.invoke<SequenceStepSendResponse>("send-sequence-step", {
     body: { doctorId, stepNumber },
   });
   if (error) throw error;
+  return data ?? { sent: true };
 }
 
 // ─── Registration Email Settings ───────────────────────────────────────────
@@ -1360,6 +1367,33 @@ export async function sendRegistrationEmailTest(
     throw new Error(data.error || "Failed to send registration email test.");
   }
   return (await res.json()) as RegistrationEmailTestResponse;
+}
+
+export async function getPartnerReferralEmailSettings(adminPassword: string): Promise<RegistrationEmailSettings> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
+    body: { action: "get", templateKind: "partner-referral", adminPassword },
+  });
+  if (error) throw error;
+  return (data as RegistrationEmailSettingsResponse).settings;
+}
+
+export async function savePartnerReferralEmailSettings(adminPassword: string, settings: RegistrationEmailSettings): Promise<RegistrationEmailSettings> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
+    body: { action: "save", templateKind: "partner-referral", adminPassword, settings },
+  });
+  if (error) throw error;
+  return (data as RegistrationEmailSettingsResponse).settings;
+}
+
+export async function sendPartnerReferralEmailTest(adminPassword: string, testEmail: string): Promise<RegistrationEmailTestResponse> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
+    body: { action: "test", templateKind: "partner-referral", adminPassword, testEmail },
+  });
+  if (error) throw error;
+  return data as RegistrationEmailTestResponse;
 }
 
 function mapClaimedPrize(row: PrizeRow | null | undefined): Prize {

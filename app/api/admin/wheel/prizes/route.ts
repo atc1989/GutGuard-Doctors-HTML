@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
-import { adminListWheelPrizes, adminSaveWheelPrize } from "@/lib/api";
+import { serverAdminListWheelPrizes, serverAdminSaveWheelPrize } from "@/lib/admin-server-api";
 
 export async function GET() {
   const adminPassword = await getAdminPasswordFromSession();
@@ -9,7 +9,7 @@ export async function GET() {
   }
 
   try {
-    const prizes = await adminListWheelPrizes(adminPassword);
+    const prizes = await serverAdminListWheelPrizes(adminPassword);
     return NextResponse.json({ prizes });
   } catch (error) {
     return NextResponse.json(
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const prize = await req.json();
-    const saved = await adminSaveWheelPrize(adminPassword, prize);
+    const saved = await serverAdminSaveWheelPrize(adminPassword, prize);
     return NextResponse.json({ prize: saved });
   } catch (error) {
     return NextResponse.json(

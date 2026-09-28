@@ -554,7 +554,7 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
   );
 }
 
-function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () => void }) {
+export function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () => void }) {
   const qrRef = useRef<HTMLDivElement>(null);
   const linkRef = useRef<HTMLParagraphElement>(null);
   const posterDialogRef = useRef<HTMLDivElement>(null);

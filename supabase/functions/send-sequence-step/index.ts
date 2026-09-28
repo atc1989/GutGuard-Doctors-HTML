@@ -192,6 +192,7 @@ Deno.serve(async (req) => {
 
 function renderTemplate(html: string, doctor: DoctorRegistration, clickUrl: string, siteUrl: string, currentStep: number) {
   const tiktokUsername = (doctor.tiktok_username ?? "").trim().replace(/^@+/, "").toLowerCase();
+  const doctorName = (doctor.full_name ?? "").trim().replace(/^dr\.?\s+/i, "");
   const routingUrl = doctor.routing_slug ? `${siteUrl}/dr/${encodeURIComponent(doctor.routing_slug)}` : "";
 
   const replacements: Record<string, string> = {
@@ -219,6 +220,7 @@ function renderTemplate(html: string, doctor: DoctorRegistration, clickUrl: stri
 
 function renderSubject(subject: string, doctor: DoctorRegistration) {
   const tiktokUsername = (doctor.tiktok_username ?? "").trim().replace(/^@+/, "").toLowerCase();
+  const doctorName = (doctor.full_name ?? "").trim().replace(/^dr\.?\s+/i, "");
   const replacements: Record<string, string> = {
     doctor_name: doctor.full_name ?? "",
     name_prefix: doctor.name_prefix ?? "",

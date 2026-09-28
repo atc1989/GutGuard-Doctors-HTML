@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
-import { adminListTestimonials, adminReviewTestimonial } from "@/lib/api";
+import { serverAdminListTestimonials, serverAdminReviewTestimonial } from "@/lib/admin-server-api";
 
 export async function GET(req: NextRequest) {
   const adminPassword = await getAdminPasswordFromSession();
@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
 
   const status = req.nextUrl.searchParams.get("status");
   try {
-    const stories = await adminListTestimonials(
+    const stories = await serverAdminListTestimonials(
       adminPassword,
       status ? (status as any) : undefined,
     );
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const input = await req.json();
-    const saved = await adminReviewTestimonial(adminPassword, input);
+    const saved = await serverAdminReviewTestimonial(adminPassword, input);
     return NextResponse.json({ story: saved });
   } catch (error) {
     return NextResponse.json(

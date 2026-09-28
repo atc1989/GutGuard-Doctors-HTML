@@ -6,7 +6,15 @@ import ProgressRail from "@/components/ProgressRail";
 import RegistrationSection from "@/sections/RegistrationSection";
 import VerificationSection from "@/sections/VerificationSection";
 import WheelSection from "@/sections/WheelSection";
-import { claimPrize, enrollDoctorInSequence, getPartnerInvitation, listWheelPrizes, updateTask } from "@/lib/api";
+import {
+  claimPrize,
+  enrollDoctorInSequence,
+  getPartnerInvitation,
+  listWheelPrizes,
+  sendPartnerReferralNotification,
+  updateTask,
+  type PartnerInvitation,
+} from "@/lib/api";
 import { PARTNER_REFERRER_KEY } from "@/lib/constants";
 import {
   clearExperienceState,
@@ -34,7 +42,8 @@ export default function RegistrationExperience({ referrerSlug = "" }: { referrer
   const [wheelLoading, setWheelLoading] = useState(false);
   const [wheelError, setWheelError] = useState<string | null>(null);
   const [emailDelivery, setEmailDelivery] = useState<RegistrationEmailDelivery>({ status: "idle" });
-  const [invitation, setInvitation] = useState<{ slug: string; fullName: string } | null>(null);
+  const [invitation, setInvitation] = useState<PartnerInvitation | null>(null);
+  const [invitationInvalid, setInvitationInvalid] = useState(false);
 
   const dateLabel = useMemo(
     () => new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date()),
@@ -57,12 +66,20 @@ export default function RegistrationExperience({ referrerSlug = "" }: { referrer
     let cancelled = false;
     getPartnerInvitation(slug)
       .then((invite) => {
-        if (cancelled || !invite) return;
-        window.sessionStorage.setItem(PARTNER_REFERRER_KEY, invite.routing_slug);
-        setInvitation({ slug: invite.routing_slug, fullName: invite.full_name });
+        if (cancelled) return;
+        if (invite) {
+          window.sessionStorage.setItem(PARTNER_REFERRER_KEY, invite.routing_slug);
+          setInvitation(invite);
+          setInvitationInvalid(false);
+        } else {
+          setInvitation(null);
+          setInvitationInvalid(true);
+        }
       })
       .catch(() => {
-        // Invalid or unreachable slug: register with no referrer rather than blocking the booth.
+        if (cancelled) return;
+        setInvitation(null);
+        setInvitationInvalid(true);
       });
 
     return () => {
@@ -122,6 +139,11 @@ export default function RegistrationExperience({ referrerSlug = "" }: { referrer
       window.alert("Registration saved, but email verification could not be recorded.");
     });
     void deliverRegistrationEmail(registration);
+    if (registration.referrerSlug) {
+      void sendPartnerReferralNotification(registration.id).catch((error: unknown) => {
+        console.error("Partner referral notification failed without affecting registration:", error);
+      });
+    }
     setScreen(2);
   }
 
@@ -186,8 +208,10 @@ export default function RegistrationExperience({ referrerSlug = "" }: { referrer
       <RegistrationSection
         key={registrationResetKey}
         active={screen === 1}
-        invitedBy={invitation}
+        invitedBy={invitation ? { slug: invitation.routing_slug, fullName: invitation.full_name } : null}
         onRegistered={handleRegistered}
+        invitation={invitation}
+        invitationInvalid={invitationInvalid}
       />
       <VerificationSection
         active={screen === 2}
