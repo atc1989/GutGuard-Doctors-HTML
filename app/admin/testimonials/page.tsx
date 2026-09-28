@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Header from "@/components/Header";
 import TestimonialVideo from "@/components/TestimonialVideo";
-import { adminListTestimonials, adminReviewTestimonial } from "@/lib/api";
+import { adminListTestimonials, adminLogin, adminReviewTestimonial, checkAdminSession } from "@/lib/api";
 import {
   testimonialPhotoUrl,
   type AdminTestimonial,
@@ -19,6 +19,15 @@ export default function AdminTestimonialsPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  useEffect(() => {
+    checkAdminSession().then((authenticated) => {
+      if (authenticated) {
+        setIsUnlocked(true);
+        loadStories();
+      }
+    });
+  }, []);
+
   const metrics = useMemo(
     () => ({
       total: stories.length,
@@ -29,13 +38,30 @@ export default function AdminTestimonialsPage() {
 
   const hasPassword = password.trim().length > 0;
 
+  async function loadStories() {
+    setIsLoading(true);
+    setError(null);
+    try {
+      setStories(await adminListTestimonials());
+      setIsUnlocked(true);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not load stories.");
+      setIsUnlocked(false);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   async function load(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
     setIsLoading(true);
     setError(null);
     try {
-      setStories(await adminListTestimonials(password));
-      setIsUnlocked(true);
+      if (password) {
+        await adminLogin(password);
+        setPassword("");
+      }
+      await loadStories();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load stories.");
       setIsUnlocked(false);
@@ -49,9 +75,9 @@ export default function AdminTestimonialsPage() {
     setError(null);
     setNotice(null);
     try {
-      const saved = await adminReviewTestimonial(password, { id: story.id, status, featured });
+      const saved = await adminReviewTestimonial("", { id: story.id, status, featured });
       // Featuring clears the flag on every other row, so refetch rather than patch in place.
-      if (featured) await load();
+      if (featured) await loadStories();
       else setStories((current) => current.map((row) => (row.id === saved.id ? saved : row)));
       setNotice(`${story.display_name}: ${status}${featured ? " · featured" : ""}.`);
     } catch (caught) {
