@@ -3126,7 +3126,16 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
               </label>
               <label>
                 Routing slug
-                <input value={editingDoctor.routing_slug || ""} readOnly />
+                <input
+                  value={editingDoctor.routing_slug || ""}
+                  onChange={(event) =>
+                    setEditingDoctor({
+                      ...editingDoctor,
+                      routing_slug: event.target.value.trim().toLowerCase(),
+                    })
+                  }
+                  placeholder="e.g. icsps"
+                />
               </label>
               <label className="admin-edit-wide">
                 Redirect link

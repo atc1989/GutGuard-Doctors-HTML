@@ -232,6 +232,17 @@ export async function serverUpdateDoctorRegistration(
   });
 
   if (error) throw error;
+
+  if (doctor.routing_slug) {
+    const cleanSlug = doctor.routing_slug.trim().toLowerCase();
+    if (cleanSlug) {
+      await supabase
+        .from("doctor_registrations")
+        .update({ routing_slug: cleanSlug })
+        .eq("id", doctor.id);
+    }
+  }
+
   return normalizeAdminDoctorRegistration((Array.isArray(data) ? data[0] : data) as AdminDoctorRegistration);
 }
 
