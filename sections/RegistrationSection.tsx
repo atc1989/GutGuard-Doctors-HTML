@@ -245,7 +245,7 @@ export default function RegistrationSection({
         ) : null}
         <InputField
           id="location"
-          label="City address"
+          label="Full Clinic Address"
           error="Please enter your city address."
           value={values.location}
           hasError={errors.location}

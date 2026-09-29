@@ -298,6 +298,8 @@ export type PartnerDashboard = {
     current_cycle: number;
     points_in_cycle: number;
     lifetime_points: number;
+    own_points: number;
+    passup_points: number;
   };
   rebates: Array<{
     cycle_number: number;
@@ -997,7 +999,7 @@ export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Pr
   const partner = (row.partner ?? {}) as Record<string, unknown>;
   const clicks = (row.clicks ?? {}) as Record<string, unknown>;
   const totals = (row.totals ?? {}) as Record<string, unknown>;
-  const points = (row.points ?? { current_cycle: 1, points_in_cycle: 0, lifetime_points: 0 }) as Record<string, unknown>;
+  const points = (row.points ?? { current_cycle: 1, points_in_cycle: 0, total_all_time: 0, own_points: 0, passup_points: 0 }) as Record<string, unknown>;
   const ordersPage = (row.orders_page ?? {}) as Record<string, unknown>;
 
   return {
@@ -1024,7 +1026,9 @@ export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Pr
     points: {
       current_cycle: Number(points.current_cycle ?? 1),
       points_in_cycle: Number(points.points_in_cycle ?? 0),
-      lifetime_points: Number(points.lifetime_points ?? 0),
+      lifetime_points: Number(points.total_all_time ?? points.lifetime_points ?? 0),
+      own_points: Number(points.own_points ?? 0),
+      passup_points: Number(points.passup_points ?? 0),
     },
     rebates: (Array.isArray(row.rebates) ? row.rebates : []).map((entry) => {
       const rebateRow = (entry ?? {}) as Record<string, unknown>;
