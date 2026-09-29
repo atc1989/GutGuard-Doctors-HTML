@@ -229,7 +229,7 @@ export default function PartnerApplyForm({
 
       <ApplyField
         id="location"
-        label="Address"
+        label=" Full Clinic Address"
         error="Please enter your practice location."
         value={values.location}
         hasError={errors.location}
