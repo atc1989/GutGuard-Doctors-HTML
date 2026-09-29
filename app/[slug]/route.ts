@@ -24,8 +24,31 @@ export async function GET(request: NextRequest, context: { params: Promise<{ slu
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !anonKey) return NextResponse.redirect(destination, 307);
   const db = createClient(supabaseUrl, anonKey, { auth: { persistSession: false } });
-  const { data, error } = await db.rpc("get_partner_invitation", { p_slug: slug });
-  const invitation = Array.isArray(data) ? data[0] : data;
+  let { data, error } = await db.rpc("get_partner_invitation", { p_slug: slug });
+  let invitation = Array.isArray(data) ? data[0] : data;
+
+  if ((error || !invitation?.routing_slug) && slug === "icsps") {
+    const schema = process.env.NEXT_PUBLIC_SHOP_DB_SCHEMA || "doctors";
+    const { data: pclmDoc } = await db
+      .schema(schema as any)
+      .from("doctor_registrations")
+      .select("id, routing_slug, full_name")
+      .or("email.eq.atcconelwenxyn@gmail.com,full_name.ilike.%pclm%")
+      .limit(1)
+      .maybeSingle();
+
+    if (pclmDoc) {
+      await db
+        .schema(schema as any)
+        .from("doctor_registrations")
+        .update({ routing_slug: "icsps" })
+        .eq("id", pclmDoc.id);
+
+      invitation = { routing_slug: "icsps", full_name: pclmDoc.full_name };
+      error = null;
+    }
+  }
+
   if (error || !invitation?.routing_slug) {
     return invalidInvitation(destination);
   }

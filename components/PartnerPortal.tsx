@@ -985,6 +985,8 @@ function PartnerNav({ onSignOut }: { onSignOut?: () => void }) {
   );
 }
 
+const PUBLIC_MARKETING_ORIGIN = (process.env.NEXT_PUBLIC_MARKETING_URL ?? "https://www.gutguard.ph").replace(/\/$/, "");
+
 /** Mirrors getDoctorQrUrl in the admin, so printed codes match across views. */
 function getPartnerQrLink(partner: { id: string; routing_slug: string }, mode: PartnerQrMode) {
   if (!partner.id) {
@@ -993,7 +995,12 @@ function getPartnerQrLink(partner: { id: string; routing_slug: string }, mode: P
   }
   const key = partnerLinkKey(partner.id);
   if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${key}`;
-  if (mode === "referral") return `${PUBLIC_SITE_ORIGIN}/physicians/register?ref=${key}`;
+  if (mode === "referral") {
+    if (partner.routing_slug) {
+      return `${PUBLIC_MARKETING_ORIGIN}/${partner.routing_slug.toUpperCase()}`;
+    }
+    return `${PUBLIC_SITE_ORIGIN}/physicians/register?ref=${key}`;
+  }
   if (partner.routing_slug === "dr-grace-saraza") return `${SHOP_ORIGIN}/beehive`;
   return `${SHOP_ORIGIN}/r/${key}`;
 }

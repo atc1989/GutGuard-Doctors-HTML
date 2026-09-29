@@ -60,6 +60,7 @@ export type AdminDoctorRegistrationUpdate = {
   email: string;
   mobile: string;
   tiktok_username: string;
+  routing_slug?: string;
   redirect_url: string;
   specialty: string;
   practice_location: string;

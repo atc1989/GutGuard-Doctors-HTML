@@ -16,10 +16,10 @@ function getLimiters(): { ip: Ratelimit | null; em: Ratelimit | null } {
 
   if (!ipLimiter) {
     const redis = Redis.fromEnv();
-    // 5 OTP sends per IP per 10 minutes — stops scripted spray from one host.
+    // 50 OTP sends per IP per 10 minutes — supports high-volume booth / conference Wi-Fi registrations.
     ipLimiter = new Ratelimit({
       redis,
-      limiter: Ratelimit.slidingWindow(5, "10 m"),
+      limiter: Ratelimit.slidingWindow(50, "10 m"),
       prefix: "rl:otp:ip",
       analytics: false,
     });

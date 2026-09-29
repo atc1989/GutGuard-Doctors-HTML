@@ -277,6 +277,8 @@ function getPrizeOdds(prize: AdminWheelPrize, activeWeightTotal: number) {
 
 type DoctorQrMode = "shop" | "referral" | "profile";
 
+const PUBLIC_MARKETING_ORIGIN = (process.env.NEXT_PUBLIC_MARKETING_URL ?? "https://www.gutguard.ph").replace(/\/$/, "");
+
 /**
  * Keyed by partnerLinkKey, not routing slug: the slug is the partner's name, and these URLs
  * are printed on QR posters and shown to customers. Slug links still resolve server-side.
@@ -286,7 +288,12 @@ function getDoctorQrUrl(doctor: AdminDoctorRegistration, mode: DoctorQrMode) {
 
   const key = partnerLinkKey(doctor.id);
   if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${key}`;
-  if (mode === "referral") return `${PUBLIC_SITE_ORIGIN}/physicians/register?ref=${key}`;
+  if (mode === "referral") {
+    if (doctor.routing_slug) {
+      return `${PUBLIC_MARKETING_ORIGIN}/${doctor.routing_slug.toUpperCase()}`;
+    }
+    return `${PUBLIC_SITE_ORIGIN}/physicians/register?ref=${key}`;
+  }
   if (doctor.routing_slug === "dr-grace-saraza") return `${SHOP_ORIGIN}/beehive`;
   return `${SHOP_ORIGIN}/r/${key}`;
 }
@@ -3126,7 +3133,16 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
               </label>
               <label>
                 Routing slug
-                <input value={editingDoctor.routing_slug || ""} readOnly />
+                <input
+                  value={editingDoctor.routing_slug || ""}
+                  onChange={(event) =>
+                    setEditingDoctor({
+                      ...editingDoctor,
+                      routing_slug: event.target.value.trim().toLowerCase(),
+                    })
+                  }
+                  placeholder="e.g. icsps"
+                />
               </label>
               <label className="admin-edit-wide">
                 Redirect link
