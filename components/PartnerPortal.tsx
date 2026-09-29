@@ -358,6 +358,8 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
       otpSent = true;
       saveOtpSentAt(normalizedEmail);
     } catch (caught) {
+      saveOtpSentAt(normalizedEmail);
+      setResendRemaining(RESEND_COOLDOWN_SECONDS);
       setError(getSendError(caught));
     }
 
