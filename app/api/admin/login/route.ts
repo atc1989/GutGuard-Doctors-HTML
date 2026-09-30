@@ -2,7 +2,8 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import {
   ADMIN_SESSION_COOKIE,
-  encryptAdminSession,
+  ADMIN_SESSION_MAX_AGE_S,
+  createAdminSessionToken,
   verifyAdminPassword,
 } from "@/lib/admin-session";
 
@@ -24,14 +25,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid admin password." }, { status: 401 });
   }
 
-  const token = encryptAdminSession(password);
+  const token = createAdminSessionToken();
+  if (!token) return NextResponse.json({ error: "Admin login is not configured." }, { status: 503 });
   const cookieStore = await cookies();
   cookieStore.set(ADMIN_SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 86400, // 24 hours
+    maxAge: ADMIN_SESSION_MAX_AGE_S,
   });
 
   return NextResponse.json({ success: true });

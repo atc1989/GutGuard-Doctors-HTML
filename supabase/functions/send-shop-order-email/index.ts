@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.106.2";
+import { serveWithCors } from "../_shared/cors.ts";
 
 const PROD_SITE_URL = (Deno.env.get("SHOP_SITE_URL") ?? "https://gutguard.ph").replace(/\/$/, "");
 const SANDBOX_SITE_URL = (Deno.env.get("SHOP_SANDBOX_SITE_URL") ?? PROD_SITE_URL).replace(/\/$/, "");
@@ -37,7 +38,7 @@ type ShopOrder = {
   created_at: string | null;
 };
 
-Deno.serve(async (req) => {
+serveWithCors(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 

@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.106.2";
+import { serveWithCors } from "../_shared/cors.ts";
 
 type AdminClient = SupabaseClient<any, "public", any>;
 
@@ -48,7 +49,7 @@ type RequestPayload = {
   templateKind?: "registration" | "partner-referral";
 };
 
-Deno.serve(async (req) => {
+serveWithCors(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

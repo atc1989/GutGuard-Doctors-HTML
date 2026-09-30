@@ -9,9 +9,25 @@ import type { NextConfig } from "next";
 const SHOP_HOST = process.env.NEXT_PUBLIC_SHOP_HOST ?? "shop.gutguard.ph";
 const PARTNERS_HOST = process.env.NEXT_PUBLIC_PARTNERS_HOST ?? "partners.gutguard.ph";
 
+// Baseline hardening for every response. ponytail: no script-src CSP yet - the site relies on
+// inline scripts, so a real CSP needs nonces (proxy.ts) and a report-only rollout first.
+// These directives block clickjacking, <base>/<object> injection and cross-site form posts
+// without touching what the pages load.
+const securityHeaders = [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
+  { key: "Content-Security-Policy", value: "frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self'" },
+];
+
 const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
+  },
+  async headers() {
+    return [{ source: "/:path*", headers: securityHeaders }];
   },
   async redirects() {
     return [
