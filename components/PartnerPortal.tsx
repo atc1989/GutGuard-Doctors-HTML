@@ -563,7 +563,7 @@ export function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignO
   const [copied, setCopied] = useState(false);
   const [qrMode, setQrMode] = useState<PartnerQrMode>("shop");
   const [dashboard, setDashboard] = useState(data);
-  const [activityTab, setActivityTab] = useState<"orders" | "partners" | "rebates">("orders");
+  const [activityTab, setActivityTab] = useState<"orders" | "partners" | "points" | "rebates">("orders");
   const [orderScope, setOrderScope] = useState<PartnerOrderScope>("all");
   const [orderStatus, setOrderStatus] = useState("");
   const [orderDateFrom, setOrderDateFrom] = useState("");
@@ -749,6 +749,7 @@ export function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignO
           <div className="partner-activity-tabs" role="tablist" aria-label="Dashboard activity">
             <button type="button" role="tab" aria-selected={activityTab === "orders"} className={activityTab === "orders" ? "active" : ""} onClick={() => setActivityTab("orders")}>Orders <span>{dashboard.totals.orders}</span></button>
             <button type="button" role="tab" aria-selected={activityTab === "partners"} className={activityTab === "partners" ? "active" : ""} onClick={() => setActivityTab("partners")}>Referred partners <span>{dashboard.totals.referred_partners}</span></button>
+            <button type="button" role="tab" aria-selected={activityTab === "points"} className={activityTab === "points" ? "active" : ""} onClick={() => setActivityTab("points")}>Points Log <span>{dashboard.points.lifetime_points} pts</span></button>
             <button type="button" role="tab" aria-selected={activityTab === "rebates"} className={activityTab === "rebates" ? "active" : ""} onClick={() => setActivityTab("rebates")}>Rebate History <span>{dashboard.rebates.length}</span></button>
           </div>
 
@@ -836,13 +837,62 @@ export function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignO
               <span>{dashboard.totals.referred_partners ? `${partnerOffset + 1}–${Math.min(partnerOffset + visiblePartners.length, dashboard.totals.referred_partners)} of ${dashboard.totals.referred_partners}` : "0 partners"}</span>
               <button type="button" className="shop-secondary" disabled={ordersBusy || partnerOffset + visiblePartners.length >= dashboard.totals.referred_partners} onClick={() => setPartnerOffset(partnerOffset + partnerPageSize)}>Next</button>
             </div>
+          </> : activityTab === "points" ? <>
+            <p className="shop-kicker">Points Activity & Sources</p>
+            <div className="partner-section-heading">
+              <h2>{dashboard.points.lifetime_points} Total E-Points Earned</h2>
+            </div>
+
+            <div className="partner-points-breakdown" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px", margin: "20px 0 28px" }}>
+               <div style={{ background: "var(--paper)", padding: "18px 20px", borderRadius: "var(--r-md)", border: "1px solid var(--rule)" }}>
+                  <small style={{ color: "var(--ink-3)", fontFamily: "var(--font-ui)", fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Direct Points</small>
+                  <strong style={{ display: "block", color: "var(--ink)", fontFamily: "var(--font-display)", fontSize: "24px", marginTop: "4px" }}>{dashboard.points.own_points} pts</strong>
+                  <span style={{ fontSize: "12px", color: "var(--ink-3)" }}>From your direct customer orders</span>
+               </div>
+               <div style={{ background: "var(--paper)", padding: "18px 20px", borderRadius: "var(--r-md)", border: "1px solid var(--rule)" }}>
+                  <small style={{ color: "var(--ink-3)", fontFamily: "var(--font-ui)", fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Pass-Up Points</small>
+                  <strong style={{ display: "block", color: "var(--blue)", fontFamily: "var(--font-display)", fontSize: "24px", marginTop: "4px" }}>{dashboard.points.passup_points} pts</strong>
+                  <span style={{ fontSize: "12px", color: "var(--ink-3)" }}>Passed up from referred partners</span>
+               </div>
+            </div>
+
+            <div className="partner-section-heading">
+              <h2>Transaction Log</h2>
+            </div>
+
+            {dashboard.point_sources && dashboard.point_sources.length > 0 ? (
+              <div className="partner-referred-list">
+                {dashboard.point_sources.map((source, idx) => (
+                  <div key={idx} className="partner-referred-row" style={{ display: "flex", justifyContent: "space-between", padding: "14px 16px", borderBottom: "1px solid var(--rule-soft)", alignItems: "center" }}>
+                    <span>
+                      <strong style={{ display: "block", color: "var(--ink)", fontFamily: "var(--font-ui)", fontSize: "14px" }}>
+                        {source.depth === 1 ? `Pass-up from ${source.source_partner}` : `Direct Customer Order ${source.order_code}`}
+                      </strong>
+                      <small style={{ color: "var(--ink-3)", fontFamily: "var(--font-ui)", fontSize: "12px" }}>
+                        Order: {source.order_code} · {formatDate(source.created_at)}
+                      </small>
+                    </span>
+                    <span style={{ textAlign: "right" }}>
+                      <strong style={{ color: source.depth === 1 ? "var(--blue)" : "var(--ink)", fontFamily: "var(--font-ui)", fontSize: "15px" }}>
+                        +{source.points} {source.points === 1 ? "pt" : "pts"}
+                      </strong>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="partner-empty-orders">
+                <strong>No points recorded yet.</strong>
+                <p>Points from direct orders and referred partners will appear here.</p>
+              </div>
+            )}
           </> : activityTab === "rebates" ? <>
-            <p className="shop-kicker">Rebate History & Points</p>
+            <p className="shop-kicker">Rebate Milestones & History</p>
             <div className="partner-section-heading">
               <h2>Cycle {dashboard.points.current_cycle} Progress</h2>
             </div>
             
-            <div className="partner-epoints-progress" style={{ margin: "24px 0", background: "var(--paper)", padding: "24px", borderRadius: "var(--r-md)", border: "1px solid var(--rule)" }}>
+            <div className="partner-epoints-progress" style={{ margin: "20px 0 32px", background: "var(--paper)", padding: "24px", borderRadius: "var(--r-md)", border: "1px solid var(--rule)" }}>
                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
                   <strong style={{ color: "var(--ink)", fontFamily: "var(--font-ui)", fontSize: "16px" }}>{dashboard.points.points_in_cycle} E-Points</strong>
                   <span style={{ color: "var(--ink-3)", fontFamily: "var(--font-ui)", fontSize: "14px" }}>Target: 1500</span>
@@ -857,17 +907,35 @@ export function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignO
                </p>
             </div>
 
-            <div className="partner-points-breakdown" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px", marginBottom: "24px" }}>
-               <div style={{ background: "var(--paper)", padding: "16px 20px", borderRadius: "var(--r-md)", border: "1px solid var(--rule)" }}>
-                  <small style={{ color: "var(--ink-3)", fontFamily: "var(--font-ui)", fontSize: "13px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Direct Points</small>
-                  <strong style={{ display: "block", color: "var(--ink)", fontFamily: "var(--font-display)", fontSize: "24px", marginTop: "4px" }}>{dashboard.points.own_points} pts</strong>
-                  <span style={{ fontSize: "12px", color: "var(--ink-3)" }}>From your direct customer orders</span>
-               </div>
-               <div style={{ background: "var(--paper)", padding: "16px 20px", borderRadius: "var(--r-md)", border: "1px solid var(--rule)" }}>
-                  <small style={{ color: "var(--ink-3)", fontFamily: "var(--font-ui)", fontSize: "13px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Pass-Up Points</small>
-                  <strong style={{ display: "block", color: "var(--blue)", fontFamily: "var(--font-display)", fontSize: "24px", marginTop: "4px" }}>{dashboard.points.passup_points} pts</strong>
-                  <span style={{ fontSize: "12px", color: "var(--ink-3)" }}>Passed up from referred partners</span>
-               </div>
+            {/* Milestone Roadmap Visual Cards */}
+            <div className="partner-section-heading">
+              <h2>Group Target Milestones</h2>
+            </div>
+            <div className="partner-milestone-cards" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "32px" }}>
+              {[
+                { pts: 300, rebate: 18000, label: "Initial group movement" },
+                { pts: 750, rebate: 70000, label: "Mid-level group movement" },
+                { pts: 1500, rebate: 150000, label: "Full group target" },
+              ].map((m) => {
+                const isUnlocked = dashboard.points.points_in_cycle >= m.pts;
+                return (
+                  <div key={m.pts} style={{
+                    background: isUnlocked ? "var(--paper)" : "var(--bone-soft)",
+                    padding: "20px",
+                    borderRadius: "var(--r-md)",
+                    border: isUnlocked ? "2px solid var(--gold)" : "1px solid var(--rule)",
+                    position: "relative"
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                      <span style={{ fontSize: "12px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px", color: isUnlocked ? "var(--gold)" : "var(--ink-3)" }}>
+                        {isUnlocked ? "✓ Unlocked" : `${Math.min(m.pts, dashboard.points.points_in_cycle)} / ${m.pts} pts`}
+                      </span>
+                    </div>
+                    <strong style={{ display: "block", color: "var(--ink)", fontFamily: "var(--font-display)", fontSize: "22px" }}>{peso(m.rebate)}</strong>
+                    <small style={{ color: "var(--ink-2)", fontFamily: "var(--font-ui)", fontSize: "13px", marginTop: "4px", display: "block" }}>{m.label}</small>
+                  </div>
+                );
+              })}
             </div>
 
             <div className="partner-section-heading">
@@ -892,37 +960,9 @@ export function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignO
             ) : (
               <div className="partner-empty-orders">
                  <strong>No milestones unlocked yet.</strong>
-                 <p>Earn points from your direct referrals and their orders!</p>
+                 <p>Earn points from your direct referrals and their orders to unlock cash rebates!</p>
               </div>
             )}
-
-            {/* Points Audit Log Table */}
-            {dashboard.point_sources && dashboard.point_sources.length > 0 ? (
-              <>
-                <div className="partner-section-heading" style={{ marginTop: "36px" }}>
-                  <h2>Points Activity Log</h2>
-                </div>
-                <div className="partner-referred-list">
-                  {dashboard.point_sources.map((source, idx) => (
-                    <div key={idx} className="partner-referred-row" style={{ display: "flex", justifyContent: "space-between", padding: "14px 16px", borderBottom: "1px solid var(--rule-soft)", alignItems: "center" }}>
-                      <span>
-                        <strong style={{ display: "block", color: "var(--ink)", fontFamily: "var(--font-ui)", fontSize: "14px" }}>
-                          {source.depth === 1 ? `Pass-up from ${source.source_partner}` : `Direct Order ${source.order_code}`}
-                        </strong>
-                        <small style={{ color: "var(--ink-3)", fontFamily: "var(--font-ui)", fontSize: "12px" }}>
-                          Order Code: {source.order_code} · {formatDate(source.created_at)}
-                        </small>
-                      </span>
-                      <span style={{ textAlign: "right" }}>
-                        <strong style={{ color: source.depth === 1 ? "var(--blue)" : "var(--ink)", fontFamily: "var(--font-ui)", fontSize: "15px" }}>
-                          +{source.points} {source.points === 1 ? "pt" : "pts"}
-                        </strong>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : null}
           </> : null}
         </section>
       </div>
