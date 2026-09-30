@@ -108,6 +108,10 @@ type WheelApi = {
     prize: Omit<AdminWheelPrize, "id">,
   ) => Promise<AdminWheelPrize>;
   getDoctorRegistrations?: (adminPassword: string) => Promise<AdminDoctorRegistration[]>;
+  adminImpersonateDoctor?: (
+    adminPassword: string,
+    email: string,
+  ) => Promise<{ actionLink: string; fullName: string }>;
   updateDoctorRegistration?: (
     adminPassword: string,
     doctor: Pick<
@@ -158,7 +162,10 @@ type WheelApi = {
   deleteSequenceStep?: (adminPassword: string, stepId: string) => Promise<void>;
   reorderSequenceSteps?: (adminPassword: string, stepIds: string[]) => Promise<void>;
   getSequenceProgress?: (adminPassword: string) => Promise<{ progress: SequenceProgress[]; totalSteps: number }>;
-  resendSequenceStep?: (doctorId: string, stepNumber: number) => Promise<void>;
+  resendSequenceStep?: (
+    doctorId: string,
+    stepNumber: number,
+  ) => Promise<{ sent?: boolean; reason?: string; sendId?: string; step?: number }>;
 };
 
 type SequenceAttachment = {
@@ -251,7 +258,7 @@ const emptyRegistrationEmailSettings: RegistrationEmailSettings = {
 };
 
 async function loadWheelApi(): Promise<WheelApi> {
-  const api = (await import("@/lib/api")) as WheelApi;
+  const api = (await import("@/lib/api")) as unknown as WheelApi;
   return api;
 }
 
@@ -270,6 +277,8 @@ function getPrizeOdds(prize: AdminWheelPrize, activeWeightTotal: number) {
 
 type DoctorQrMode = "shop" | "referral" | "profile";
 
+const PUBLIC_MARKETING_ORIGIN = (process.env.NEXT_PUBLIC_MARKETING_URL ?? "https://www.gutguard.ph").replace(/\/$/, "");
+
 /**
  * Keyed by partnerLinkKey, not routing slug: the slug is the partner's name, and these URLs
  * are printed on QR posters and shown to customers. Slug links still resolve server-side.
@@ -279,7 +288,12 @@ function getDoctorQrUrl(doctor: AdminDoctorRegistration, mode: DoctorQrMode) {
 
   const key = partnerLinkKey(doctor.id);
   if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${key}`;
-  if (mode === "referral") return `${PUBLIC_SITE_ORIGIN}/physicians/register?ref=${key}`;
+  if (mode === "referral") {
+    if (doctor.routing_slug) {
+      return `${PUBLIC_MARKETING_ORIGIN}/${doctor.routing_slug.toUpperCase()}`;
+    }
+    return `${PUBLIC_SITE_ORIGIN}/physicians/register?ref=${key}`;
+  }
   if (doctor.routing_slug === "dr-grace-saraza") return `${SHOP_ORIGIN}/beehive`;
   return `${SHOP_ORIGIN}/r/${key}`;
 }
@@ -354,6 +368,7 @@ export default function AdminWheelPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [impersonatingId, setImpersonatingId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [newsletterToast, setNewsletterToast] = useState<{
@@ -555,6 +570,48 @@ export default function AdminWheelPage() {
     return () => window.clearTimeout(timeout);
   }, [newsletterToast]);
 
+  useEffect(() => {
+    loadWheelApi().then((api) => {
+      if ((api as any).checkAdminSession) {
+        (api as any).checkAdminSession().then((authenticated: boolean) => {
+          if (authenticated) {
+            setIsUnlocked(true);
+            loadAdminData().catch(() => setIsUnlocked(false));
+          }
+        });
+      }
+    });
+  }, []);
+
+  async function loadAdminData() {
+    const api = await loadWheelApi();
+    if (!api.getWheelPrizes) {
+      throw new Error("Missing getWheelPrizes helper in lib/api.ts.");
+    }
+
+    const [loadedPrizes, loadedDoctors, loadedNewsletterHistory, loadedSmsHistory, loadedRegistrationEmail, loadedSequence] = await Promise.all([
+      api.getWheelPrizes(""),
+      api.getDoctorRegistrations ? api.getDoctorRegistrations("") : Promise.resolve([]),
+      api.getNewsletterSendHistory ? api.getNewsletterSendHistory("") : Promise.resolve([]),
+      api.getSmsBlastHistory ? api.getSmsBlastHistory("") : Promise.resolve([]),
+      api.getRegistrationEmailSettings
+        ? api.getRegistrationEmailSettings("")
+        : Promise.resolve(emptyRegistrationEmailSettings),
+      api.getSequenceSteps ? api.getSequenceSteps("") : Promise.resolve([]),
+    ]);
+    setPrizes(loadedPrizes.sort((a, b) => a.sort_order - b.sort_order));
+    setDoctors(loadedDoctors);
+    setNewsletterHistory(loadedNewsletterHistory);
+    setSmsHistory(loadedSmsHistory);
+    setRegistrationEmail(loadedRegistrationEmail);
+    setRegistrationEmailFileName(loadedRegistrationEmail.html ? "Saved registration email HTML" : "");
+    setSequenceSteps(loadedSequence.sort((a, b) => a.step_number - b.step_number));
+    setDoctorPage(1);
+    setNewsletterPage(1);
+    setSmsPage(1);
+    setIsUnlocked(true);
+  }
+
   async function handleUnlock(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -562,35 +619,19 @@ export default function AdminWheelPage() {
     setIsLoading(true);
 
     try {
-      const api = await loadWheelApi();
-      if (!api.getWheelPrizes) {
-        throw new Error("Missing getWheelPrizes helper in lib/api.ts.");
+      if (password) {
+        const api = await loadWheelApi();
+        if ((api as any).adminLogin) {
+          await (api as any).adminLogin(password);
+          setPassword("");
+        }
       }
 
-      const [loadedPrizes, loadedDoctors, loadedNewsletterHistory, loadedSmsHistory, loadedRegistrationEmail, loadedSequence] = await Promise.all([
-        api.getWheelPrizes(password),
-        api.getDoctorRegistrations ? api.getDoctorRegistrations(password) : Promise.resolve([]),
-        api.getNewsletterSendHistory ? api.getNewsletterSendHistory(password) : Promise.resolve([]),
-        api.getSmsBlastHistory ? api.getSmsBlastHistory(password) : Promise.resolve([]),
-        api.getRegistrationEmailSettings
-          ? api.getRegistrationEmailSettings(password)
-          : Promise.resolve(emptyRegistrationEmailSettings),
-        api.getSequenceSteps ? api.getSequenceSteps(password) : Promise.resolve([]),
-      ]);
-      setPrizes(loadedPrizes.sort((a, b) => a.sort_order - b.sort_order));
-      setDoctors(loadedDoctors);
-      setNewsletterHistory(loadedNewsletterHistory);
-      setSmsHistory(loadedSmsHistory);
-      setRegistrationEmail(loadedRegistrationEmail);
-      setRegistrationEmailFileName(loadedRegistrationEmail.html ? "Saved registration email HTML" : "");
-      setSequenceSteps(loadedSequence.sort((a, b) => a.step_number - b.step_number));
-      setDoctorPage(1);
-      setNewsletterPage(1);
-      setSmsPage(1);
-      setIsUnlocked(true);
+      await loadAdminData();
       setNotice("Admin data loaded.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to load wheel prizes.");
+      setIsUnlocked(false);
     } finally {
       setIsLoading(false);
     }
@@ -1062,6 +1103,38 @@ export default function AdminWheelPage() {
       setNotice("Doctor QR link copied.");
     } catch {
       setError("Unable to copy the QR link. Please copy it from the text field instead.");
+    }
+  }
+
+  async function loginAsDoctor(doctor: AdminDoctorRegistration) {
+    setError(null);
+    setNotice(null);
+
+    if (!doctor.email) {
+      setError("This doctor has no email address, so there is no account to open.");
+      return;
+    }
+    if (!window.confirm(`Open the partner portal as ${doctor.full_name || doctor.email}?
+
+This signs you in as them and is recorded in the impersonation log. Any partner session in this browser is replaced.`)) {
+      return;
+    }
+
+    setImpersonatingId(doctor.id);
+    try {
+      const api = await loadWheelApi();
+      if (!api.adminImpersonateDoctor) {
+        throw new Error("Missing adminImpersonateDoctor helper in lib/api.ts.");
+      }
+
+      const { actionLink } = await api.adminImpersonateDoctor(password, doctor.email);
+      // Opened rather than followed, so this admin tab keeps its own state.
+      window.open(actionLink, "_blank", "noopener,noreferrer");
+      setNotice(`Opened the partner portal as ${doctor.full_name || doctor.email}.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to open that partner account.");
+    } finally {
+      setImpersonatingId("");
     }
   }
 
@@ -1761,6 +1834,14 @@ export default function AdminWheelPage() {
                     <div className="admin-doctor-row-actions">
                       <button type="button" onClick={() => openDoctorEditor(doctor)}>
                         Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => loginAsDoctor(doctor)}
+                        disabled={!doctor.email || impersonatingId === doctor.id}
+                        title={doctor.email ? "Open the partner portal as this doctor" : "No email on this registration"}
+                      >
+                        {impersonatingId === doctor.id ? "Opening…" : "Log in as"}
                       </button>
                     </div>
                   </article>
@@ -3052,7 +3133,16 @@ export default function AdminWheelPage() {
               </label>
               <label>
                 Routing slug
-                <input value={editingDoctor.routing_slug || ""} readOnly />
+                <input
+                  value={editingDoctor.routing_slug || ""}
+                  onChange={(event) =>
+                    setEditingDoctor({
+                      ...editingDoctor,
+                      routing_slug: event.target.value.trim().toLowerCase(),
+                    })
+                  }
+                  placeholder="e.g. icsps"
+                />
               </label>
               <label className="admin-edit-wide">
                 Redirect link
@@ -3231,7 +3321,7 @@ function renderRegistrationEmailPreview(html: string) {
     tiktok_username: "gutguarddoctor",
     specialty: "Internal Medicine",
     clinic_location: "Makati City",
-    routing_url: "https://gut-guard-doctors-html.vercel.app/dr/maria-santos",
+    routing_url: `${PUBLIC_SITE_ORIGIN}/dr/maria-santos`,
     redirect_url: "https://www.tiktok.com/@gutguarddoctor",
     registered_at: "Jun 12, 2026",
   };

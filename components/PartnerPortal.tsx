@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { QRCodeCanvas, QRCodeSVG } from "qrcode.react";
-import { LoaderCircle, X } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { LoaderCircle } from "lucide-react";
 import { Logo } from "@/components/GutguardSite";
 import PartnerApplyForm from "@/components/PartnerApplyForm";
+import PartnerShell from "@/components/partner/PartnerShell";
+import { PartnerProvider } from "@/components/partner/shared";
 import {
   enrollWelcomeIfNeeded,
   getPartnerAuthEmail,
@@ -17,17 +18,17 @@ import {
   signOutPartner,
   verifyPartnerOtp,
   type PartnerDashboard,
-  type PartnerOrder,
-  type PartnerOrderScope,
 } from "@/lib/api";
 import { PARTNER_REFERRER_KEY } from "@/lib/constants";
-import { partnerLinkKey } from "@/lib/referral";
 import {
   clearPendingPartnerWelcome,
   peekPendingPartnerWelcome,
   stashPendingPartnerSignin,
   stashPendingPartnerWelcome,
   takePendingPartnerSignin,
+  saveOtpSentAt,
+  loadOtpSentAt,
+  clearOtpSentAt,
 } from "@/lib/storage";
 
 const SHOP_ORIGIN = (process.env.NEXT_PUBLIC_SHOP_URL ?? "https://shop.gutguard.ph").replace(/\/$/, "");
@@ -92,11 +93,17 @@ type AuthError = { field: "email" | "code" | "form"; message: string; expired?: 
 type PartnerPortalProps = {
   initialView?: "email" | "apply";
   referrerSlug?: string;
+  /** Rendered inside the dashboard shell once signed in. Omit on public pages such as registration. */
+  children?: React.ReactNode;
 };
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
-export default function PartnerPortal({ initialView = "email", referrerSlug = "" }: PartnerPortalProps) {
+export default function PartnerPortal({ initialView: initialViewProp, referrerSlug: referrerSlugProp, children }: PartnerPortalProps) {
+  const searchParams = useSearchParams();
+  const firstQuery = (key: string) => searchParams.get(key)?.trim() ?? "";
+  const initialView = initialViewProp ?? (["1", "true", "yes"].includes(firstQuery("apply").toLowerCase()) ? "apply" : "email");
+  const referrerSlug = referrerSlugProp ?? firstQuery("ref").toLowerCase();
   const [view, setView] = useState<View>("checking");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -217,6 +224,17 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
     return () => window.clearInterval(timer);
   }, [resendRemaining]);
 
+  // Restore the resend cooldown from sessionStorage so a page reload cannot
+  // reset the counter to zero and let the user bypass the 60-second wait.
+  useEffect(() => {
+    if (!email) return;
+    const sentAt = loadOtpSentAt(email);
+    if (!sentAt) return;
+    const elapsed = Math.floor((Date.now() - sentAt) / 1000);
+    const remaining = Math.max(0, RESEND_COOLDOWN_SECONDS - elapsed);
+    if (remaining > 0) setResendRemaining(remaining);
+  }, [email]);
+
   useEffect(() => {
     if (view !== "code") return;
     requestAnimationFrame(() => {
@@ -253,6 +271,7 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
       await sendPartnerOtp(normalizedEmail);
       setCode("");
       setResendRemaining(RESEND_COOLDOWN_SECONDS);
+      saveOtpSentAt(normalizedEmail);
       setView("code");
       setNotice("Code sent. Check your email.");
     } catch (caught) {
@@ -320,6 +339,7 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
       await sendPartnerOtp(email);
       setCode("");
       setResendRemaining(RESEND_COOLDOWN_SECONDS);
+      saveOtpSentAt(email);
       setNotice("A new code was sent.");
       requestAnimationFrame(() => codeInputRef.current?.focus());
     } catch (caught) {
@@ -332,6 +352,7 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
   }
 
   function changeEmail() {
+    clearOtpSentAt();
     setView("email");
     setCode("");
     setError(null);
@@ -384,7 +405,10 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
     try {
       await sendPartnerOtp(normalizedEmail);
       otpSent = true;
+      saveOtpSentAt(normalizedEmail);
     } catch (caught) {
+      saveOtpSentAt(normalizedEmail);
+      setResendRemaining(RESEND_COOLDOWN_SECONDS);
       setError(getSendError(caught));
     }
 
@@ -426,7 +450,13 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
     setView("email");
   }
 
-  if (view === "checking") {
+  // Public pages (registration) have no dashboard shell, so a live session goes to the portal.
+  const redirectToPortal = view === "dashboard" && !children;
+  useEffect(() => {
+    if (redirectToPortal) router.replace("/partner");
+  }, [redirectToPortal, router]);
+
+  if (view === "checking" || redirectToPortal) {
     return (
       <main className="shop-shell partner-auth-shell">
         <PartnerNav />
@@ -440,7 +470,11 @@ export default function PartnerPortal({ initialView = "email", referrerSlug = ""
   }
 
   if (view === "dashboard" && data) {
-    return <Dashboard data={data} onSignOut={signOut} />;
+    return (
+      <PartnerProvider value={{ dashboard: data, signOut }}>
+        <PartnerShell>{children}</PartnerShell>
+      </PartnerProvider>
+    );
   }
 
   if (view === "signing-in") {
@@ -993,32 +1027,6 @@ function PartnerNav({ onSignOut }: { onSignOut?: () => void }) {
       )}
     </nav>
   );
-}
-
-/** Mirrors getDoctorQrUrl in the admin, so printed codes match across views. */
-function getPartnerQrLink(partner: { id: string; routing_slug: string }, mode: PartnerQrMode) {
-  if (!partner.id) {
-    if (mode === "shop") return SHOP_ORIGIN;
-    return `${PUBLIC_SITE_ORIGIN}/physicians/register`;
-  }
-  const key = partnerLinkKey(partner.id);
-  if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${key}`;
-  if (mode === "referral") return `${PUBLIC_SITE_ORIGIN}/physicians/register?ref=${key}`;
-  if (partner.routing_slug === "dr-grace-saraza") return `${SHOP_ORIGIN}/beehive`;
-  return `${SHOP_ORIGIN}/r/${key}`;
-}
-
-function statusLabel(order: PartnerOrder) {
-  if (order.payment_status === "refunded") return "Refunded";
-  if (order.payment_status === "paid") return order.status === "fulfilled" ? "Delivered" : "Paid";
-  if (order.status === "cancelled") return "Cancelled";
-  return "Awaiting payment";
-}
-
-function formatDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "--";
-  return new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric" }).format(date);
 }
 
 function maskEmail(email: string) {

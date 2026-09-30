@@ -21,6 +21,8 @@ type RegistrationSectionProps = {
   active: boolean;
   invitedBy?: { slug: string; fullName: string } | null;
   onRegistered: (registration: Registration) => void;
+  invitation?: { routing_slug: string; full_name: string } | null;
+  invitationInvalid?: boolean;
 };
 
 const INITIAL_VALUES: FormValues = {
@@ -41,6 +43,8 @@ export default function RegistrationSection({
   active,
   invitedBy,
   onRegistered,
+  invitation,
+  invitationInvalid,
 }: RegistrationSectionProps) {
   const [values, setValues] = useState<FormValues>(INITIAL_VALUES);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -127,6 +131,17 @@ export default function RegistrationSection({
   return (
     <section className={`screen ${active ? "active" : ""}`.trim()}>
       <SectionLabel number="i.">Booth Registration</SectionLabel>
+      {invitation ? (
+        <aside className="partner-invitation" role="status">
+          <strong>Invited by {invitation.full_name}</strong>
+          <span>Your registration and future attributed orders will be connected to this partner.</span>
+        </aside>
+      ) : invitationInvalid ? (
+        <aside className="partner-invitation is-neutral" role="status">
+          <strong>Invitation unavailable</strong>
+          <span>You can continue with a regular GutGuard partner registration.</span>
+        </aside>
+      ) : null}
       <p className="lede dropcap">
         Lead Clinical Adopters are a closed cohort of one hundred Filipino physicians.
         Register here. Add your email if you would like the proposal delivered to your inbox.
@@ -230,7 +245,7 @@ export default function RegistrationSection({
         ) : null}
         <InputField
           id="location"
-          label="City address"
+          label="Full Clinic Address"
           error="Please enter your city address."
           value={values.location}
           hasError={errors.location}
