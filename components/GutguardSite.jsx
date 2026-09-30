@@ -43,18 +43,18 @@ const CSS = `
 .measure-img{width:100%;max-height:540px;object-fit:contain;display:block;}
 
 
-.science-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;}
-@media(max-width:900px){.science-top-grid{grid-template-columns:1fr;gap:32px;}}
-.science-top-copy{display:flex;flex-direction:column;justify-content:center;}
+.science-top-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(36px,6vw,80px);align-items:center;}
+@media(max-width:900px){.science-top-grid{grid-template-columns:1fr;gap:48px;}}
+.science-top-copy{display:flex;flex-direction:column;}
 .science-top-visual{display:flex;align-items:center;justify-content:center;position:relative;}
-.science-floating-molecules{width:100%;max-width:580px;height:auto;object-fit:contain;display:block;background:transparent;box-shadow:none;border:none;}
+.science-floating-molecules{width:100%;max-width:680px;height:auto;object-fit:contain;display:block;background:transparent;box-shadow:none;border:none;filter:drop-shadow(0 20px 40px rgba(0,0,0,.04));}
 
 
 .measure-section-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;}
 @media(max-width:900px){.measure-section-grid{grid-template-columns:1fr;gap:32px;}}
 .measure-section-copy{display:flex;flex-direction:column;justify-content:center;}
 .measure-section-visual{display:flex;align-items:center;justify-content:center;position:relative;}
-.measure-section-img{width:100%;max-height:500px;object-fit:contain;border-radius:16px;display:block;mix-blend-mode:multiply;filter:contrast(1.03) brightness(1.01);}
+.measure-section-img{width:100%;height:100%;max-height:480px;object-fit:cover;display:block;box-shadow:0 10px 30px rgba(0,0,0,.04);}
 
 
 .lca-hero.dark{background:var(--slate);color:#EAF1F0;padding:0;overflow:hidden;}
@@ -128,18 +128,18 @@ const CSS = `
 .measure-img{width:100%;max-height:540px;object-fit:contain;display:block;}
 
 
-.science-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;}
-@media(max-width:900px){.science-top-grid{grid-template-columns:1fr;gap:32px;}}
-.science-top-copy{display:flex;flex-direction:column;justify-content:center;}
+.science-top-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(36px,6vw,80px);align-items:center;}
+@media(max-width:900px){.science-top-grid{grid-template-columns:1fr;gap:48px;}}
+.science-top-copy{display:flex;flex-direction:column;}
 .science-top-visual{display:flex;align-items:center;justify-content:center;position:relative;}
-.science-floating-molecules{width:100%;max-width:580px;height:auto;object-fit:contain;display:block;background:transparent;box-shadow:none;border:none;}
+.science-floating-molecules{width:100%;max-width:680px;height:auto;object-fit:contain;display:block;background:transparent;box-shadow:none;border:none;filter:drop-shadow(0 20px 40px rgba(0,0,0,.04));}
 
 
 .measure-section-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;}
 @media(max-width:900px){.measure-section-grid{grid-template-columns:1fr;gap:32px;}}
 .measure-section-copy{display:flex;flex-direction:column;justify-content:center;}
 .measure-section-visual{display:flex;align-items:center;justify-content:center;position:relative;}
-.measure-section-img{width:100%;max-height:500px;object-fit:contain;border-radius:16px;display:block;mix-blend-mode:multiply;filter:contrast(1.03) brightness(1.01);}
+.measure-section-img{width:100%;height:100%;max-height:480px;object-fit:cover;display:block;box-shadow:0 10px 30px rgba(0,0,0,.04);}
 
 
 .lca-hero.dark{background:var(--slate);color:#EAF1F0;padding:0;overflow:hidden;}
@@ -187,18 +187,18 @@ const CSS = `
 .measure-img{width:100%;max-height:540px;object-fit:contain;display:block;}
 
 
-.science-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;}
-@media(max-width:900px){.science-top-grid{grid-template-columns:1fr;gap:32px;}}
-.science-top-copy{display:flex;flex-direction:column;justify-content:center;}
+.science-top-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(36px,6vw,80px);align-items:center;}
+@media(max-width:900px){.science-top-grid{grid-template-columns:1fr;gap:48px;}}
+.science-top-copy{display:flex;flex-direction:column;}
 .science-top-visual{display:flex;align-items:center;justify-content:center;position:relative;}
-.science-floating-molecules{width:100%;max-width:580px;height:auto;object-fit:contain;display:block;background:transparent;box-shadow:none;border:none;}
+.science-floating-molecules{width:100%;max-width:680px;height:auto;object-fit:contain;display:block;background:transparent;box-shadow:none;border:none;filter:drop-shadow(0 20px 40px rgba(0,0,0,.04));}
 
 
 .measure-section-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;}
 @media(max-width:900px){.measure-section-grid{grid-template-columns:1fr;gap:32px;}}
 .measure-section-copy{display:flex;flex-direction:column;justify-content:center;}
 .measure-section-visual{display:flex;align-items:center;justify-content:center;position:relative;}
-.measure-section-img{width:100%;max-height:500px;object-fit:contain;border-radius:16px;display:block;mix-blend-mode:multiply;filter:contrast(1.03) brightness(1.01);}
+.measure-section-img{width:100%;height:100%;max-height:480px;object-fit:cover;display:block;box-shadow:0 10px 30px rgba(0,0,0,.04);}
 
 
 .lca-hero.dark{background:var(--slate);color:#EAF1F0;padding:0;overflow:hidden;}
@@ -1732,11 +1732,11 @@ function Home() {
 function Science() {
   return (
     <>
-      <section className="section science-top-section" id="top" style={{ paddingTop: 40, paddingBottom: 20 }}>
+      <section className="section science-top-section" id="top" style={{ paddingTop: 100, paddingBottom: 60 }}>
         <div className="wrap">
           <div className="science-top-grid">
             <div className="science-top-copy">
-              <header className="science-hero-copy reveal" style={{ marginBottom: 56 }}>
+              <header className="science-hero-copy reveal" style={{ marginBottom: 80 }}>
                 <span className="eyebrow">The Science</span>
                 <h1>The science, <em>in plain sight.</em></h1>
                 <p className="hero-lede">No black box. Here is exactly how inflammation compounds into the way you feel — and how the right repair runs it in reverse.</p>
