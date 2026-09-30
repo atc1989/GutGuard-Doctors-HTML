@@ -126,14 +126,26 @@ export default async function TestimonialsPage() {
 
       <div className="tm-page">
         <header className="tm-hero">
-          <div className="tm-eyebrow">Member stories</div>
-          <h1>
-            The method is measured. <em>The difference is felt.</em>
-          </h1>
-          <p>
-            Every story here was sent in by the person who lived it, and read by a human before it
-            went up.
-          </p>
+          <div className="tm-hero-grid">
+            <div className="tm-hero-copy">
+              <div className="tm-eyebrow">Member stories</div>
+              <h1>
+                The method is measured. <em>The difference is felt.</em>
+              </h1>
+              <p>
+                Every story here was sent in by the person who lived it, and read by a human before it
+                went up.
+              </p>
+            </div>
+            <div className="tm-hero-visual">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/slides/slide10.png"
+                alt="Gut-Brain Axis Vagus Nerve Pathway"
+                className="tm-hero-img"
+              />
+            </div>
+          </div>
         </header>
 
         {featured && <Featured story={featured} />}
