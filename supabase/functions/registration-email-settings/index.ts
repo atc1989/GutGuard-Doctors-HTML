@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Missing Supabase Edge Function secrets" }, 500);
     }
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const supabase = createClient(supabaseUrl, serviceRoleKey, { db: { schema: "doctors" } });
     const { error: adminError } = await supabase.rpc("assert_wheel_admin", {
       p_admin_password: adminPassword,
     });
@@ -295,7 +295,8 @@ function parseAttachments(value: unknown): AttachmentRecord[] {
 
 function sampleDoctor() {
   return {
-    full_name: "Dr. Maria Santos",
+    name_prefix: "Dr.",
+    full_name: "Maria Santos",
     email: "doctor@example.com",
     mobile: "09171234567",
     tiktok_username: "gutguarddoctor",
@@ -311,6 +312,8 @@ function renderTemplate(html: string, doctor: Record<string, string>) {
   const routingUrl = `${getSiteOrigin()}/dr/${doctor.routing_slug}`;
   const replacements: Record<string, string> = {
     doctor_name: doctor.full_name ?? "",
+    name_prefix: doctor.name_prefix ?? "",
+    prefixed_name: formatPrefixedName(doctor.name_prefix, doctor.full_name),
     doctor_email: doctor.email ?? "",
     doctor_mobile: doctor.mobile ?? "",
     tiktok_username: doctor.tiktok_username ?? "",
@@ -339,7 +342,7 @@ function renderBodyText(value: string) {
 }
 
 function getSiteOrigin() {
-  return (Deno.env.get("PUBLIC_SITE_URL") ?? "https://gut-guard-doctors-html.vercel.app").replace(/\/$/, "");
+  return (Deno.env.get("PUBLIC_SITE_URL") ?? "https://partners.gutguard.ph").replace(/\/$/, "");
 }
 
 function base64ToUint8Array(value: string) {
@@ -370,6 +373,12 @@ function stripScriptTags(value: string) {
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function formatPrefixedName(prefix?: string | null, name?: string | null) {
+  const n = (name ?? "").trim();
+  if (!n) return "";
+  return `${(prefix || "Dr.").trim()} ${n}`;
 }
 
 function formatDate(value: string | null) {

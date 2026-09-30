@@ -43,9 +43,7 @@ Deno.serve(async (req) => {
 
   try {
     const { orderId, kind = "saved", schema } = (await req.json()) as RequestPayload;
-    // Only 'public' and 'sandbox' are valid; anything else is ignored so a caller
-    // cannot point this at an arbitrary schema.
-    const dbSchema = schema === "sandbox" ? "sandbox" : "public";
+    const dbSchema = schema === "sandbox" || schema === "doctors" || schema === "public" ? schema : "doctors";
     if (!orderId) return jsonResponse({ error: "Missing orderId" }, 400);
 
     const resendApiKey = Deno.env.get("RESEND_API_KEY");

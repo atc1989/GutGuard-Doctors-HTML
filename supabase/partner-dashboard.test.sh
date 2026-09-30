@@ -26,6 +26,8 @@ done
 # Stubs, then the two live sections, then the assertions - in that order, because the
 # assertions call functions the sections define.
 sed -n '/^-- ─── Stand-ins/,/^-- ─── CHECKS/p' partner-dashboard.test.sql | $PSQL
+# partner_by_key sits above the partner section, but every referral lookup calls it.
+sed -n '/^-- One lookup for every public partner link/,/^revoke all on function public.partner_by_key/p' doctor-qr-redirect.sql | $PSQL
 sed -n '/^-- ─── Partner login identity/,$p' doctor-qr-redirect.sql | $PSQL
 sed -n '/^-- ─── Partner dashboard/,$p' shop-orders.sql | $PSQL
 sed -n '/^-- ─── CHECKS/,$p' partner-dashboard.test.sql | $PSQL 2>&1 | grep -E 'NOTICE|ERROR' || true

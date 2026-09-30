@@ -23,7 +23,7 @@ type PrizeRow = {
   claim_count?: number;
 };
 
-type AdminWheelPrize = {
+export type AdminWheelPrize = {
   id?: string;
   label: string;
   note: string;
@@ -37,7 +37,7 @@ type AdminWheelPrize = {
   claim_count?: number;
 };
 
-type AdminDoctorRegistration = {
+export type AdminDoctorRegistration = {
   id: string;
   full_name: string;
   name_prefix: string;
@@ -53,19 +53,20 @@ type AdminDoctorRegistration = {
   prize_claimed_at?: string | null;
 };
 
-type AdminDoctorRegistrationUpdate = {
+export type AdminDoctorRegistrationUpdate = {
   id: string;
   full_name: string;
   name_prefix: string;
   email: string;
   mobile: string;
   tiktok_username: string;
+  routing_slug?: string;
   redirect_url: string;
   specialty: string;
   practice_location: string;
 };
 
-type NewsletterSendHistory = {
+export type NewsletterSendHistory = {
   id: string;
   doctor_id: string;
   newsletter_id?: string | null;
@@ -86,7 +87,7 @@ type NewsletterSendResult = {
   error?: string | null;
 };
 
-type SmsSendHistory = {
+export type SmsSendHistory = {
   id: string;
   doctor_id: string;
   sms_campaign_id?: string | null;
@@ -107,14 +108,14 @@ type SmsSendResult = {
   error?: string | null;
 };
 
-type NewsletterResponse = {
+export type NewsletterResponse = {
   sent: number;
   failed: number;
   skipped: number;
   results: NewsletterSendResult[];
 };
 
-type SmsBlastResponse = {
+export type SmsBlastResponse = {
   sent: number;
   failed: number;
   skipped: number;
@@ -243,6 +244,13 @@ export type PartnerOrder = {
   payment_status: ShopPaymentStatus;
   total_amount: number;
   buyer_first_name: string;
+  /** Buyer contact, shown in full to the partner. See 20260924000000 for the scope caveat. */
+  buyer_name: string;
+  buyer_email: string;
+  buyer_mobile: string;
+  address: string;
+  barangay: string;
+  zip: string;
   city: string;
   province: string;
   source_type: "direct" | "referred";
@@ -286,6 +294,27 @@ export type PartnerDashboard = {
     direct_paid_amount: number;
     referred_paid_amount: number;
   };
+  points: {
+    current_cycle: number;
+    points_in_cycle: number;
+    lifetime_points: number;
+    own_points: number;
+    passup_points: number;
+  };
+  rebates: Array<{
+    cycle_number: number;
+    milestone_pts: number;
+    rebate_amount: number;
+    status: string;
+    created_at: string;
+  }>;
+  point_sources?: Array<{
+    order_code: string;
+    points: number;
+    depth: number;
+    source_partner: string;
+    created_at: string;
+  }>;
   orders: PartnerOrder[];
   orders_page: { total: number; limit: number; offset: number; has_more: boolean };
   referred_partners: ReferredPartner[];
@@ -490,6 +519,10 @@ export async function getPartnerInvitation(slug: string): Promise<PartnerInvitat
   return { routing_slug, full_name };
 }
 
+export async function sendPartnerReferralNotification(registrationId: string) {
+  return notifyPartnerReferral(registrationId);
+}
+
 async function notifyPartnerReferral(registrationId: string) {
   if (!isSupabaseConfigured || !supabase || registrationId.startsWith("local-")) return;
 
@@ -577,42 +610,62 @@ export async function claimPrize(doctorId: string | null | undefined): Promise<P
   return PRIZES[pickPrizeIndex()];
 }
 
-export async function adminListWheelPrizes(adminPassword: string): Promise<WheelPrize[]> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-
-  const { data, error } = await supabase.rpc("admin_list_wheel_prizes", {
-    p_admin_password: adminPassword,
+export async function adminLogin(password: string): Promise<boolean> {
+  const res = await fetch("/api/admin/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
   });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Invalid admin password.");
+  }
+  return true;
+}
 
-  if (error) throw error;
-  return ((data ?? []) as PrizeRow[]).map(mapWheelPrizeRow);
+export async function adminLogout(): Promise<void> {
+  await fetch("/api/admin/logout", { method: "POST" });
+}
+
+export async function checkAdminSession(): Promise<boolean> {
+  try {
+    const res = await fetch("/api/admin/session");
+    if (!res.ok) return false;
+    const data = await res.json();
+    return Boolean(data.authenticated);
+  } catch {
+    return false;
+  }
+}
+
+export async function adminListWheelPrizes(_adminPassword?: string): Promise<WheelPrize[]> {
+  const res = await fetch("/api/admin/wheel/prizes");
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to load wheel prizes.");
+  }
+  const data = await res.json();
+  return ((data.prizes ?? []) as PrizeRow[]).map(mapWheelPrizeRow);
 }
 
 export async function adminSaveWheelPrize(
-  adminPassword: string,
-  prize: WheelPrizeInput,
+  _adminPassword?: string,
+  prize?: WheelPrizeInput,
 ): Promise<WheelPrize> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-
-  const { data, error } = await supabase.rpc("admin_upsert_wheel_prize", {
-    p_admin_password: adminPassword,
-    p_id: prize.id ?? null,
-    p_label: prize.label,
-    p_note: prize.note,
-    p_color: prize.color,
-    p_text_color: prize.textColor,
-    p_chance_weight: prize.chanceWeight,
-    p_total_stock: prize.totalStock,
-    p_remaining_stock: prize.remainingStock,
-    p_is_active: prize.isActive,
-    p_sort_order: prize.sortOrder,
+  const res = await fetch("/api/admin/wheel/prizes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(prize),
   });
-
-  if (error) throw error;
-  return mapWheelPrizeRow((Array.isArray(data) ? data[0] : data) as PrizeRow);
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to save wheel prize.");
+  }
+  const data = await res.json();
+  return mapWheelPrizeRow((Array.isArray(data.prize) ? data.prize[0] : data.prize) as PrizeRow);
 }
 
-export async function getWheelPrizes(adminPassword: string): Promise<AdminWheelPrize[]> {
+export async function getWheelPrizes(adminPassword?: string): Promise<AdminWheelPrize[]> {
   const prizes = await adminListWheelPrizes(adminPassword);
   return prizes.map(mapAdminWheelPrize);
 }
@@ -633,95 +686,108 @@ export async function createWheelPrize(
   return mapAdminWheelPrize(saved);
 }
 
-export async function getDoctorRegistrations(adminPassword: string): Promise<AdminDoctorRegistration[]> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+export async function getDoctorRegistrations(_adminPassword?: string): Promise<AdminDoctorRegistration[]> {
+  const res = await fetch("/api/admin/doctors");
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to load doctor registrations.");
+  }
+  const data = await res.json();
+  return ((data.doctors ?? []) as AdminDoctorRegistration[]).map(normalizeAdminDoctorRegistration);
+}
 
-  const { data, error } = await supabase.rpc("admin_list_doctor_registrations", {
-    p_admin_password: adminPassword,
+/**
+ * Admin "log in as this doctor": returns a one-time magic link that opens the partner
+ * portal as that partner. The link is not emailed - open it in a new tab (or a private
+ * window, since it replaces any partner session already held by this browser profile).
+ */
+export async function adminImpersonateDoctor(
+  _adminPassword?: string,
+  email?: string,
+): Promise<{ actionLink: string; fullName: string }> {
+  const res = await fetch("/api/admin/impersonate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
   });
-
-  if (error) throw error;
-  return ((data ?? []) as AdminDoctorRegistration[]).map(normalizeAdminDoctorRegistration);
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Impersonation failed.");
+  }
+  return (await res.json()) as { actionLink: string; fullName: string };
 }
 
 export async function updateDoctorRegistration(
-  adminPassword: string,
+  _adminPassword: string,
   doctor: AdminDoctorRegistrationUpdate,
 ): Promise<AdminDoctorRegistration> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-
-  const { data, error } = await supabase.rpc("admin_update_doctor_registration", {
-    p_admin_password: adminPassword,
-    p_doctor_id: doctor.id,
-    p_full_name: doctor.full_name,
-    p_name_prefix: doctor.name_prefix,
-    p_email: doctor.email,
-    p_mobile: doctor.mobile,
-    p_tiktok_username: doctor.tiktok_username,
-    p_redirect_url: doctor.redirect_url,
-    p_specialty: doctor.specialty,
-    p_practice_location: doctor.practice_location,
+  const res = await fetch("/api/admin/doctors", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(doctor),
   });
-
-  if (error) throw error;
-  return normalizeAdminDoctorRegistration((Array.isArray(data) ? data[0] : data) as AdminDoctorRegistration);
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to update doctor registration.");
+  }
+  const data = await res.json();
+  return normalizeAdminDoctorRegistration((Array.isArray(data.doctor) ? data.doctor[0] : data.doctor) as AdminDoctorRegistration);
 }
 
-export async function getNewsletterSendHistory(adminPassword: string): Promise<NewsletterSendHistory[]> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-
-  const { data, error } = await supabase.rpc("admin_list_newsletter_sends", {
-    p_admin_password: adminPassword,
-  });
-
-  if (error) throw error;
-  return (data ?? []) as NewsletterSendHistory[];
+export async function getNewsletterSendHistory(_adminPassword?: string): Promise<NewsletterSendHistory[]> {
+  const res = await fetch("/api/admin/newsletter/history");
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to load newsletter history.");
+  }
+  const data = await res.json();
+  return (data.history ?? []) as NewsletterSendHistory[];
 }
 
 export async function sendNewsletter(
-  adminPassword: string,
+  _adminPassword: string,
   doctorIds: string[],
   subject: string,
   html: string,
 ): Promise<NewsletterResponse> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-
-  const { data, error } = await supabase.functions.invoke("send-newsletter", {
-    body: { adminPassword, doctorIds, subject, html },
+  const res = await fetch("/api/admin/newsletter/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ doctorIds, subject, html }),
   });
-
-  if (error) throw error;
-  return data as NewsletterResponse;
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to send newsletter.");
+  }
+  return (await res.json()) as NewsletterResponse;
 }
 
-export async function getSmsBlastHistory(adminPassword: string): Promise<SmsSendHistory[]> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-
-  const { data, error } = await supabase.rpc("admin_list_sms_sends", {
-    p_admin_password: adminPassword,
-  });
-
-  if (error) {
-    if (isMissingSupabaseFunctionError(error)) return [];
-    throw error;
+export async function getSmsBlastHistory(_adminPassword?: string): Promise<SmsSendHistory[]> {
+  const res = await fetch("/api/admin/sms/history");
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to load SMS history.");
   }
-  return (data ?? []) as SmsSendHistory[];
+  const data = await res.json();
+  return (data.history ?? []) as SmsSendHistory[];
 }
 
 export async function sendSmsBlast(
-  adminPassword: string,
+  _adminPassword: string,
   doctorIds: string[],
   title: string,
   message: string,
 ): Promise<SmsBlastResponse> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-
-  const { data, error } = await supabase.functions.invoke("send-sms-blast", {
-    body: { adminPassword, doctorIds, title, message },
+  const res = await fetch("/api/admin/sms/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ doctorIds, title, message }),
   });
-
-  if (error) throw new Error(await getSupabaseFunctionErrorMessage(error));
-  return data as SmsBlastResponse;
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to send SMS blast.");
+  }
+  return (await res.json()) as SmsBlastResponse;
 }
 
 export async function createShopOrder(payload: ShopOrderInput): Promise<ShopOrder> {
@@ -839,15 +905,13 @@ export async function getPublicShopOrder(orderCode: string): Promise<PublicShopO
 /**
  * Partner sign-in, step 1: email a 6-digit code.
  *
- * shouldCreateUser stays true even though only registered partners may see data. Partner
- * rows predate this login and have no auth.users entry, so `false` would lock every one of
- * them out permanently. Access is gated by partner_dashboard(), which checks the verified
- * address against doctor_registrations - and leaving account creation open means the sign-in
- * form cannot be used to test whether an address is a registered partner.
+ * The request goes through /api/auth/send-otp — a server-side proxy that is
+ * intercepted by middleware.ts before it reaches Supabase. This ensures the
+ * Upstash sliding-window rate limits (per IP and per email) are enforced even
+ * when the client reloads or opens multiple tabs.
  *
- * Requires {{ .Token }} in the Supabase "Magic Link" email template, or the mail arrives
- * with a link and no code to type. emailRedirectTo must be on the project's URI allow
- * list; without it GoTrue uses Site URL (currently the Gema /my-account host).
+ * shouldCreateUser stays true in the proxy (see app/api/auth/send-otp/route.ts)
+ * for the same reason as before: partner rows predate the auth system.
  */
 function partnerAuthRedirectTo() {
   if (typeof window !== "undefined") return `${window.location.origin}/partner`;
@@ -856,14 +920,24 @@ function partnerAuthRedirectTo() {
 }
 
 export async function sendPartnerOtp(email: string): Promise<void> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  if (!isSupabaseConfigured) throw new Error("Supabase is not configured.");
 
-  const { error } = await supabase.auth.signInWithOtp({
-    email: email.trim().toLowerCase(),
-    options: { shouldCreateUser: true, emailRedirectTo: partnerAuthRedirectTo() },
+  const response = await fetch("/api/auth/send-otp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: email.trim().toLowerCase() }),
   });
 
-  if (error) throw error;
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    // Preserve the HTTP status on the thrown Error so PartnerPortal's
+    // getSendError / getResendError handlers can detect rate-limit messages
+    // via their existing "rate" / "too many" / "429" text matching.
+    throw Object.assign(
+      new Error(body?.error ?? "We couldn't send a sign-in code. Please try again."),
+      { status: response.status },
+    );
+  }
 }
 
 /** Partner sign-in, step 2: exchange the code for a session. */
@@ -873,36 +947,21 @@ export async function verifyPartnerOtp(email: string, token: string): Promise<vo
   const normalizedEmail = email.trim().toLowerCase();
   const normalizedToken = token.trim();
 
-  // Supabase normally verifies a numeric email OTP with type "email". On a partner's
-  // first-ever login, however, signInWithOtp creates the auth user and sends the Confirm
-  // signup template; some hosted Auth versions classify that token as "signup" (and older
-  // passwordless flows as "magiclink"). Try the canonical type first, then the two exact
-  // email-flow variants. A failed verification does not consume the token.
-  let session = null;
-  let lastError: Error | null = null;
+  // "email" is GoTrue's unified type for a numeric email OTP - it covers both a
+  // returning partner's magic-link code and a first-ever login's signup-confirmation
+  // code, so one call verifies both cases. A failed verification does not consume the token.
+  const { data, error } = await supabase.auth.verifyOtp({
+    email: normalizedEmail,
+    token: normalizedToken,
+    type: "email",
+  });
 
-  for (const type of ["magiclink", "email", "signup"] as const) {
-    const { data, error } = await supabase.auth.verifyOtp({
-      email: normalizedEmail,
-      token: normalizedToken,
-      type,
-    });
-
-    if (!error) {
-      session = data.session;
-      lastError = null;
-      break;
-    }
-
-    lastError = error;
-  }
-
-  if (lastError) throw lastError;
+  if (error) throw error;
 
   // supabaseShop is a second createClient (see lib/supabase.ts) and was built before this
   // session existed, so it is still anonymous in this tab until it is handed the session.
   // Without this the first dashboard read fails and only starts working after a reload.
-  if (session) await supabaseShop.auth.setSession(session);
+  if (data.session) await supabaseShop.auth.setSession(data.session);
 }
 
 export async function signOutPartner(): Promise<void> {
@@ -947,6 +1006,7 @@ export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Pr
   const partner = (row.partner ?? {}) as Record<string, unknown>;
   const clicks = (row.clicks ?? {}) as Record<string, unknown>;
   const totals = (row.totals ?? {}) as Record<string, unknown>;
+  const points = (row.points ?? { current_cycle: 1, points_in_cycle: 0, total_all_time: 0, own_points: 0, passup_points: 0 }) as Record<string, unknown>;
   const ordersPage = (row.orders_page ?? {}) as Record<string, unknown>;
 
   return {
@@ -970,6 +1030,33 @@ export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Pr
       direct_paid_amount: Number(totals.direct_paid_amount ?? 0),
       referred_paid_amount: Number(totals.referred_paid_amount ?? 0),
     },
+    points: {
+      current_cycle: Number(points.current_cycle ?? 1),
+      points_in_cycle: Number(points.points_in_cycle ?? 0),
+      lifetime_points: Number(points.total_all_time ?? points.lifetime_points ?? 0),
+      own_points: Number(points.own_points ?? 0),
+      passup_points: Number(points.passup_points ?? 0),
+    },
+    rebates: (Array.isArray(row.rebates) ? row.rebates : []).map((entry) => {
+      const rebateRow = (entry ?? {}) as Record<string, unknown>;
+      return {
+        cycle_number: Number(rebateRow.cycle_number ?? 1),
+        milestone_pts: Number(rebateRow.milestone_pts ?? 0),
+        rebate_amount: Number(rebateRow.rebate_amount ?? 0),
+        status: String(rebateRow.status ?? "unlocked"),
+        created_at: String(rebateRow.created_at ?? ""),
+      };
+    }),
+    point_sources: (Array.isArray(row.point_sources) ? row.point_sources : []).map((entry) => {
+      const psRow = (entry ?? {}) as Record<string, unknown>;
+      return {
+        order_code: String(psRow.order_code ?? ""),
+        points: Number(psRow.points ?? 0),
+        depth: Number(psRow.depth ?? 0),
+        source_partner: String(psRow.source_partner ?? ""),
+        created_at: String(psRow.created_at ?? ""),
+      };
+    }),
     orders: (Array.isArray(row.orders) ? row.orders : []).map(normalizePartnerOrder),
     orders_page: {
       total: Number(ordersPage.total ?? 0),
@@ -1001,6 +1088,13 @@ function normalizePartnerOrder(entry: unknown): PartnerOrder {
     payment_status: (order.payment_status ?? "pending") as ShopPaymentStatus,
     total_amount: Number(order.total_amount ?? 0),
     buyer_first_name: String(order.buyer_first_name ?? ""),
+    // Older rows predate these keys, so fall back rather than render "undefined".
+    buyer_name: String(order.buyer_name ?? order.buyer_first_name ?? ""),
+    buyer_email: String(order.buyer_email ?? ""),
+    buyer_mobile: String(order.buyer_mobile ?? ""),
+    address: String(order.address ?? ""),
+    barangay: String(order.barangay ?? ""),
+    zip: String(order.zip ?? ""),
     city: String(order.city ?? ""),
     province: String(order.province ?? ""),
     source_type: order.source_type === "referred" ? "referred" : "direct",
@@ -1009,46 +1103,41 @@ function normalizePartnerOrder(entry: unknown): PartnerOrder {
   };
 }
 
-export async function adminListShopOrders(adminPassword: string): Promise<ShopOrder[]> {
-  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
-
-  const { data, error } = await supabaseShop.rpc("admin_list_shop_orders", {
-    p_admin_password: adminPassword,
-  });
-
-  if (error) throw error;
-  return ((data ?? []) as unknown[]).map(normalizeShopOrder);
+export async function adminListShopOrders(_adminPassword?: string): Promise<ShopOrder[]> {
+  const res = await fetch("/api/admin/shop-orders");
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to load shop orders.");
+  }
+  const data = await res.json();
+  return ((data.orders ?? []) as unknown[]).map(normalizeShopOrder);
 }
 
-export async function adminGetShopOrder(adminPassword: string, orderId: string): Promise<ShopOrder> {
-  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
-
-  const { data, error } = await supabaseShop.rpc("admin_get_shop_order", {
-    p_admin_password: adminPassword,
-    p_order_id: orderId,
-  });
-
-  if (error) throw error;
-  return normalizeShopOrder(Array.isArray(data) ? data[0] : data);
+export async function adminGetShopOrder(_adminPassword?: string, orderId?: string): Promise<ShopOrder> {
+  const res = await fetch(`/api/admin/shop-orders?orderId=${encodeURIComponent(orderId ?? "")}`);
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to get shop order.");
+  }
+  const data = await res.json();
+  return normalizeShopOrder(Array.isArray(data.order) ? data.order[0] : data.order);
 }
 
 export async function adminUpdateShopOrder(
-  adminPassword: string,
+  _adminPassword: string,
   update: ShopOrderAdminUpdate,
 ): Promise<ShopOrder> {
-  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
-
-  const { data, error } = await supabaseShop.rpc("admin_update_shop_order", {
-    p_admin_password: adminPassword,
-    p_order_id: update.id,
-    p_status: update.status,
-    p_payment_status: update.paymentStatus,
-    p_maya_reference: update.mayaReference,
-    p_admin_notes: update.adminNotes,
+  const res = await fetch("/api/admin/shop-orders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(update),
   });
-
-  if (error) throw error;
-  return normalizeShopOrder(Array.isArray(data) ? data[0] : data);
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to update shop order.");
+  }
+  const data = await res.json();
+  return normalizeShopOrder(Array.isArray(data.order) ? data.order[0] : data.order);
 }
 
 // ─── Email Sequence ────────────────────────────────────────────────────────
@@ -1114,18 +1203,20 @@ export async function sendTikTokRawApiRequest(
 }
 
 export async function callTikTokAdminApi<TResponse>(
-  adminPassword: string,
+  _adminPassword: string,
   action: TikTokAdminAction,
-  payload: Record<string, unknown>,
+  payload?: Record<string, unknown>,
 ): Promise<TResponse> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-
-  const { data, error } = await supabase.functions.invoke("tiktok-shop-admin", {
-    body: { adminPassword, action, payload },
+  const res = await fetch("/api/admin/tiktok", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, payload }),
   });
-
-  if (error) throw new Error(await getSupabaseFunctionErrorMessage(error));
-  return data as TResponse;
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "TikTok admin request failed.");
+  }
+  return (await res.json()) as TResponse;
 }
 
 export type SequenceAttachment = {
@@ -1155,52 +1246,66 @@ export type SequenceProgress = {
   email_sequence_sends: { sent_at: string; clicked_at: string | null; status: string; step_id: string }[];
 };
 
-export async function getSequenceSteps(adminPassword: string): Promise<SequenceStep[]> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-  const { data, error } = await supabase.functions.invoke("manage-sequence", {
-    body: { action: "get-steps", adminPassword },
-  });
-  if (error) throw error;
-  return (data as { steps: SequenceStep[] }).steps;
+export async function getSequenceSteps(_adminPassword?: string): Promise<SequenceStep[]> {
+  const res = await fetch("/api/admin/sequence?type=steps");
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to load sequence steps.");
+  }
+  const data = await res.json();
+  return (data.steps ?? []) as SequenceStep[];
 }
 
 export async function upsertSequenceStep(
-  adminPassword: string,
+  _adminPassword: string,
   step: { id?: string; stepNumber: number; subject: string; htmlBody: string; attachments?: SequenceAttachment[] },
 ): Promise<SequenceStep> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-  const { data, error } = await supabase.functions.invoke("manage-sequence", {
-    body: { action: "upsert-step", adminPassword, step },
+  const res = await fetch("/api/admin/sequence", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "upsert", step }),
   });
-  if (error) throw error;
-  return (data as { step: SequenceStep }).step;
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to upsert sequence step.");
+  }
+  const data = await res.json();
+  return data.step as SequenceStep;
 }
 
-export async function deleteSequenceStep(adminPassword: string, stepId: string): Promise<void> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-  const { error } = await supabase.functions.invoke("manage-sequence", {
-    body: { action: "delete-step", adminPassword, stepId },
+export async function deleteSequenceStep(_adminPassword: string, stepId: string): Promise<void> {
+  const res = await fetch("/api/admin/sequence", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "delete", stepId }),
   });
-  if (error) throw error;
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to delete sequence step.");
+  }
 }
 
-export async function reorderSequenceSteps(adminPassword: string, stepIds: string[]): Promise<void> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-  const { error } = await supabase.functions.invoke("manage-sequence", {
-    body: { action: "reorder-steps", adminPassword, stepIds },
+export async function reorderSequenceSteps(_adminPassword: string, stepIds: string[]): Promise<void> {
+  const res = await fetch("/api/admin/sequence", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "reorder", stepIds }),
   });
-  if (error) throw error;
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to reorder sequence steps.");
+  }
 }
 
 export async function getSequenceProgress(
-  adminPassword: string,
+  _adminPassword?: string,
 ): Promise<{ progress: SequenceProgress[]; totalSteps: number }> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-  const { data, error } = await supabase.functions.invoke("manage-sequence", {
-    body: { action: "get-progress", adminPassword },
-  });
-  if (error) throw error;
-  return data as { progress: SequenceProgress[]; totalSteps: number };
+  const res = await fetch("/api/admin/sequence?type=progress");
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to load sequence progress.");
+  }
+  return (await res.json()) as { progress: SequenceProgress[]; totalSteps: number };
 }
 
 type SequenceStepSendResponse = {
@@ -1232,90 +1337,83 @@ export async function enrollWelcomeIfNeeded(doctorId: string): Promise<void> {
   if (!data?.sent) throw new Error(data?.reason || "Welcome email was not sent.");
 }
 
-export async function resendSequenceStep(doctorId: string, stepNumber: number): Promise<void> {
+export async function resendSequenceStep(doctorId: string, stepNumber: number): Promise<SequenceStepSendResponse> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-  const { error } = await supabase.functions.invoke("send-sequence-step", {
+  const { data, error } = await supabase.functions.invoke<SequenceStepSendResponse>("send-sequence-step", {
     body: { doctorId, stepNumber },
   });
   if (error) throw error;
+  return data ?? { sent: true };
 }
 
 // ─── Registration Email Settings ───────────────────────────────────────────
 
-export async function getRegistrationEmailSettings(adminPassword: string): Promise<RegistrationEmailSettings> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-
-  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
-    body: { action: "get", adminPassword },
-  });
-
-  if (error) throw error;
-  return (data as RegistrationEmailSettingsResponse).settings;
+export async function getRegistrationEmailSettings(_adminPassword?: string): Promise<RegistrationEmailSettings> {
+  const res = await fetch("/api/admin/registration-email");
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to load registration email settings.");
+  }
+  const data = await res.json();
+  return data.settings as RegistrationEmailSettings;
 }
 
 export async function saveRegistrationEmailSettings(
-  adminPassword: string,
+  _adminPassword: string,
   settings: RegistrationEmailSettings,
 ): Promise<RegistrationEmailSettings> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-
-  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
-    body: { action: "save", adminPassword, settings },
+  const res = await fetch("/api/admin/registration-email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "save", settings }),
   });
-
-  if (error) throw error;
-  return (data as RegistrationEmailSettingsResponse).settings;
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to save registration email settings.");
+  }
+  const data = await res.json();
+  return data.settings as RegistrationEmailSettings;
 }
 
 export async function sendRegistrationEmailTest(
-  adminPassword: string,
+  _adminPassword: string,
   testEmail: string,
 ): Promise<RegistrationEmailTestResponse> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-
-  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
-    body: { action: "test", adminPassword, testEmail },
+  const res = await fetch("/api/admin/registration-email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "test", testEmail }),
   });
-
-  if (error) throw error;
-  return data as RegistrationEmailTestResponse;
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to send registration email test.");
+  }
+  return (await res.json()) as RegistrationEmailTestResponse;
 }
 
 export async function getPartnerReferralEmailSettings(adminPassword: string): Promise<RegistrationEmailSettings> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-
   const { data, error } = await supabase.functions.invoke("registration-email-settings", {
     body: { action: "get", templateKind: "partner-referral", adminPassword },
   });
-
   if (error) throw error;
   return (data as RegistrationEmailSettingsResponse).settings;
 }
 
-export async function savePartnerReferralEmailSettings(
-  adminPassword: string,
-  settings: RegistrationEmailSettings,
-): Promise<RegistrationEmailSettings> {
+export async function savePartnerReferralEmailSettings(adminPassword: string, settings: RegistrationEmailSettings): Promise<RegistrationEmailSettings> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-
   const { data, error } = await supabase.functions.invoke("registration-email-settings", {
     body: { action: "save", templateKind: "partner-referral", adminPassword, settings },
   });
-
   if (error) throw error;
   return (data as RegistrationEmailSettingsResponse).settings;
 }
 
-export async function sendPartnerReferralEmailTest(
-  adminPassword: string,
-  testEmail: string,
-): Promise<RegistrationEmailTestResponse> {
+export async function sendPartnerReferralEmailTest(adminPassword: string, testEmail: string): Promise<RegistrationEmailTestResponse> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-
   const { data, error } = await supabase.functions.invoke("registration-email-settings", {
     body: { action: "test", templateKind: "partner-referral", adminPassword, testEmail },
   });
-
   if (error) throw error;
   return data as RegistrationEmailTestResponse;
 }
@@ -1568,34 +1666,34 @@ export async function listTestimonials(limit = 60): Promise<PublicTestimonial[]>
 }
 
 export async function adminListTestimonials(
-  adminPassword: string,
+  _adminPassword?: string,
   status?: TestimonialStatus,
 ): Promise<AdminTestimonial[]> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-
-  const { data, error } = await supabase.rpc("admin_list_testimonials", {
-    p_admin_password: adminPassword,
-    p_status: status ?? null,
-  });
-
-  if (error) throw error;
-  return (data ?? []) as AdminTestimonial[];
+  const url = status
+    ? `/api/admin/testimonials?status=${encodeURIComponent(status)}`
+    : "/api/admin/testimonials";
+  const res = await fetch(url);
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to load testimonials.");
+  }
+  const data = await res.json();
+  return (data.stories ?? []) as AdminTestimonial[];
 }
 
 export async function adminReviewTestimonial(
-  adminPassword: string,
+  _adminPassword: string,
   input: { id: string; status: TestimonialStatus; featured?: boolean; reviewNote?: string },
 ): Promise<AdminTestimonial> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-
-  const { data, error } = await supabase.rpc("admin_review_testimonial", {
-    p_admin_password: adminPassword,
-    p_id: input.id,
-    p_status: input.status,
-    p_featured: input.featured ?? false,
-    p_review_note: input.reviewNote ?? "",
+  const res = await fetch("/api/admin/testimonials", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
   });
-
-  if (error) throw error;
-  return (Array.isArray(data) ? data[0] : data) as AdminTestimonial;
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to review testimonial.");
+  }
+  const data = await res.json();
+  return data.story as AdminTestimonial;
 }

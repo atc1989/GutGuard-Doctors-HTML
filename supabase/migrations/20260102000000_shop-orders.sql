@@ -431,7 +431,44 @@ alter table public.referral_clicks enable row level security;
 
 drop function if exists public.track_referral_click(text);
 drop function if exists public.partner_dashboard();
+drop function if exists public.partner_dashboard(text, text, integer, integer, timestamptz, timestamptz, text);
 
+alter table public.doctor_registrations
+  add column if not exists referred_by_partner_id uuid references public.doctor_registrations(id);
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'doctor_registrations_referred_by_partner_id_fkey'
+  ) then
+    alter table public.doctor_registrations
+      add constraint doctor_registrations_referred_by_partner_id_fkey
+      foreign key (referred_by_partner_id) references public.doctor_registrations(id);
+  end if;
+end $$;
+
+create index if not exists doctor_registrations_referred_by_partner_id_idx
+  on public.doctor_registrations (referred_by_partner_id);
+
+create or replace function public.prevent_partner_referrer_change()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if new.referred_by_partner_id is distinct from old.referred_by_partner_id then
+    raise exception 'Partner referral attribution cannot be changed.' using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists doctor_registrations_referrer_immutable on public.doctor_registrations;
+create trigger doctor_registrations_referrer_immutable
+before update on public.doctor_registrations
+for each row execute function public.prevent_partner_referrer_change();
+
+-- Needs public.partner_by_key from doctor-qr-redirect.sql - run that file first.
 -- Supersedes get_referral_partner for /r/[slug]: same return value, plus the click. Doing
 -- both in one call keeps the redirect at a single round trip - that link is on printed QR
 -- codes, so it is the one call that must not get slower.
@@ -445,10 +482,9 @@ declare
   v_slug text;
   v_doctor_id uuid;
 begin
+  -- p_slug is the partner id on new QR codes and the routing slug on older printed ones.
   select d.routing_slug, d.id into v_slug, v_doctor_id
-  from public.doctor_registrations d
-  where d.routing_slug = lower(trim(coalesce(p_slug, '')))
-  limit 1;
+  from public.partner_by_key(p_slug) d;
 
   -- Unknown slug: no row, no click. Counting misses would let anyone inflate a partner's
   -- numbers by hitting /r/<anything>.
@@ -464,14 +500,58 @@ $$;
 
 grant execute on function public.track_referral_click(text) to anon, authenticated;
 
--- Partner-facing read. Takes no parameters on purpose: the caller is whoever the Supabase
--- Auth JWT says they are, so there is no partner id to tamper with.
+-- Maps partner-portal status chips onto payment_status + status.
+-- Paid and Delivered are distinct: payment_status=paid AND status=fulfilled is Delivered only.
+create or replace function public.partner_order_matches_status(
+  p_payment_status text,
+  p_order_status text,
+  p_filter text
+) returns boolean
+language sql
+immutable
+set search_path = public
+as $$
+  select case
+    when nullif(lower(trim(coalesce(p_filter, ''))), '') is null then true
+    when lower(trim(p_filter)) in ('pending', 'awaiting', 'awaiting_payment') then
+      lower(coalesce(p_payment_status, '')) not in ('paid', 'refunded')
+      and lower(coalesce(p_order_status, '')) not in ('cancelled', 'fulfilled')
+    when lower(trim(p_filter)) = 'paid' then
+      lower(coalesce(p_payment_status, '')) = 'paid'
+      and lower(coalesce(p_order_status, '')) is distinct from 'fulfilled'
+      and lower(coalesce(p_order_status, '')) is distinct from 'cancelled'
+    when lower(trim(p_filter)) in ('fulfilled', 'delivered') then
+      lower(coalesce(p_payment_status, '')) = 'paid'
+      and lower(coalesce(p_order_status, '')) = 'fulfilled'
+    when lower(trim(p_filter)) = 'refunded' then
+      lower(coalesce(p_payment_status, '')) = 'refunded'
+    when lower(trim(p_filter)) = 'cancelled' then
+      lower(coalesce(p_order_status, '')) = 'cancelled'
+      and lower(coalesce(p_payment_status, '')) is distinct from 'refunded'
+    else
+      lower(coalesce(p_payment_status, '')) = lower(trim(p_filter))
+      or lower(coalesce(p_order_status, '')) = lower(trim(p_filter))
+  end;
+$$;
+
+revoke all on function public.partner_order_matches_status(text, text, text) from public, anon, authenticated;
+
+-- Partner-facing read. Takes no partner id on purpose: the caller is whoever the
+-- Supabase Auth JWT says they are. Optional filters paginate the order list.
 --
 -- Buyer email, mobile and street address are deliberately NOT selected. A partner needs to
 -- know an order happened, not where it ships. Rows are matched on referral_doctor_id, never
 -- referral_slug, so a rejected self-referral stays invisible here while remaining on the row
--- as an audit trail.
-create or replace function public.partner_dashboard()
+-- as an audit trail. Downline orders are one referral level: partners this partner referred.
+create or replace function public.partner_dashboard(
+  p_scope text default 'all',
+  p_status text default null,
+  p_limit integer default 25,
+  p_offset integer default 0,
+  p_date_from timestamptz default null,
+  p_date_to timestamptz default null,
+  p_sort text default 'newest'
+)
 returns jsonb
 language plpgsql
 stable
@@ -481,9 +561,20 @@ as $$
 declare
   v_email text;
   v_doctor public.doctor_registrations;
+  v_scope text := lower(trim(coalesce(p_scope, 'all')));
+  v_limit integer := least(greatest(coalesce(p_limit, 25), 1), 100);
+  v_offset integer := greatest(coalesce(p_offset, 0), 0);
+  v_order_count bigint;
+  v_orders jsonb;
 begin
-  v_email := nullif(lower(trim(coalesce(auth.jwt() ->> 'email', ''))), '');
+  if v_scope not in ('all', 'direct', 'referred') then
+    raise exception 'Invalid order scope.' using errcode = '22023';
+  end if;
+  if lower(coalesce(p_sort, 'newest')) not in ('newest', 'oldest') then
+    raise exception 'Invalid order sort.' using errcode = '22023';
+  end if;
 
+  v_email := nullif(lower(trim(coalesce(auth.jwt() ->> 'email', ''))), '');
   if v_email is null then
     raise exception 'Sign in to view your dashboard.' using errcode = '42501';
   end if;
@@ -498,8 +589,57 @@ begin
     raise exception 'This email is not registered as a GutGuard partner.' using errcode = '42501';
   end if;
 
+  select count(*) into v_order_count
+  from public.shop_orders o
+  join public.doctor_registrations source on source.id = o.referral_doctor_id
+  where (source.id = v_doctor.id or source.referred_by_partner_id = v_doctor.id)
+    and (
+      v_scope = 'all'
+      or (v_scope = 'direct' and source.id = v_doctor.id)
+      or (v_scope = 'referred' and source.referred_by_partner_id = v_doctor.id)
+    )
+    and public.partner_order_matches_status(o.payment_status, o.status, p_status)
+    and (p_date_from is null or o.created_at >= p_date_from)
+    and (p_date_to is null or o.created_at < p_date_to + interval '1 day');
+
+  select coalesce(jsonb_agg(entry order by
+    case when lower(coalesce(p_sort, 'newest')) = 'oldest' then sort_at end asc,
+    case when lower(coalesce(p_sort, 'newest')) = 'newest' then sort_at end desc
+  ), '[]'::jsonb) into v_orders
+  from (
+    select o.created_at as sort_at, jsonb_build_object(
+      'order_code', o.order_code,
+      'created_at', o.created_at,
+      'status', o.status,
+      'payment_status', o.payment_status,
+      'total_amount', coalesce(nullif(o.total_amount, 0), o.subtotal + coalesce(o.shipping_fee, 0)),
+      'buyer_first_name', coalesce(o.first_name, split_part(o.customer_name, ' ', 1)),
+      'city', o.city,
+      'province', o.province,
+      'source_type', case when source.id = v_doctor.id then 'direct' else 'referred' end,
+      'source_partner_name', source.full_name,
+      'source_partner_slug', source.routing_slug
+    ) as entry
+    from public.shop_orders o
+    join public.doctor_registrations source on source.id = o.referral_doctor_id
+    where (source.id = v_doctor.id or source.referred_by_partner_id = v_doctor.id)
+      and (
+        v_scope = 'all'
+        or (v_scope = 'direct' and source.id = v_doctor.id)
+        or (v_scope = 'referred' and source.referred_by_partner_id = v_doctor.id)
+      )
+      and public.partner_order_matches_status(o.payment_status, o.status, p_status)
+      and (p_date_from is null or o.created_at >= p_date_from)
+      and (p_date_to is null or o.created_at < p_date_to + interval '1 day')
+    order by
+      case when lower(coalesce(p_sort, 'newest')) = 'oldest' then o.created_at end asc,
+      case when lower(coalesce(p_sort, 'newest')) = 'newest' then o.created_at end desc
+    limit v_limit offset v_offset
+  ) page;
+
   return jsonb_build_object(
     'partner', jsonb_build_object(
+      'id', v_doctor.id,
       'full_name', v_doctor.full_name,
       'routing_slug', v_doctor.routing_slug,
       'joined_at', v_doctor.created_at
@@ -517,36 +657,55 @@ begin
     -- deliberately unbuilt calculation - do not surface this as "earnings".
     'totals', (
       select jsonb_build_object(
+        'direct_orders', count(*) filter (where source.id = v_doctor.id),
+        'referred_orders', count(*) filter (where source.referred_by_partner_id = v_doctor.id),
         'orders', count(*),
         'paid_orders', count(*) filter (where o.payment_status = 'paid'),
+        'direct_paid_amount', coalesce(sum(
+          coalesce(nullif(o.total_amount, 0), o.subtotal + coalesce(o.shipping_fee, 0))
+        ) filter (where o.payment_status = 'paid' and source.id = v_doctor.id), 0),
+        'referred_paid_amount', coalesce(sum(
+          coalesce(nullif(o.total_amount, 0), o.subtotal + coalesce(o.shipping_fee, 0))
+        ) filter (where o.payment_status = 'paid' and source.referred_by_partner_id = v_doctor.id), 0),
         'paid_amount', coalesce(sum(
           coalesce(nullif(o.total_amount, 0), o.subtotal + coalesce(o.shipping_fee, 0))
-        ) filter (where o.payment_status = 'paid'), 0)
+        ) filter (where o.payment_status = 'paid'), 0),
+        'referred_partners', (
+          select count(*) from public.doctor_registrations d
+          where d.referred_by_partner_id = v_doctor.id
+        )
       )
       from public.shop_orders o
-      where o.referral_doctor_id = v_doctor.id
+      join public.doctor_registrations source on source.id = o.referral_doctor_id
+      where source.id = v_doctor.id or source.referred_by_partner_id = v_doctor.id
     ),
-    -- ponytail: newest 200, no pagination. Add it when a partner actually passes 200 orders.
-    'orders', (
-      -- Sorted at the aggregate, not just in the subquery: a subquery's order is not
-      -- contractually preserved through jsonb_agg, and the newest order must come first.
-      select coalesce(jsonb_agg(entry order by sort_at desc), '[]'::jsonb)
+    'orders', v_orders,
+    'orders_page', jsonb_build_object(
+      'total', v_order_count,
+      'limit', v_limit,
+      'offset', v_offset,
+      'has_more', v_offset + jsonb_array_length(v_orders) < v_order_count
+    ),
+    'referred_partners', (
+      select coalesce(jsonb_agg(entry order by joined_at desc), '[]'::jsonb)
       from (
-        select o.created_at as sort_at, jsonb_build_object(
-          'order_code', o.order_code,
-          'created_at', o.created_at,
-          'status', o.status,
-          'payment_status', o.payment_status,
-          'total_amount', coalesce(nullif(o.total_amount, 0), o.subtotal + coalesce(o.shipping_fee, 0)),
-          'buyer_first_name', coalesce(o.first_name, split_part(o.customer_name, ' ', 1)),
-          'city', o.city,
-          'province', o.province
+        select child.created_at as joined_at, jsonb_build_object(
+          'full_name', child.full_name,
+          'routing_slug', child.routing_slug,
+          'specialty', child.specialty,
+          'practice_location', child.practice_location,
+          'joined_at', child.created_at,
+          'orders', count(o.id),
+          'paid_order_value', coalesce(sum(
+            coalesce(nullif(o.total_amount, 0), o.subtotal + coalesce(o.shipping_fee, 0))
+          ) filter (where o.payment_status = 'paid'), 0)
         ) as entry
-        from public.shop_orders o
-        where o.referral_doctor_id = v_doctor.id
-        order by o.created_at desc
-        limit 200
-      ) recent
+        from public.doctor_registrations child
+        left join public.shop_orders o on o.referral_doctor_id = child.id
+        where child.referred_by_partner_id = v_doctor.id
+        group by child.id
+        order by child.created_at desc
+      ) partners
     )
   );
 end;
@@ -556,5 +715,5 @@ $$;
 -- every new function, and Supabase's default privileges in `public` add anon on top. The
 -- grant on its own leaves this callable with the anon key. The body would still refuse
 -- (no JWT email), but an unauthenticated caller should not reach it at all.
-revoke all on function public.partner_dashboard() from public, anon;
-grant execute on function public.partner_dashboard() to authenticated;
+revoke all on function public.partner_dashboard(text, text, integer, integer, timestamptz, timestamptz, text) from public, anon;
+grant execute on function public.partner_dashboard(text, text, integer, integer, timestamptz, timestamptz, text) to authenticated;

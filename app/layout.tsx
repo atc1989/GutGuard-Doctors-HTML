@@ -1,5 +1,19 @@
 import type { Metadata, Viewport } from "next";
+import { Fraunces } from "next/font/google";
 import "@/styles/globals.css";
+
+/**
+ * The design has always named Fraunces as --serif, but nothing ever loaded it, so every
+ * visitor without it installed locally got Times New Roman. The variable cut carries the
+ * whole 100-900 range in one file, which matters because the site uses 400 and 600 side
+ * by side - a static 400-only load is what made bold headings fall back mid-sentence.
+ */
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  variable: "--font-fraunces",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://gutguard.ph"),
@@ -43,7 +57,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={fraunces.variable}>
       <body>{children}</body>
     </html>
   );

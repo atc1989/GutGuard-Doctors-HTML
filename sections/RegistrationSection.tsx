@@ -6,7 +6,7 @@ import ConfirmRegistrationModal from "@/components/ConfirmRegistrationModal";
 import { ArrowRightIcon } from "@/components/Icons";
 import { InputField, SelectField } from "@/components/FormField";
 import SectionLabel from "@/components/SectionLabel";
-import { SPECIALTIES } from "@/lib/constants";
+import { NAME_PREFIXES, SPECIALTIES } from "@/lib/constants";
 import { registerDoctor } from "@/lib/api";
 import type { FieldErrors, FieldName, FormValues } from "@/lib/validation";
 import {
@@ -19,12 +19,14 @@ import type { Registration, RegistrationPayload } from "@/lib/types";
 
 type RegistrationSectionProps = {
   active: boolean;
+  invitedBy?: { slug: string; fullName: string } | null;
   onRegistered: (registration: Registration) => void;
   invitation?: { routing_slug: string; full_name: string } | null;
   invitationInvalid?: boolean;
 };
 
 const INITIAL_VALUES: FormValues = {
+  namePrefix: "",
   fullName: "",
   email: "",
   mobile: "",
@@ -34,8 +36,12 @@ const INITIAL_VALUES: FormValues = {
   location: "",
 };
 
+// Email is only used to deliver the proposal; specialty helps tailor it. Neither blocks registration.
+const OPTIONAL_FIELDS: FieldName[] = ["email", "specialty"];
+
 export default function RegistrationSection({
   active,
+  invitedBy,
   onRegistered,
   invitation,
   invitationInvalid,
@@ -56,7 +62,7 @@ export default function RegistrationSection({
     if (errors[name]) {
       setErrors((current) => ({
         ...current,
-        [name]: !validateField(name, value),
+        [name]: !validateField(name, value, OPTIONAL_FIELDS),
       }));
     }
   }
@@ -64,12 +70,13 @@ export default function RegistrationSection({
   function handleFieldBlur(name: FieldName) {
     setErrors((current) => ({
       ...current,
-      [name]: !validateField(name, values[name]),
+      [name]: !validateField(name, values[name], OPTIONAL_FIELDS),
     }));
   }
 
   function buildPayload(): RegistrationPayload {
     return {
+      namePrefix: values.namePrefix.trim(),
       fullName: values.fullName.trim(),
       email: values.email.trim().toLowerCase(),
       mobile: normalizeMobile(values.mobile),
@@ -79,14 +86,14 @@ export default function RegistrationSection({
           ? values.otherSpecialty.trim()
           : values.specialty.trim(),
       location: values.location.trim(),
-      referrerSlug: invitation?.routing_slug,
+      referrerSlug: invitedBy?.slug,
     };
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const nextErrors = validateForm(values);
+    const nextErrors = validateForm(values, OPTIONAL_FIELDS);
     if (values.specialty !== "Other") delete nextErrors.otherSpecialty;
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
@@ -109,9 +116,13 @@ export default function RegistrationSection({
     } catch (error) {
       setSubmitting(false);
       const message = error instanceof Error ? error.message : "";
-      if (message.toLowerCase().includes("tiktok")) {
+      const lower = message.toLowerCase();
+      if (lower.includes("duplicate") && lower.includes("tiktok")) {
         setSubmitError("This TikTok username has already been registered. Please check the handle and try again.");
-      } else {
+      } else if (lower.includes("duplicate") && lower.includes("email")) {
+        setSubmitError("This email has already been registered. Please check the address and try again.");
+      } else if (lower.includes("cannot refer themselves") || lower.includes("refer themselves")) {
+        setSubmitError("A partner cannot refer themselves. Register without using your own referral link.");
         setSubmitError("Registration failed. Please try again or ask the booth coordinator.");
       }
     }
@@ -135,8 +146,23 @@ export default function RegistrationSection({
         Lead Clinical Adopters are a closed cohort of one hundred Filipino physicians.
         Register here. Add your email if you would like the proposal delivered to your inbox.
       </p>
+      {invitedBy?.fullName ? (
+        <p className="invite-note">Invited by {invitedBy.fullName}.</p>
+      ) : null}
 
       <form noValidate onSubmit={handleSubmit}>
+        <SelectField
+          id="namePrefix"
+          label="Prefix"
+          error="Please select a prefix."
+          value={values.namePrefix}
+          hasError={errors.namePrefix}
+          options={NAME_PREFIXES}
+          onValueChange={handleValueChange}
+          onFieldBlur={handleFieldBlur}
+          placeholder="Select prefix"
+          required
+        />
         <InputField
           id="fullName"
           label="Name"
@@ -146,7 +172,7 @@ export default function RegistrationSection({
           onValueChange={handleValueChange}
           onFieldBlur={handleFieldBlur}
           type="text"
-          placeholder="Dr. Maria Santos"
+          placeholder="Maria Santos"
           required
           autoComplete="name"
         />
@@ -201,7 +227,6 @@ export default function RegistrationSection({
           onValueChange={handleValueChange}
           onFieldBlur={handleFieldBlur}
           placeholder="Select your field"
-          required
         />
         {values.specialty === "Other" ? (
           <InputField
@@ -220,8 +245,8 @@ export default function RegistrationSection({
         ) : null}
         <InputField
           id="location"
-          label="Clinic location"
-          error="Please enter your practice location."
+          label="Full Clinic Address"
+          error="Please enter your city address."
           value={values.location}
           hasError={errors.location}
           onValueChange={handleValueChange}
@@ -244,6 +269,7 @@ export default function RegistrationSection({
       <ConfirmRegistrationModal
         open={Boolean(pendingPayload)}
         payload={pendingPayload}
+        invitedByName={invitedBy?.fullName ?? null}
         submitting={submitting}
         error={submitError}
         onCancel={() => {

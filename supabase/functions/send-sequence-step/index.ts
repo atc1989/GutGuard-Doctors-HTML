@@ -9,11 +9,13 @@ const corsHeaders = {
 type SendSequenceStepRequest = {
   doctorId: string;
   stepNumber?: number;
+  onlyIfUnenrolled?: boolean;
 };
 
 type DoctorRegistration = {
   id: string;
   full_name: string | null;
+  name_prefix: string | null;
   email: string | null;
   mobile: string | null;
   tiktok_username: string | null;
@@ -46,7 +48,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
   try {
-    const { doctorId, stepNumber } = (await req.json()) as SendSequenceStepRequest;
+    const { doctorId, stepNumber, onlyIfUnenrolled } = (await req.json()) as SendSequenceStepRequest;
     if (!doctorId) return jsonResponse({ error: "Missing doctorId" }, 400);
 
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
@@ -63,12 +65,12 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Missing Edge Function secrets" }, 500);
     }
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const supabase = createClient(supabaseUrl, serviceRoleKey, { db: { schema: "doctors" } });
 
     // Fetch doctor
     const { data: doctorData, error: doctorError } = await supabase
       .from("doctor_registrations")
-      .select("id, full_name, email, mobile, tiktok_username, specialty, practice_location, routing_slug, redirect_url, created_at")
+      .select("id, name_prefix, full_name, email, mobile, tiktok_username, specialty, practice_location, routing_slug, redirect_url, created_at")
       .eq("id", doctorId)
       .single();
 
@@ -87,6 +89,10 @@ Deno.serve(async (req) => {
       .single();
 
     const targetStep = stepNumber ?? (existingEnrollment ? existingEnrollment.current_step : 1);
+
+    if (onlyIfUnenrolled && existingEnrollment) {
+      return jsonResponse({ sent: false, skipped: true, reason: "already enrolled" });
+    }
 
     if (!existingEnrollment) {
       const { data: newEnrollment, error: enrollError } = await supabase
@@ -190,7 +196,9 @@ function renderTemplate(html: string, doctor: DoctorRegistration, clickUrl: stri
   const routingUrl = doctor.routing_slug ? `${siteUrl}/dr/${encodeURIComponent(doctor.routing_slug)}` : "";
 
   const replacements: Record<string, string> = {
-    doctor_name: doctorName,
+    doctor_name: doctor.full_name ?? "",
+    name_prefix: doctor.name_prefix ?? "",
+    prefixed_name: formatPrefixedName(doctor.name_prefix, doctor.full_name),
     doctor_email: doctor.email ?? "",
     doctor_mobile: doctor.mobile ?? "",
     tiktok_username: tiktokUsername,
@@ -214,7 +222,9 @@ function renderSubject(subject: string, doctor: DoctorRegistration) {
   const tiktokUsername = (doctor.tiktok_username ?? "").trim().replace(/^@+/, "").toLowerCase();
   const doctorName = (doctor.full_name ?? "").trim().replace(/^dr\.?\s+/i, "");
   const replacements: Record<string, string> = {
-    doctor_name: doctorName,
+    doctor_name: doctor.full_name ?? "",
+    name_prefix: doctor.name_prefix ?? "",
+    prefixed_name: formatPrefixedName(doctor.name_prefix, doctor.full_name),
     tiktok_username: tiktokUsername,
     specialty: doctor.specialty ?? "",
     clinic_location: doctor.practice_location ?? "",
@@ -222,6 +232,12 @@ function renderSubject(subject: string, doctor: DoctorRegistration) {
   return subject.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_match, key: string) => {
     return replacements[key] ?? `{{${key}}}`;
   });
+}
+
+function formatPrefixedName(prefix?: string | null, name?: string | null) {
+  const n = (name ?? "").trim();
+  if (!n) return "";
+  return `${(prefix || "Dr.").trim()} ${n}`;
 }
 
 function formatDate(value: string | null) {
