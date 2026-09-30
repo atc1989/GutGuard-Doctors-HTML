@@ -308,6 +308,13 @@ export type PartnerDashboard = {
     status: string;
     created_at: string;
   }>;
+  point_sources?: Array<{
+    order_code: string;
+    points: number;
+    depth: number;
+    source_partner: string;
+    created_at: string;
+  }>;
   orders: PartnerOrder[];
   orders_page: { total: number; limit: number; offset: number; has_more: boolean };
   referred_partners: ReferredPartner[];
@@ -1038,6 +1045,16 @@ export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Pr
         rebate_amount: Number(rebateRow.rebate_amount ?? 0),
         status: String(rebateRow.status ?? "unlocked"),
         created_at: String(rebateRow.created_at ?? ""),
+      };
+    }),
+    point_sources: (Array.isArray(row.point_sources) ? row.point_sources : []).map((entry) => {
+      const psRow = (entry ?? {}) as Record<string, unknown>;
+      return {
+        order_code: String(psRow.order_code ?? ""),
+        points: Number(psRow.points ?? 0),
+        depth: Number(psRow.depth ?? 0),
+        source_partner: String(psRow.source_partner ?? ""),
+        created_at: String(psRow.created_at ?? ""),
       };
     }),
     orders: (Array.isArray(row.orders) ? row.orders : []).map(normalizePartnerOrder),
