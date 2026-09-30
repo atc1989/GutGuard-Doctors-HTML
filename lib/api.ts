@@ -300,6 +300,7 @@ export type PartnerDashboard = {
     lifetime_points: number;
     own_points: number;
     passup_points: number;
+    passed_up_to_upline_points: number;
   };
   rebates: Array<{
     cycle_number: number;
@@ -1036,6 +1037,7 @@ export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Pr
       lifetime_points: Number(points.total_all_time ?? points.lifetime_points ?? 0),
       own_points: Number(points.own_points ?? 0),
       passup_points: Number(points.passup_points ?? 0),
+      passed_up_to_upline_points: Number(points.passed_up_to_upline_points ?? 0),
     },
     rebates: (Array.isArray(row.rebates) ? row.rebates : []).map((entry) => {
       const rebateRow = (entry ?? {}) as Record<string, unknown>;

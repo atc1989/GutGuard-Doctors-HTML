@@ -24,9 +24,10 @@ export default function EPointsPage() {
     <>
       <PageHeader kicker="E-Points" title={`${points.lifetime_points} pts earned`} lede="Points from your direct orders and from partners you referred count towards cash rebate milestones." />
 
-      <section className="pp-stats pp-stats-3" aria-label="E-Points summary">
-        <StatTile label="Direct points" value={`${points.own_points} pts`} note="from your direct customer orders" />
-        <StatTile label="Pass-up points" value={`${points.passup_points} pts`} note="passed up from referred partners" />
+      <section className="pp-stats" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }} aria-label="E-Points summary">
+        <StatTile label="Pass-up points (Earned)" value={`${points.passup_points} pts`} note="earned from referred downline partners" />
+        <StatTile label="Passed up to upline" value={`${points.passed_up_to_upline_points} pts`} note="passed up to your sponsor/upline" />
+        <StatTile label="Direct points (Kept)" value={`${points.own_points} pts`} note="kept from direct customer orders" />
         <StatTile label={`Cycle ${points.current_cycle}`} value={`${points.points_in_cycle} pts`} note={`target ${CYCLE_TARGET}`} />
       </section>
 
