@@ -1322,6 +1322,7 @@ export async function enrollDoctorInSequence(doctorId: string): Promise<Sequence
     body: { doctorId, stepNumber: 1 },
   });
   if (error) throw error;
+  if (data?.skipped) return data;
   if (!data?.sent) throw new Error(data?.reason || "Drip Campaign Step 1 was not sent.");
   return data;
 }
@@ -1338,12 +1339,14 @@ export async function enrollWelcomeIfNeeded(doctorId: string): Promise<void> {
 }
 
 export async function resendSequenceStep(doctorId: string, stepNumber: number): Promise<SequenceStepSendResponse> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-  const { data, error } = await supabase.functions.invoke<SequenceStepSendResponse>("send-sequence-step", {
-    body: { doctorId, stepNumber },
+  const res = await fetch("/api/admin/sequence", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "resend", doctorId, stepNumber }),
   });
-  if (error) throw error;
-  return data ?? { sent: true };
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Failed to resend step.");
+  return { sent: true };
 }
 
 // ─── Registration Email Settings ───────────────────────────────────────────
@@ -1391,31 +1394,27 @@ export async function sendRegistrationEmailTest(
   return (await res.json()) as RegistrationEmailTestResponse;
 }
 
-export async function getPartnerReferralEmailSettings(adminPassword: string): Promise<RegistrationEmailSettings> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
-    body: { action: "get", templateKind: "partner-referral", adminPassword },
+async function referralEmailRequest(body: Record<string, unknown>) {
+  const res = await fetch("/api/admin/registration-email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...body, templateKind: "partner-referral" }),
   });
-  if (error) throw error;
-  return (data as RegistrationEmailSettingsResponse).settings;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Referral email request failed.");
+  return data;
 }
 
-export async function savePartnerReferralEmailSettings(adminPassword: string, settings: RegistrationEmailSettings): Promise<RegistrationEmailSettings> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
-    body: { action: "save", templateKind: "partner-referral", adminPassword, settings },
-  });
-  if (error) throw error;
-  return (data as RegistrationEmailSettingsResponse).settings;
+export async function getPartnerReferralEmailSettings(_adminPassword?: string): Promise<RegistrationEmailSettings> {
+  return (await referralEmailRequest({ action: "get" })).settings as RegistrationEmailSettings;
 }
 
-export async function sendPartnerReferralEmailTest(adminPassword: string, testEmail: string): Promise<RegistrationEmailTestResponse> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
-    body: { action: "test", templateKind: "partner-referral", adminPassword, testEmail },
-  });
-  if (error) throw error;
-  return data as RegistrationEmailTestResponse;
+export async function savePartnerReferralEmailSettings(_adminPassword: string, settings: RegistrationEmailSettings): Promise<RegistrationEmailSettings> {
+  return (await referralEmailRequest({ action: "save", settings })).settings as RegistrationEmailSettings;
+}
+
+export async function sendPartnerReferralEmailTest(_adminPassword: string, testEmail: string): Promise<RegistrationEmailTestResponse> {
+  return (await referralEmailRequest({ action: "test", testEmail })) as RegistrationEmailTestResponse;
 }
 
 function mapClaimedPrize(row: PrizeRow | null | undefined): Prize {

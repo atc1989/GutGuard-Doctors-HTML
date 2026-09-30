@@ -73,6 +73,15 @@ Deno.serve(async (req) => {
     }
 
     const doctor = registration as DoctorRegistration;
+
+    // Once per registration: the id is the only input, so repeats must not re-mail the doctor.
+    const { data: alreadySent } = await supabase
+      .from("registration_email_sends")
+      .select("registration_id")
+      .eq("registration_id", registrationId)
+      .eq("status", "sent")
+      .limit(1);
+    if (alreadySent?.length) return jsonResponse({ sent: false, duplicate: true });
     const email = (doctor.email ?? "").trim().toLowerCase();
     if (!isValidEmail(email)) {
       await recordSendAttempt(supabase, {

@@ -1,4 +1,9 @@
-import { isSupabaseConfigured, supabase, supabaseShop, SHOP_SCHEMA } from "@/lib/supabase";
+import { SHOP_SCHEMA } from "@/lib/supabase";
+import {
+  isSupabaseAdminConfigured as isSupabaseConfigured,
+  supabaseAdmin as supabase,
+  supabaseAdminShop as supabaseShop,
+} from "@/lib/supabase-admin";
 import type { AdminTestimonial, TestimonialStatus } from "@/lib/testimonials";
 import type { Prize, WheelPrize, WheelPrizeInput } from "@/lib/types";
 import type {
@@ -432,13 +437,20 @@ export async function serverGetSequenceProgress(
   return data as { progress: SequenceProgress[]; totalSteps: number };
 }
 
+export async function serverResendSequenceStep(doctorId: string, stepNumber: number): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  const { data, error } = await supabase.functions.invoke("send-sequence-step", { body: { doctorId, stepNumber } });
+  if (error) throw error;
+  if (data && data.sent === false) throw new Error(data.reason || "Step was not sent.");
+}
+
 // ─── Registration Email Settings ───────────────────────────────────────────
 
-export async function serverGetRegistrationEmailSettings(adminPassword: string): Promise<RegistrationEmailSettings> {
+export async function serverGetRegistrationEmailSettings(adminPassword: string, templateKind = "registration"): Promise<RegistrationEmailSettings> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
 
   const { data, error } = await supabase.functions.invoke("registration-email-settings", {
-    body: { action: "get", adminPassword },
+    body: { action: "get", adminPassword, templateKind },
   });
 
   if (error) throw error;
@@ -448,11 +460,12 @@ export async function serverGetRegistrationEmailSettings(adminPassword: string):
 export async function serverSaveRegistrationEmailSettings(
   adminPassword: string,
   settings: RegistrationEmailSettings,
+  templateKind = "registration",
 ): Promise<RegistrationEmailSettings> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
 
   const { data, error } = await supabase.functions.invoke("registration-email-settings", {
-    body: { action: "save", adminPassword, settings },
+    body: { action: "save", adminPassword, settings, templateKind },
   });
 
   if (error) throw error;
@@ -462,11 +475,12 @@ export async function serverSaveRegistrationEmailSettings(
 export async function serverSendRegistrationEmailTest(
   adminPassword: string,
   testEmail: string,
+  templateKind = "registration",
 ): Promise<{ sent: boolean; resendId?: string }> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
 
   const { data, error } = await supabase.functions.invoke("registration-email-settings", {
-    body: { action: "test", adminPassword, testEmail },
+    body: { action: "test", adminPassword, testEmail, templateKind },
   });
 
   if (error) throw error;

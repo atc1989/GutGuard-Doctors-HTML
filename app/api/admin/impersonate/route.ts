@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
-import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { isSupabaseAdminConfigured as isSupabaseConfigured, supabaseAdmin as supabase } from "@/lib/supabase-admin";
 
 function partnerAuthRedirectTo() {
   const site = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://partners.gutguard.ph").replace(/\/$/, "");

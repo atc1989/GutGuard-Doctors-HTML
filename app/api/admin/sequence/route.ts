@@ -5,6 +5,7 @@ import {
   serverGetSequenceProgress,
   serverGetSequenceSteps,
   serverReorderSequenceSteps,
+  serverResendSequenceStep,
   serverUpsertSequenceStep,
 } from "@/lib/admin-server-api";
 
@@ -49,6 +50,10 @@ export async function POST(req: NextRequest) {
     }
     if (body.action === "reorder") {
       await serverReorderSequenceSteps(adminPassword, body.stepIds);
+      return NextResponse.json({ success: true });
+    }
+    if (body.action === "resend") {
+      await serverResendSequenceStep(String(body.doctorId), Number(body.stepNumber));
       return NextResponse.json({ success: true });
     }
     return NextResponse.json({ error: "Invalid action." }, { status: 400 });

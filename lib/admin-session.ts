@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
-import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { isSupabaseAdminConfigured as isSupabaseConfigured, supabaseAdmin as supabase } from "@/lib/supabase-admin";
 
 export const ADMIN_SESSION_COOKIE = "gg_admin_session";
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
