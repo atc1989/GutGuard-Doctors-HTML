@@ -43,18 +43,61 @@ export default function EPointsPage() {
             <button type="button" role="tab" aria-selected={pointsFilter === "referred"} className={pointsFilter === "referred" ? "active" : ""} onClick={() => setPointsFilter("referred")}>Referred partners points <span>{points.passup_points} pts</span></button>
           </div>
 
+          {pointsFilter === "referred" && referredSources.length ? (
+            <section className="pp-card" style={{ marginBottom: 16 }} aria-label="Pass-up points breakdown by partner">
+              <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--blue)", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px" }}>Pass-Up Points by Partner</h3>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
+                {Array.from(
+                  referredSources.reduce((map, item) => {
+                    const name = item.source_partner || "Unknown Partner";
+                    map.set(name, (map.get(name) || 0) + item.points);
+                    return map;
+                  }, new Map<string, number>())
+                ).map(([partnerName, pts]) => (
+                  <div key={partnerName} style={{ background: "var(--paper)", padding: "12px 14px", borderRadius: "var(--r-md)", border: "1px solid var(--rule)" }}>
+                    <small style={{ color: "var(--ink-3)", fontSize: 12, display: "block" }}>{partnerName}</small>
+                    <strong style={{ color: "var(--blue)", fontSize: 16 }}>+{pts} pts</strong>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
           <section className="pp-card pp-card-flush" aria-label="Points log">
             {activeSources.length ? (
               <ul className="pp-log">
-                {activeSources.map((source, index) => (
-                  <li key={`${source.order_code}-${index}`}>
-                    <span>
-                      <strong>{source.depth === 1 ? `Pass-up from ${source.source_partner}` : `Direct customer order ${source.order_code}`}</strong>
-                      <small>Order {source.order_code} · {formatDate(source.created_at)}</small>
-                    </span>
-                    <b className={source.depth === 1 ? "is-passup" : undefined}>+{source.points} {source.points === 1 ? "pt" : "pts"}</b>
-                  </li>
-                ))}
+                {activeSources.map((source, index) => {
+                  const isPassup = source.depth === 1;
+                  return (
+                    <li key={`${source.order_code}-${index}`} style={{ padding: "14px 16px" }}>
+                      <span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                          <span style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.5px",
+                            padding: "2px 6px",
+                            borderRadius: 4,
+                            background: isPassup ? "var(--blue-soft, #eef2ff)" : "var(--bone-soft, #f4f4f5)",
+                            color: isPassup ? "var(--blue, #2563eb)" : "var(--ink-2, #52525b)"
+                          }}>
+                            {isPassup ? "👥 Pass-Up" : "🛒 Direct Order"}
+                          </span>
+                          <strong style={{ fontSize: 14 }}>
+                            {isPassup ? `Pass-up from ${source.source_partner}` : `Direct Order ${source.order_code}`}
+                          </strong>
+                        </div>
+                        <small style={{ color: "var(--ink-3)", fontSize: 12 }}>
+                          {isPassup ? `Earned from downline order ${source.order_code}` : `Direct shop purchase via your link`} · {formatDate(source.created_at)}
+                        </small>
+                      </span>
+                      <b className={isPassup ? "is-passup" : undefined} style={{ fontSize: 16 }}>
+                        +{source.points} {source.points === 1 ? "pt" : "pts"}
+                      </b>
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <EmptyState title={pointsFilter === "direct" ? "No direct shop points yet." : pointsFilter === "referred" ? "No pass-up points from referred partners yet." : "No points recorded yet."}>
