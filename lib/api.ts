@@ -1418,6 +1418,45 @@ export async function sendPartnerReferralEmailTest(adminPassword: string, testEm
   return data as RegistrationEmailTestResponse;
 }
 
+export async function getPartnerReferralEmailSettings(adminPassword: string): Promise<RegistrationEmailSettings> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
+    body: { action: "get", templateKind: "partner-referral", adminPassword },
+  });
+
+  if (error) throw error;
+  return (data as RegistrationEmailSettingsResponse).settings;
+}
+
+export async function savePartnerReferralEmailSettings(
+  adminPassword: string,
+  settings: RegistrationEmailSettings,
+): Promise<RegistrationEmailSettings> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
+    body: { action: "save", templateKind: "partner-referral", adminPassword, settings },
+  });
+
+  if (error) throw error;
+  return (data as RegistrationEmailSettingsResponse).settings;
+}
+
+export async function sendPartnerReferralEmailTest(
+  adminPassword: string,
+  testEmail: string,
+): Promise<RegistrationEmailTestResponse> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
+    body: { action: "test", templateKind: "partner-referral", adminPassword, testEmail },
+  });
+
+  if (error) throw error;
+  return data as RegistrationEmailTestResponse;
+}
+
 function mapClaimedPrize(row: PrizeRow | null | undefined): Prize {
   const matchingPrize = PRIZES.find((prize) => prize.label === row?.prize_label || prize.label === row?.label);
 
