@@ -14,6 +14,64 @@ import { TIERS } from "@/lib/catalog";
    ──────────────────────────────────────────────────────────── */
 
 const CSS = `
+
+.section-visual-card{margin:32px 0;border-radius:24px;overflow:hidden;background:#fff;border:1px solid var(--rule-soft);box-shadow:0 16px 40px rgba(0,0,0,.04);}
+.section-visual-img{width:100%;max-height:520px;object-fit:cover;display:block;background:#fff;}
+
+
+
+@media(max-width:900px){}
+
+
+
+
+
+
+.cost-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;}
+@media(max-width:900px){.cost-top-grid{grid-template-columns:1fr;gap:32px;}}
+.cost-copy{display:flex;flex-direction:column;justify-content:center;}
+.cost-visual{display:flex;align-items:center;justify-content:center;position:relative;margin:0;padding:0;}
+.cost-img{width:100%;max-height:620px;object-fit:contain;display:block;mix-blend-mode:multiply;margin:0;padding:0;filter:contrast(1.03) brightness(1.01);}
+
+
+
+.measure-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;margin-bottom:48px;}
+@media(max-width:900px){.measure-top-grid{grid-template-columns:1fr;gap:32px;}}
+.measure-copy{display:flex;flex-direction:column;justify-content:center;}
+.measure-visual{display:flex;align-items:center;justify-content:center;position:relative;}
+.measure-badge{position:absolute;top:12px;right:12px;border:1px dashed rgba(255,255,255,.4);color:var(--slate-mut);padding:4px 12px;border-radius:100px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;background:rgba(14,26,43,.6);backdrop-filter:blur(4px);z-index:2;}
+.measure-img{width:100%;max-height:540px;object-fit:contain;display:block;}
+
+
+.science-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;}
+@media(max-width:900px){.science-top-grid{grid-template-columns:1fr;gap:32px;}}
+.science-top-copy{display:flex;flex-direction:column;justify-content:center;}
+.science-top-visual{display:flex;align-items:center;justify-content:center;position:relative;}
+.science-floating-molecules{width:100%;max-width:580px;height:auto;object-fit:contain;display:block;background:transparent;box-shadow:none;border:none;}
+
+
+.measure-section-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;}
+@media(max-width:900px){.measure-section-grid{grid-template-columns:1fr;gap:32px;}}
+.measure-section-copy{display:flex;flex-direction:column;justify-content:center;}
+.measure-section-visual{display:flex;align-items:center;justify-content:center;position:relative;}
+.measure-section-img{width:100%;max-height:500px;object-fit:contain;border-radius:16px;display:block;mix-blend-mode:multiply;filter:contrast(1.03) brightness(1.01);}
+
+
+.lca-hero.dark{background:var(--slate);color:#EAF1F0;padding:0;overflow:hidden;}
+.physicians-hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:clamp(32px,5vw,64px);align-items:stretch;}
+@media(max-width:900px){.physicians-hero-grid{grid-template-columns:1fr;gap:32px;}}
+.physicians-hero-copy{display:flex;flex-direction:column;justify-content:center;padding:100px 0 80px;}
+@media(max-width:900px){.physicians-hero-copy{padding:60px 0 20px;}}
+.physicians-hero-visual{display:flex;align-items:flex-end;justify-content:flex-end;position:relative;height:100%;margin:0;padding:0;}
+.physician-floating-img{height:100%;max-height:580px;width:auto;object-fit:contain;object-position:bottom right;display:block;background:transparent;box-shadow:none;border:none;margin:0;padding:0;}
+
+.section.younger{padding:0;position:relative;overflow:hidden;}
+.why-now-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:clamp(32px,5vw,64px);align-items:stretch;}
+@media(max-width:900px){.why-now-grid{grid-template-columns:1fr;gap:32px;}}
+.why-now-copy{display:flex;flex-direction:column;justify-content:center;padding:100px 0 80px;}
+@media(max-width:900px){.why-now-copy{padding:60px 0 20px;}}
+.why-now-visual{display:flex;align-items:center;justify-content:flex-end;position:relative;height:100%;margin:0;padding:0;}
+.why-now-img{height:100%;max-height:640px;width:100%;object-fit:contain;object-position:center right;display:block;mix-blend-mode:multiply;margin:0;padding:0;filter:contrast(1.03) brightness(1.01);}
 :root{
   --bone:#F4F1EA;--bone-soft:#EBE7DE;--bone-deep:#DDD7C8;--paper:#FCFAF5;
   --ink:#141019;--ink-2:#3A3A48;--ink-3:#6B6B7A;--ink-4:#A0A0AE;
@@ -41,8 +99,124 @@ const CSS = `
 .gg main:focus{outline:none;}
 .wrap{position:relative;z-index:1;max-width:var(--maxw);margin:0 auto;padding:0 clamp(20px,5vw,40px);}
 /* true-desktop: canvas grows intentionally on large displays; text stays capped by ch */
-@media(min-width:1600px){:root{--maxw:1320px;}}
-@media(min-width:2000px){:root{--maxw:1400px;} .gg{font-size:18px;}}
+@media(min-width:1600px){
+.section-visual-card{margin:32px 0;border-radius:24px;overflow:hidden;background:#fff;border:1px solid var(--rule-soft);box-shadow:0 16px 40px rgba(0,0,0,.04);}
+.section-visual-img{width:100%;max-height:520px;object-fit:cover;display:block;background:#fff;}
+
+
+
+@media(max-width:900px){}
+
+
+
+
+
+
+.cost-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;}
+@media(max-width:900px){.cost-top-grid{grid-template-columns:1fr;gap:32px;}}
+.cost-copy{display:flex;flex-direction:column;justify-content:center;}
+.cost-visual{display:flex;align-items:center;justify-content:center;position:relative;margin:0;padding:0;}
+.cost-img{width:100%;max-height:620px;object-fit:contain;display:block;mix-blend-mode:multiply;margin:0;padding:0;filter:contrast(1.03) brightness(1.01);}
+
+
+
+.measure-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;margin-bottom:48px;}
+@media(max-width:900px){.measure-top-grid{grid-template-columns:1fr;gap:32px;}}
+.measure-copy{display:flex;flex-direction:column;justify-content:center;}
+.measure-visual{display:flex;align-items:center;justify-content:center;position:relative;}
+.measure-badge{position:absolute;top:12px;right:12px;border:1px dashed rgba(255,255,255,.4);color:var(--slate-mut);padding:4px 12px;border-radius:100px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;background:rgba(14,26,43,.6);backdrop-filter:blur(4px);z-index:2;}
+.measure-img{width:100%;max-height:540px;object-fit:contain;display:block;}
+
+
+.science-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;}
+@media(max-width:900px){.science-top-grid{grid-template-columns:1fr;gap:32px;}}
+.science-top-copy{display:flex;flex-direction:column;justify-content:center;}
+.science-top-visual{display:flex;align-items:center;justify-content:center;position:relative;}
+.science-floating-molecules{width:100%;max-width:580px;height:auto;object-fit:contain;display:block;background:transparent;box-shadow:none;border:none;}
+
+
+.measure-section-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;}
+@media(max-width:900px){.measure-section-grid{grid-template-columns:1fr;gap:32px;}}
+.measure-section-copy{display:flex;flex-direction:column;justify-content:center;}
+.measure-section-visual{display:flex;align-items:center;justify-content:center;position:relative;}
+.measure-section-img{width:100%;max-height:500px;object-fit:contain;border-radius:16px;display:block;mix-blend-mode:multiply;filter:contrast(1.03) brightness(1.01);}
+
+
+.lca-hero.dark{background:var(--slate);color:#EAF1F0;padding:0;overflow:hidden;}
+.physicians-hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:clamp(32px,5vw,64px);align-items:stretch;}
+@media(max-width:900px){.physicians-hero-grid{grid-template-columns:1fr;gap:32px;}}
+.physicians-hero-copy{display:flex;flex-direction:column;justify-content:center;padding:100px 0 80px;}
+@media(max-width:900px){.physicians-hero-copy{padding:60px 0 20px;}}
+.physicians-hero-visual{display:flex;align-items:flex-end;justify-content:flex-end;position:relative;height:100%;margin:0;padding:0;}
+.physician-floating-img{height:100%;max-height:580px;width:auto;object-fit:contain;object-position:bottom right;display:block;background:transparent;box-shadow:none;border:none;margin:0;padding:0;}
+
+.section.younger{padding:0;position:relative;overflow:hidden;}
+.why-now-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:clamp(32px,5vw,64px);align-items:stretch;}
+@media(max-width:900px){.why-now-grid{grid-template-columns:1fr;gap:32px;}}
+.why-now-copy{display:flex;flex-direction:column;justify-content:center;padding:100px 0 80px;}
+@media(max-width:900px){.why-now-copy{padding:60px 0 20px;}}
+.why-now-visual{display:flex;align-items:center;justify-content:flex-end;position:relative;height:100%;margin:0;padding:0;}
+.why-now-img{height:100%;max-height:640px;width:100%;object-fit:contain;object-position:center right;display:block;mix-blend-mode:multiply;margin:0;padding:0;filter:contrast(1.03) brightness(1.01);}
+:root{--maxw:1320px;}}
+@media(min-width:2000px){
+.section-visual-card{margin:32px 0;border-radius:24px;overflow:hidden;background:#fff;border:1px solid var(--rule-soft);box-shadow:0 16px 40px rgba(0,0,0,.04);}
+.section-visual-img{width:100%;max-height:520px;object-fit:cover;display:block;background:#fff;}
+
+
+
+@media(max-width:900px){}
+
+
+
+
+
+
+.cost-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;}
+@media(max-width:900px){.cost-top-grid{grid-template-columns:1fr;gap:32px;}}
+.cost-copy{display:flex;flex-direction:column;justify-content:center;}
+.cost-visual{display:flex;align-items:center;justify-content:center;position:relative;margin:0;padding:0;}
+.cost-img{width:100%;max-height:620px;object-fit:contain;display:block;mix-blend-mode:multiply;margin:0;padding:0;filter:contrast(1.03) brightness(1.01);}
+
+
+
+.measure-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;margin-bottom:48px;}
+@media(max-width:900px){.measure-top-grid{grid-template-columns:1fr;gap:32px;}}
+.measure-copy{display:flex;flex-direction:column;justify-content:center;}
+.measure-visual{display:flex;align-items:center;justify-content:center;position:relative;}
+.measure-badge{position:absolute;top:12px;right:12px;border:1px dashed rgba(255,255,255,.4);color:var(--slate-mut);padding:4px 12px;border-radius:100px;font-family:var(--mono);font-size:11px;letter-spacing:.08em;background:rgba(14,26,43,.6);backdrop-filter:blur(4px);z-index:2;}
+.measure-img{width:100%;max-height:540px;object-fit:contain;display:block;}
+
+
+.science-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;}
+@media(max-width:900px){.science-top-grid{grid-template-columns:1fr;gap:32px;}}
+.science-top-copy{display:flex;flex-direction:column;justify-content:center;}
+.science-top-visual{display:flex;align-items:center;justify-content:center;position:relative;}
+.science-floating-molecules{width:100%;max-width:580px;height:auto;object-fit:contain;display:block;background:transparent;box-shadow:none;border:none;}
+
+
+.measure-section-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;}
+@media(max-width:900px){.measure-section-grid{grid-template-columns:1fr;gap:32px;}}
+.measure-section-copy{display:flex;flex-direction:column;justify-content:center;}
+.measure-section-visual{display:flex;align-items:center;justify-content:center;position:relative;}
+.measure-section-img{width:100%;max-height:500px;object-fit:contain;border-radius:16px;display:block;mix-blend-mode:multiply;filter:contrast(1.03) brightness(1.01);}
+
+
+.lca-hero.dark{background:var(--slate);color:#EAF1F0;padding:0;overflow:hidden;}
+.physicians-hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:clamp(32px,5vw,64px);align-items:stretch;}
+@media(max-width:900px){.physicians-hero-grid{grid-template-columns:1fr;gap:32px;}}
+.physicians-hero-copy{display:flex;flex-direction:column;justify-content:center;padding:100px 0 80px;}
+@media(max-width:900px){.physicians-hero-copy{padding:60px 0 20px;}}
+.physicians-hero-visual{display:flex;align-items:flex-end;justify-content:flex-end;position:relative;height:100%;margin:0;padding:0;}
+.physician-floating-img{height:100%;max-height:580px;width:auto;object-fit:contain;object-position:bottom right;display:block;background:transparent;box-shadow:none;border:none;margin:0;padding:0;}
+
+.section.younger{padding:0;position:relative;overflow:hidden;}
+.why-now-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:clamp(32px,5vw,64px);align-items:stretch;}
+@media(max-width:900px){.why-now-grid{grid-template-columns:1fr;gap:32px;}}
+.why-now-copy{display:flex;flex-direction:column;justify-content:center;padding:100px 0 80px;}
+@media(max-width:900px){.why-now-copy{padding:60px 0 20px;}}
+.why-now-visual{display:flex;align-items:center;justify-content:flex-end;position:relative;height:100%;margin:0;padding:0;}
+.why-now-img{height:100%;max-height:640px;width:100%;object-fit:contain;object-position:center right;display:block;mix-blend-mode:multiply;margin:0;padding:0;filter:contrast(1.03) brightness(1.01);}
+:root{--maxw:1400px;} .gg{font-size:18px;}}
 /* premium text wrapping at every width */
 .gg h1,.gg h2,.gg h3,.gg h4,.hero h1,.co-h1{text-wrap:balance;}
 .gg p,.sec-body,.hero-lede,.mh-desc{text-wrap:pretty;}
@@ -1245,10 +1419,16 @@ function MeasureSection({ heading = true }) {
   return (
     <section className="section measure"><Constellation /><div className="wrap">
       {heading && (
-        <div className="reveal">
-          <div className="sec-label" id="your-number"><span className="num">03</span> Your number <BetaFlag variant="sec" /></div>
-          <h2 className="sec">One number you’ll remember: <em>your MiAge.</em> <span className="sec-h-beta">Beta</span></h2>
-          <p className="sec-sub"><strong>Your BioScan is included with every protocol</strong> — a baseline, then re-tests at Day 30, 60 and 90. From the lab tests you already have, we read two things. Your Lifestyle Inflammation Score (GLIS) measures low-grade chronic systemic inflammation — what doctors track with markers like hs-CRP, and what science calls inflammaging as it builds with age.<sup><a href="#ref2">2</a></sup> It reads as a cardiometabolic composite: not just inflammatory markers, but the metabolic sources that fuel them, like visceral fat and insulin resistance. Your MiAge then translates that into a biological age in years, set against your real age.</p>
+        <div className="measure-top-grid reveal">
+          <div className="measure-copy">
+            <div className="sec-label" id="your-number"><span className="num">03</span> Your number <BetaFlag variant="sec" /></div>
+            <h2 className="sec">One number you’ll remember: <em>your MiAge.</em> <span className="sec-h-beta">Beta</span></h2>
+            <p className="sec-sub"><strong>Your BioScan is included with every protocol</strong> — a baseline, then re-tests at Day 30, 60 and 90. From the lab tests you already have, we read two things. Your Lifestyle Inflammation Score (GLIS) measures low-grade chronic systemic inflammation — what doctors track with markers like hs-CRP, and what science calls inflammaging as it builds with age.<sup><a href="#ref2">2</a></sup> It reads as a cardiometabolic composite: not just inflammatory markers, but the metabolic sources that fuel them, like visceral fat and insulin resistance. Your MiAge then translates that into a biological age in years, set against your real age.</p>
+          </div>
+          <div className="measure-visual">
+            <span className="measure-badge">• BETA · IN VALIDATION</span>
+            <img src="/images/slides/slide4.png" alt="3D Holographic GI Anatomical Model" className="measure-img" />
+          </div>
         </div>
       )}
       <div className="miage-block reveal">
@@ -1407,25 +1587,8 @@ function Home() {
             </ul>
           </div>
           <div className="hero-visual reveal">
-            <div className="portrait" role="img" aria-label="GutGuard gut-mitochondrial protocol visualization">
-              <div className="grade" aria-hidden="true" /><div className="grain" aria-hidden="true" /><div className="vig" aria-hidden="true" />
-              <span className="ph" aria-hidden="true">The Gut-Mitochondrial Axis</span>
-            </div>
-            <div className="bioscan reveal" aria-label="Demonstration Blood Scan readout — Beta">
-              <div className="bs-top"><span className="bs-label">Blood Scan</span><span className="bs-beta">Beta test</span></div>
-              <div className="bs-reads">
-                <div className="bs-read"><small>hs-CRP</small><span className="v">4.8</span></div>
-                <div className="bs-read now"><small>Inflammation</small><span className="v"><CountUp to={62} /></span></div>
-                <div className="bs-read"><small>Level</small><span className="v" style={{ fontSize: 20 }}>High</span></div>
-              </div>
-              <div className="bs-bars">
-                <div className="bs-bar"><span className="k">Inflammation</span><div className="bs-track"><div className="bs-fill heat" style={{ "--w": "62%" }} aria-hidden="true" /></div></div>
-                <div className="bs-bar"><span className="k">Restored</span><div className="bs-track"><div className="bs-fill rec" style={{ "--w": "38%" }} aria-hidden="true" /></div></div>
-              </div>
-              <div className="bs-foot">
-                <span className="bs-lc"><LaunchNote /></span>
-                <span className="bs-sample">Demonstration readout · Beta</span>
-              </div>
+            <div className="portrait" role="img" aria-label="GutGuard gut-mitochondrial protocol visualization" style={{ padding: 0, overflow: "hidden", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <img src="/images/slides/slide1.png" alt="The Gut-Mitochondrial Axis" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             </div>
           </div>
         </div></div>
@@ -1434,21 +1597,31 @@ function Home() {
       <hr className="seam" />
 
       <section className="section younger"><div className="wrap">
-        <div className="reveal">
-          <div className="sec-label" id="why-now"><span className="num">01</span> Why now</div>
-          <h2 className="sec">The body can age faster than the calendar — and it’s <em>starting younger.</em></h2>
-          <p className="sec-sub">Ultra-processed food, chronic stress, and too little sleep drive chronic low-grade inflammation.<sup><a href="#ref1">1</a></sup> Once tied to later life, it now shows up in the 20s and 30s.</p>
+        <div className="why-now-grid reveal">
+          <div className="why-now-copy">
+            <div className="sec-label" id="why-now"><span className="num">01</span> Why now</div>
+            <h2 className="sec">The body can age faster than the calendar — and it’s <em>starting younger.</em></h2>
+            <p className="sec-sub">Ultra-processed food, chronic stress, and too little sleep drive chronic low-grade inflammation.<sup><a href="#ref1">1</a></sup> Once tied to later life, it now shows up in the 20s and 30s.</p>
+            <p className="sec-body" style={{ marginTop: 28 }}>You can’t feel low-grade inflammation. You can measure it — and the earlier you do, the more time you have to act.</p>
+          </div>
+          <div className="why-now-visual">
+            <img src="/images/slides/slide2.png" alt="Chronic Gut Inflammation Baseline" className="why-now-img" />
+          </div>
         </div>
-        <p className="sec-body reveal" style={{ marginTop: 28 }}>You can’t feel low-grade inflammation. You can measure it — and the earlier you do, the more time you have to act.</p>
       </div></section>
 
       <section className="section" style={{ background: "var(--paper)", borderTop: "1px solid var(--rule)", borderBottom: "1px solid var(--rule)" }}>
         <div className="wrap">
-          <div className="reveal">
-            <div className="sec-label" id="cost"><span className="num">02</span> The cost of not knowing</div>
-            <h2 className="sec">What chronic inflammation does <em>before symptoms appear.</em></h2>
-            <p className="sec-sub">Unmeasured, it builds for years — and it’s now linked to the leading causes of death and disability worldwide.<sup><a href="#ref1">1</a></sup></p>
-            <p className="sec-body">Most people never measure it, so they learn of it only once a diagnosis names it.</p>
+          <div className="cost-top-grid reveal">
+            <div className="cost-copy">
+              <div className="sec-label" id="cost"><span className="num">02</span> The cost of not knowing</div>
+              <h2 className="sec">What chronic inflammation does <em>before symptoms appear.</em></h2>
+              <p className="sec-sub">Unmeasured, it builds for years — and it’s now linked to the leading causes of death and disability worldwide.<sup><a href="#ref1">1</a></sup></p>
+              <p className="sec-body">Most people never measure it, so they learn of it only once a diagnosis names it.</p>
+            </div>
+            <div className="cost-visual">
+              <img src="/images/slides/slide3.png" alt="Systemic Gut-Organ Axis" className="cost-img" />
+            </div>
           </div>
           <p className="reveal" style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: ".14em", textTransform: "uppercase", color: "var(--heat-text)", marginTop: 48, marginBottom: 0 }}>Left unchecked, it’s linked to —</p>
           <div className="grid3 reveal" style={{ marginTop: 18 }}>
@@ -1481,6 +1654,7 @@ function Home() {
             ))}
           </div>
         </div>
+
       </div></section>
 
       <TrustStrip />
@@ -1558,23 +1732,28 @@ function Home() {
 function Science() {
   return (
     <>
-      <header className="hero" id="top">
-        <div className="wrap"><div className="narrow reveal" style={{ maxWidth: 760 }}>
-          <span className="eyebrow">The Science</span>
-          <h1>The science, <em>in plain sight.</em></h1>
-          <p className="hero-lede">No black box. Here is exactly how inflammation compounds into the way you feel — and how the right repair runs it in reverse.</p>
-          <div className="hero-actions"><Link className="btn-primary" href="/shop">Start the 90-Day Protocol <Arrow /></Link></div>
-        </div></div>
-      </header>
+      <section className="section science-top-section" id="top" style={{ paddingTop: 40, paddingBottom: 20 }}>
+        <div className="wrap">
+          <div className="science-top-grid">
+            <div className="science-top-copy">
+              <header className="science-hero-copy reveal" style={{ marginBottom: 56 }}>
+                <span className="eyebrow">The Science</span>
+                <h1>The science, <em>in plain sight.</em></h1>
+                <p className="hero-lede">No black box. Here is exactly how inflammation compounds into the way you feel — and how the right repair runs it in reverse.</p>
+                <div className="hero-actions"><Link className="btn-primary" href="/shop">Start the 90-Day Protocol <Arrow /></Link></div>
+              </header>
 
-      <hr className="seam" />
+              <div className="reveal">
+                <div className="sec-label" id="mechanism"><span className="num">01</span> The mechanism</div>
+                <h2 className="sec">How a leaky gut quietly becomes a <em>tired body.</em></h2>
+                <p className="sec-body" style={{ marginTop: 14 }}>When the gut barrier weakens, bacterial fragments can enter the bloodstream. The immune system reacts, inflammation spreads body-wide, and it wears down the mitochondria that power your cells — which can fuel still more inflammation.<sup><a href="#mref1">1</a>,<a href="#mref2">2</a>,<a href="#mref3">3</a></sup> This is the biological pathway the measurement system is designed to track.</p>
+              </div>
+            </div>
 
-      <section className="section"><div className="wrap">
-        <div className="reveal" style={{ marginBottom: 8 }}>
-          <div className="sec-label" id="mechanism"><span className="num">01</span> The mechanism</div>
-          <h2 className="sec">How a leaky gut quietly becomes a <em>tired body.</em></h2>
-          <p className="sec-body" style={{ marginTop: 14 }}>When the gut barrier weakens, bacterial fragments can enter the bloodstream. The immune system reacts, inflammation spreads body-wide, and it wears down the mitochondria that power your cells — which can fuel still more inflammation.<sup><a href="#mref1">1</a>,<a href="#mref2">2</a>,<a href="#mref3">3</a></sup> This is the biological pathway the measurement system is designed to track.</p>
-        </div>
+            <div className="science-top-visual reveal">
+              <img src="/images/slides/slide6.png" alt="Active Synbiotic Molecular Formula" className="science-floating-molecules" />
+            </div>
+          </div>
         <div className="teaser reveal">
           <div className="teaser-art" role="img" aria-label="Gut, inflammation, and mitochondrial aging pathway"><span className="teaser-play" aria-hidden="true"><IconNetwork size={30} /></span></div>
           <div className="teaser-body">
@@ -1597,6 +1776,7 @@ function Science() {
           <p className="sec-sub">Everyday pressures — especially here — that quietly feed chronic inflammation.</p>
           <p className="sec-body">Your biology hasn’t changed in millennia; your environment has. These are the forces measurably pushing inflammation up, day after day.</p>
         </div>
+
         <div className="triggers reveal">
           {TRIGGERS.map(([n, h, stat, ctx, imp], i) => (
             <div className="trigger" key={n}>
@@ -1619,12 +1799,17 @@ function Science() {
       </div></section>
 
       <section className="section" style={{ background: "var(--paper)", borderTop: "1px solid var(--rule)", borderBottom: "1px solid var(--rule)" }}><div className="wrap">
-        <div className="reveal">
-          <div className="sec-label" id="measure"><span className="num">03</span> How we measure</div>
-          <h2 className="sec">Belief needs <em>proof.</em> Proof needs a method.</h2>
-          <p className="sec-body">Understanding the biology is only half of it. The other half is measuring it — repeatably, from routine lab markers, the same way every time.</p>
-          <div className="hero-actions" style={{ marginTop: 24 }}>
-            <Link className="btn-primary" href="/system">See the measurement system <Arrow /></Link>
+        <div className="measure-section-grid reveal">
+          <div className="measure-section-copy">
+            <div className="sec-label" id="measure"><span className="num">03</span> How we measure</div>
+            <h2 className="sec">Belief needs <em>proof.</em> Proof needs a method.</h2>
+            <p className="sec-body">Understanding the biology is only half of it. The other half is measuring it — repeatably, from routine lab markers, the same way every time.</p>
+            <div className="hero-actions" style={{ marginTop: 24 }}>
+              <Link className="btn-primary" href="/system">See the measurement system <Arrow /></Link>
+            </div>
+          </div>
+          <div className="measure-section-visual">
+            <img src="/images/slides/slide7.png" alt="Cellular Bio-Absorption & Organelle Interaction" className="measure-section-img" />
           </div>
         </div>
       </div></section>
@@ -1653,12 +1838,22 @@ function Physicians() {
   return (
     <>
       <header className="lca-hero dark">
-        <div className="wrap"><div className="narrow reveal" style={{ maxWidth: 760 }}>
-          <span className="eyebrow">For Physicians · Lead Clinical Adopters</span>
-          <h1>Practice medicine at the <em>upstream.</em></h1>
-          <p className="hero-lede">An invitation to the first 100 founding Filipino physicians treating mitochondrial dysfunction and inflammaging — with measurement, not guesswork.</p>
-          <div className="hero-actions"><Link className="btn-primary" href="/physicians/register">Request the program brief <Arrow /></Link></div>
-        </div></div>
+        <div className="wrap">
+          <div className="physicians-hero-grid">
+            <div className="physicians-hero-copy reveal">
+              <span className="eyebrow">For Physicians · Lead Clinical Adopters</span>
+              <h1>Practice medicine at the <em>upstream.</em></h1>
+              <p className="hero-lede">An invitation to the first 100 founding Filipino physicians treating mitochondrial dysfunction and inflammaging — with measurement, not guesswork.</p>
+              <div className="hero-actions" style={{ marginTop: 32 }}>
+                <Link className="btn-primary" href="/physicians/register">Request the program brief <Arrow /></Link>
+              </div>
+            </div>
+
+            <div className="physicians-hero-visual reveal">
+              <img src="/images/slides/slide11.png" alt="Lead Clinical Adopter Physician" className="physician-floating-img" />
+            </div>
+          </div>
+        </div>
       </header>
 
       <hr className="seam" />
@@ -1723,13 +1918,20 @@ function System() {
   return (
     <>
       <header className="hero" id="top">
-        <div className="wrap"><div className="narrow reveal" style={{ maxWidth: 760 }}>
-          <span className="eyebrow">The System</span>
-          <h1>Three layers between a <em>sample</em> and an answer.</h1>
-          <p className="hero-lede">No single number tells the whole story. Gutguard reads inflammation through a measured stack — a sample, a composite score, and a translation you can actually feel.</p>
-          <div className="hero-actions">
-            <Link className="btn-primary" href="/shop">Start the 90-Day Protocol <Arrow /></Link>
-            <Link className="btn-ghost" href="/physicians"><span className="ring"><ArrowRight size={13} /></span>For physicians</Link>
+        <div className="wrap"><div className="hero-grid">
+          <div className="hero-copy reveal">
+            <span className="eyebrow">The System</span>
+            <h1>Three layers between a <em>sample</em> and an answer.</h1>
+            <p className="hero-lede">No single number tells the whole story. Gutguard reads inflammation through a measured stack — a sample, a composite score, and a translation you can actually feel.</p>
+            <div className="hero-actions">
+              <Link className="btn-primary" href="/shop">Start the 90-Day Protocol <Arrow /></Link>
+              <Link className="btn-ghost" href="/physicians"><span className="ring"><ArrowRight size={13} /></span>For physicians</Link>
+            </div>
+          </div>
+          <div className="hero-visual reveal">
+            <div className="portrait" role="img" aria-label="Genomic strain double helix visualization" style={{ padding: 0, overflow: "hidden", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <img src="/images/slides/slide5.png" alt="Genomic Probiotic Strain Science" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            </div>
           </div>
         </div></div>
       </header>
