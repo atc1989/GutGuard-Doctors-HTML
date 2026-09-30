@@ -39,6 +39,51 @@ const QR_RENDER_PX = 1024;
 
 type PartnerQrMode = "shop" | "referral" | "profile";
 
+type PartnerPointLog = {
+  id: string;
+  date: string;
+  activity: string;
+  points: number;
+  type: "earned" | "redeemed";
+  balance: number;
+};
+
+type PartnerRebate = {
+  id: string;
+  date: string;
+  period: string;
+  amount: number;
+  status: "paid" | "processing" | "pending";
+  payout_method: string;
+  reference_no: string;
+};
+
+const SAMPLE_POINTS_LOG: PartnerPointLog[] = [
+  { id: "pt-1", date: "Sep 28, 2026", activity: "Direct order attributed #GG-9024", points: 15, type: "earned", balance: 352 },
+  { id: "pt-2", date: "Sep 26, 2026", activity: "Partner referral registration (Dr. Cruz)", points: 50, type: "earned", balance: 337 },
+  { id: "pt-3", date: "Sep 22, 2026", activity: "Direct order attributed #GG-8991", points: 15, type: "earned", balance: 287 },
+  { id: "pt-4", date: "Sep 18, 2026", activity: "Sample kit request redeemed", points: -50, type: "redeemed", balance: 272 },
+  { id: "pt-5", date: "Sep 15, 2026", activity: "Referred partner order attributed (Dr. Santos)", points: 25, type: "earned", balance: 322 },
+  { id: "pt-6", date: "Sep 10, 2026", activity: "Direct order attributed #GG-8910", points: 30, type: "earned", balance: 297 },
+  { id: "pt-7", date: "Sep 05, 2026", activity: "Monthly active partner reward", points: 100, type: "earned", balance: 267 },
+  { id: "pt-8", date: "Aug 30, 2026", activity: "Direct order attributed #GG-8842", points: 15, type: "earned", balance: 167 },
+  { id: "pt-9", date: "Aug 25, 2026", activity: "Partner referral registration (Dr. Reyes)", points: 50, type: "earned", balance: 152 },
+  { id: "pt-10", date: "Aug 20, 2026", activity: "Direct order attributed #GG-8790", points: 15, type: "earned", balance: 102 },
+  { id: "pt-11", date: "Aug 15, 2026", activity: "Educational webinars completion bonus", points: 40, type: "earned", balance: 87 },
+  { id: "pt-12", date: "Aug 10, 2026", activity: "Direct order attributed #GG-8721", points: 15, type: "earned", balance: 47 },
+  { id: "pt-13", date: "Aug 01, 2026", activity: "Welcome gift bonus", points: 32, type: "earned", balance: 32 },
+];
+
+const SAMPLE_REBATES_HISTORY: PartnerRebate[] = [
+  { id: "reb-1", date: "Sep 15, 2026", period: "August 2026", amount: 4250, status: "paid", payout_method: "GCash (0917***4829)", reference_no: "REB-202608-089" },
+  { id: "reb-2", date: "Aug 15, 2026", period: "July 2026", amount: 3800, status: "paid", payout_method: "Bank Transfer (BDO)", reference_no: "REB-202607-042" },
+  { id: "reb-3", date: "Jul 15, 2026", period: "June 2026", amount: 5100, status: "paid", payout_method: "Bank Transfer (BDO)", reference_no: "REB-202606-118" },
+  { id: "reb-4", date: "Jun 15, 2026", period: "May 2026", amount: 2950, status: "paid", payout_method: "Maya (0917***4829)", reference_no: "REB-202605-077" },
+  { id: "reb-5", date: "May 15, 2026", period: "April 2026", amount: 3100, status: "paid", payout_method: "Maya (0917***4829)", reference_no: "REB-202604-031" },
+  { id: "reb-6", date: "Apr 15, 2026", period: "March 2026", amount: 1850, status: "paid", payout_method: "GCash (0917***4829)", reference_no: "REB-202603-012" },
+  { id: "reb-7", date: "Mar 15, 2026", period: "February 2026", amount: 2400, status: "paid", payout_method: "GCash (0917***4829)", reference_no: "REB-202602-005" },
+];
+
 const peso = (value: number) =>
   new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value);
 
@@ -545,7 +590,7 @@ function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () 
   const [copied, setCopied] = useState(false);
   const [qrMode, setQrMode] = useState<PartnerQrMode>("shop");
   const [dashboard, setDashboard] = useState(data);
-  const [activityTab, setActivityTab] = useState<"orders" | "partners">("orders");
+  const [activityTab, setActivityTab] = useState<"orders" | "partners" | "points" | "rebates">("orders");
   const [orderScope, setOrderScope] = useState<PartnerOrderScope>("all");
   const [orderStatus, setOrderStatus] = useState("");
   const [orderDateFrom, setOrderDateFrom] = useState("");
@@ -555,6 +600,10 @@ function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () 
   const [orderPageSize, setOrderPageSize] = useState(10);
   const [partnerOffset, setPartnerOffset] = useState(0);
   const [partnerPageSize, setPartnerPageSize] = useState(10);
+  const [pointsOffset, setPointsOffset] = useState(0);
+  const [pointsPageSize, setPointsPageSize] = useState(10);
+  const [rebatesOffset, setRebatesOffset] = useState(0);
+  const [rebatesPageSize, setRebatesPageSize] = useState(10);
   const [ordersBusy, setOrdersBusy] = useState(false);
   const [ordersError, setOrdersError] = useState("");
   const [posterOpen, setPosterOpen] = useState(false);
@@ -562,6 +611,8 @@ function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () 
   const link = getPartnerQrLink(dashboard.partner, qrMode);
   const conversion = dashboard.clicks.total > 0 ? (dashboard.totals.direct_orders / dashboard.clicks.total) * 100 : 0;
   const visiblePartners = dashboard.referred_partners.slice(partnerOffset, partnerOffset + partnerPageSize);
+  const visiblePoints = SAMPLE_POINTS_LOG.slice(pointsOffset, pointsOffset + pointsPageSize);
+  const visibleRebates = SAMPLE_REBATES_HISTORY.slice(rebatesOffset, rebatesOffset + rebatesPageSize);
 
   useEffect(() => {
     const queryKey = [orderScope, orderStatus, orderDateFrom, orderDateTo, orderSort, orderPageSize, orderOffset].join("|");
@@ -729,8 +780,10 @@ function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () 
 
         <section className="shop-order-panel partner-orders-panel">
           <div className="partner-activity-tabs" role="tablist" aria-label="Dashboard activity">
-            <button type="button" role="tab" aria-selected={activityTab === "orders"} className={activityTab === "orders" ? "active" : ""} onClick={() => setActivityTab("orders")}>Orders <span>{dashboard.totals.orders}</span></button>
-            <button type="button" role="tab" aria-selected={activityTab === "partners"} className={activityTab === "partners" ? "active" : ""} onClick={() => setActivityTab("partners")}>Referred partners <span>{dashboard.totals.referred_partners}</span></button>
+            <button type="button" role="tab" aria-selected={activityTab === "orders"} className={activityTab === "orders" ? "active" : ""} onClick={() => setActivityTab("orders")}>Orders</button>
+            <button type="button" role="tab" aria-selected={activityTab === "partners"} className={activityTab === "partners" ? "active" : ""} onClick={() => setActivityTab("partners")}>Referred partners</button>
+            <button type="button" role="tab" aria-selected={activityTab === "points"} className={activityTab === "points" ? "active" : ""} onClick={() => setActivityTab("points")}>Points Log</button>
+            <button type="button" role="tab" aria-selected={activityTab === "rebates"} className={activityTab === "rebates" ? "active" : ""} onClick={() => setActivityTab("rebates")}>Rebate History</button>
           </div>
 
           {activityTab === "orders" ? <>
@@ -739,10 +792,10 @@ function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () 
 
           <div className="partner-order-toolbar">
             <div className="partner-order-tabs" role="tablist" aria-label="Order attribution">
-              {([['all', `All ${dashboard.totals.orders}`], ['direct', `Direct ${dashboard.totals.direct_orders}`], ['referred', `Referred ${dashboard.totals.referred_orders}`]] as const).map(([value, label]) => (
+              {(['all', 'direct', 'referred'] as const).map((value) => (
                 <button key={value} type="button" role="tab" aria-selected={orderScope === value}
                   className={orderScope === value ? "active" : ""}
-                  onClick={() => { setOrderScope(value); setOrderOffset(0); }}>{label}</button>
+                  onClick={() => { setOrderScope(value); setOrderOffset(0); }}>{value.charAt(0).toUpperCase() + value.slice(1)}</button>
               ))}
             </div>
             <label className="partner-order-filter">Status
@@ -782,7 +835,7 @@ function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () 
           <p className="shop-note">
             Buyer details stay private. You only see their first name and area.
           </p>
-          </> : <>
+          </> : activityTab === "partners" ? <>
             <p className="shop-kicker">Partners you referred</p>
             <div className="partner-section-heading">
               <h2>{dashboard.totals.referred_partners ? `${dashboard.totals.referred_partners} partners` : "No referred partners yet"}</h2>
@@ -800,6 +853,54 @@ function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () 
               <button type="button" className="shop-secondary" disabled={ordersBusy || partnerOffset === 0} onClick={() => setPartnerOffset(Math.max(0, partnerOffset - partnerPageSize))}>Previous</button>
               <span>{dashboard.totals.referred_partners ? `${partnerOffset + 1}–${Math.min(partnerOffset + visiblePartners.length, dashboard.totals.referred_partners)} of ${dashboard.totals.referred_partners}` : "0 partners"}</span>
               <button type="button" className="shop-secondary" disabled={ordersBusy || partnerOffset + visiblePartners.length >= dashboard.totals.referred_partners} onClick={() => setPartnerOffset(partnerOffset + partnerPageSize)}>Next</button>
+            </div>
+          </> : activityTab === "points" ? <>
+            <p className="shop-kicker">Points log</p>
+            <div className="partner-section-heading">
+              <h2>352 pts current balance</h2>
+            </div>
+            {visiblePoints.length ? <div className="partner-log-list">{visiblePoints.map((item) => (
+              <div key={item.id} className="partner-log-row">
+                <div className="partner-log-info">
+                  <strong>{item.activity}</strong>
+                  <small>{item.date}</small>
+                </div>
+                <div className="partner-log-value">
+                  <span className={`partner-log-badge ${item.type}`}>
+                    {item.points > 0 ? `+${item.points} pts` : `${item.points} pts`}
+                  </span>
+                  <small>Balance: {item.balance} pts</small>
+                </div>
+              </div>
+            ))}</div> : <div className="partner-empty-orders"><strong>No points history yet.</strong><p>Points earned from orders and referrals will appear here.</p></div>}
+            <div className="partner-pagination" aria-label="Points log pages">
+              <label className="partner-pagination-size">Rows<select value={pointsPageSize} onChange={(event) => { setPointsPageSize(Number(event.target.value)); setPointsOffset(0); }}><option value="10">10</option><option value="25">25</option><option value="50">50</option></select></label>
+              <button type="button" className="shop-secondary" disabled={pointsOffset === 0} onClick={() => setPointsOffset(Math.max(0, pointsOffset - pointsPageSize))}>Previous</button>
+              <span>{SAMPLE_POINTS_LOG.length ? `${pointsOffset + 1}–${Math.min(pointsOffset + visiblePoints.length, SAMPLE_POINTS_LOG.length)} of ${SAMPLE_POINTS_LOG.length}` : "0 entries"}</span>
+              <button type="button" className="shop-secondary" disabled={pointsOffset + visiblePoints.length >= SAMPLE_POINTS_LOG.length} onClick={() => setPointsOffset(pointsOffset + pointsPageSize)}>Next</button>
+            </div>
+          </> : <>
+            <p className="shop-kicker">Rebate history</p>
+            <div className="partner-section-heading">
+              <h2>₱23,450.00 total payouts</h2>
+            </div>
+            {visibleRebates.length ? <div className="partner-log-list">{visibleRebates.map((rebate) => (
+              <div key={rebate.id} className="partner-log-row">
+                <div className="partner-log-info">
+                  <strong>{rebate.period}</strong>
+                  <small>{rebate.payout_method} · Ref: {rebate.reference_no}</small>
+                </div>
+                <div className="partner-log-value">
+                  <strong>{peso(rebate.amount)}</strong>
+                  <span className={`partner-status-badge ${rebate.status}`}>{rebate.status.charAt(0).toUpperCase() + rebate.status.slice(1)}</span>
+                </div>
+              </div>
+            ))}</div> : <div className="partner-empty-orders"><strong>No rebate history yet.</strong><p>Payout statements will appear here.</p></div>}
+            <div className="partner-pagination" aria-label="Rebate history pages">
+              <label className="partner-pagination-size">Rows<select value={rebatesPageSize} onChange={(event) => { setRebatesPageSize(Number(event.target.value)); setRebatesOffset(0); }}><option value="10">10</option><option value="25">25</option><option value="50">50</option></select></label>
+              <button type="button" className="shop-secondary" disabled={rebatesOffset === 0} onClick={() => setRebatesOffset(Math.max(0, rebatesOffset - rebatesPageSize))}>Previous</button>
+              <span>{SAMPLE_REBATES_HISTORY.length ? `${rebatesOffset + 1}–${Math.min(rebatesOffset + visibleRebates.length, SAMPLE_REBATES_HISTORY.length)} of ${SAMPLE_REBATES_HISTORY.length}` : "0 entries"}</span>
+              <button type="button" className="shop-secondary" disabled={rebatesOffset + visibleRebates.length >= SAMPLE_REBATES_HISTORY.length} onClick={() => setRebatesOffset(rebatesOffset + rebatesPageSize)}>Next</button>
             </div>
           </>}
         </section>
