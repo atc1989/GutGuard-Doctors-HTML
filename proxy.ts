@@ -36,6 +36,14 @@ function getLimiters(): { ip: Ratelimit | null; em: Ratelimit | null } {
 }
 
 export async function proxy(req: NextRequest) {
+  // 1. Canonical Host Redirect: Redirect any *.vercel.app request to custom domain
+  const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "").toLowerCase();
+  if (host.endsWith(".vercel.app") && !host.includes("localhost")) {
+    const targetOrigin = (process.env.NEXT_PUBLIC_SITE_URL || "https://partners.gutguard.ph").replace(/\/$/, "");
+    const targetUrl = new URL(req.nextUrl.pathname + req.nextUrl.search, targetOrigin);
+    return NextResponse.redirect(targetUrl, 308);
+  }
+
   // Only gate the OTP proxy route; everything else passes through.
   if (req.nextUrl.pathname !== "/api/auth/send-otp") {
     return NextResponse.next();
@@ -107,7 +115,8 @@ export async function proxy(req: NextRequest) {
   return NextResponse.next();
 }
 
-// Narrow the matcher so this file doesn't add overhead to any other route.
 export const config = {
-  matcher: "/api/auth/send-otp",
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };
