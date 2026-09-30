@@ -6,13 +6,15 @@ import ProgressRail from "@/components/ProgressRail";
 import RegistrationSection from "@/sections/RegistrationSection";
 import VerificationSection from "@/sections/VerificationSection";
 import WheelSection from "@/sections/WheelSection";
-import { claimPrize, enrollDoctorInSequence, getPartnerInvitation, listWheelPrizes, sendPartnerReferralNotification, updateTask } from "@/lib/api";
+import { claimPrize, enrollDoctorInSequence, getPartnerInvitation, listWheelPrizes, updateTask } from "@/lib/api";
+import { PARTNER_REFERRER_KEY } from "@/lib/constants";
 import {
   clearExperienceState,
   INITIAL_STATE,
   loadExperienceState,
   saveExperienceState,
 } from "@/lib/storage";
+import { formatPrefixedName } from "@/lib/validation";
 import type {
   ExperienceState,
   Prize,
@@ -23,7 +25,7 @@ import type {
   WheelPrize,
 } from "@/lib/types";
 
-export default function RegistrationExperience({ initialReferrerSlug = "", initialInvitationInvalid = false }: { initialReferrerSlug?: string; initialInvitationInvalid?: boolean }) {
+export default function RegistrationExperience({ referrerSlug = "" }: { referrerSlug?: string }) {
   const [state, setState] = useState<ExperienceState>(INITIAL_STATE);
   const [screen, setScreen] = useState<Screen>(1);
   const [isHydrated, setIsHydrated] = useState(false);
@@ -32,8 +34,7 @@ export default function RegistrationExperience({ initialReferrerSlug = "", initi
   const [wheelLoading, setWheelLoading] = useState(false);
   const [wheelError, setWheelError] = useState<string | null>(null);
   const [emailDelivery, setEmailDelivery] = useState<RegistrationEmailDelivery>({ status: "idle" });
-  const [invitation, setInvitation] = useState<{ routing_slug: string; full_name: string } | null>(null);
-  const [invitationInvalid, setInvitationInvalid] = useState(initialInvitationInvalid);
+  const [invitation, setInvitation] = useState<{ slug: string; fullName: string } | null>(null);
 
   const dateLabel = useMemo(
     () => new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(new Date()),
@@ -48,13 +49,26 @@ export default function RegistrationExperience({ initialReferrerSlug = "", initi
   }, []);
 
   useEffect(() => {
-    const slug = initialReferrerSlug.trim().toLowerCase();
+    const fromQuery = referrerSlug.trim().toLowerCase();
+    const stored = typeof window === "undefined" ? "" : window.sessionStorage.getItem(PARTNER_REFERRER_KEY) ?? "";
+    const slug = fromQuery || stored;
     if (!slug) return;
-    getPartnerInvitation(slug).then((value) => {
-      setInvitation(value);
-      setInvitationInvalid(!value);
-    });
-  }, [initialReferrerSlug]);
+
+    let cancelled = false;
+    getPartnerInvitation(slug)
+      .then((invite) => {
+        if (cancelled || !invite) return;
+        window.sessionStorage.setItem(PARTNER_REFERRER_KEY, invite.routing_slug);
+        setInvitation({ slug: invite.routing_slug, fullName: invite.full_name });
+      })
+      .catch(() => {
+        // Invalid or unreachable slug: register with no referrer rather than blocking the booth.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [referrerSlug]);
 
   useEffect(() => {
     if (isHydrated) saveExperienceState(state);
@@ -93,6 +107,12 @@ export default function RegistrationExperience({ initialReferrerSlug = "", initi
   }, [screen]);
 
   function handleRegistered(registration: Registration) {
+    try {
+      window.sessionStorage.removeItem(PARTNER_REFERRER_KEY);
+    } catch {
+      // sessionStorage is best-effort on restricted booth devices.
+    }
+    setInvitation(null);
     setState((current) => ({
       ...current,
       registration,
@@ -102,11 +122,6 @@ export default function RegistrationExperience({ initialReferrerSlug = "", initi
       window.alert("Registration saved, but email verification could not be recorded.");
     });
     void deliverRegistrationEmail(registration);
-    if (registration.referrerSlug) {
-      void sendPartnerReferralNotification(registration.id).catch((error) => {
-        console.error("Partner referral notification failed without affecting registration:", error);
-      });
-    }
     setScreen(2);
   }
 
@@ -171,9 +186,8 @@ export default function RegistrationExperience({ initialReferrerSlug = "", initi
       <RegistrationSection
         key={registrationResetKey}
         active={screen === 1}
+        invitedBy={invitation}
         onRegistered={handleRegistered}
-        invitation={invitation}
-        invitationInvalid={invitationInvalid}
       />
       <VerificationSection
         active={screen === 2}
@@ -187,7 +201,7 @@ export default function RegistrationExperience({ initialReferrerSlug = "", initi
       />
       <WheelSection
         active={screen === 3}
-        doctorName={state.registration?.fullName}
+        doctorName={formatPrefixedName(state.registration?.namePrefix, state.registration?.fullName)}
         prizes={wheelPrizes}
         loading={wheelLoading}
         error={wheelError}

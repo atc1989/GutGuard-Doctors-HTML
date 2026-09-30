@@ -18,6 +18,13 @@ export function readReferralSlug(): string {
   }
 }
 
+/**
+ * The only shops that greet visitors by name. Partner shops used to greet customers with
+ * the partner's full name; cookies set before that was removed live for 30 days, so the
+ * value is checked here rather than trusted.
+ */
+export const SHOP_FRONT_NAMES = ["Beehive", "Ginhawa"];
+
 /** Reads the public shop name paired with the active referral. */
 export function readReferralShopName(): string {
   if (typeof document === "undefined" || !readReferralSlug()) return "";
@@ -26,8 +33,19 @@ export function readReferralShopName(): string {
   if (!match) return "";
 
   try {
-    return decodeURIComponent(match[1]).trim();
+    const name = decodeURIComponent(match[1]).trim();
+    return SHOP_FRONT_NAMES.includes(name) ? name : "";
   } catch {
     return "";
   }
+}
+
+/**
+ * What a partner's public links are keyed by: the last 5 characters of their id. Short
+ * enough to read off a poster, and not their name. The tail, not the head - seeded rows
+ * share a prefix. A unique index on the same 5 characters keeps it unambiguous, and
+ * register_doctor only hands out ids whose key is free; partner_by_key resolves it.
+ */
+export function partnerLinkKey(partnerId: string) {
+  return partnerId.slice(-5);
 }

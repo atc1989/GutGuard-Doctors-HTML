@@ -1,6 +1,8 @@
 import { PRIZES } from "@/lib/constants";
 import { pickPrizeIndex } from "@/lib/prizes";
 import { isSupabaseConfigured, supabase, supabaseShop, SHOP_SCHEMA } from "@/lib/supabase";
+import { checkImageFile, TESTIMONIAL_BUCKET } from "@/lib/testimonials";
+import type { AdminTestimonial, PublicTestimonial, TestimonialStatus } from "@/lib/testimonials";
 import type { Prize, RegistrationPayload, TaskId, WheelPrize, WheelPrizeInput } from "@/lib/types";
 
 type PrizeRow = {
@@ -38,6 +40,7 @@ type AdminWheelPrize = {
 type AdminDoctorRegistration = {
   id: string;
   full_name: string;
+  name_prefix: string;
   email: string;
   mobile: string;
   tiktok_username: string;
@@ -53,6 +56,7 @@ type AdminDoctorRegistration = {
 type AdminDoctorRegistrationUpdate = {
   id: string;
   full_name: string;
+  name_prefix: string;
   email: string;
   mobile: string;
   tiktok_username: string;
@@ -256,22 +260,41 @@ export type ReferredPartner = {
   paid_order_value: number;
 };
 
+export type PartnerOrderScope = "all" | "direct" | "referred";
+
+export type PartnerDashboardQuery = {
+  scope?: PartnerOrderScope;
+  status?: string;
+  limit?: number;
+  offset?: number;
+  dateFrom?: string;
+  dateTo?: string;
+  sort?: "newest" | "oldest";
+};
+
 export type PartnerDashboard = {
-  partner: { full_name: string; routing_slug: string; joined_at: string };
+  partner: { id: string; full_name: string; routing_slug: string; joined_at: string };
   clicks: { total: number; last_30_days: number };
   /** paid_amount is gross order value, not commission. */
   totals: {
-    orders: number; paid_orders: number; paid_amount: number;
-    direct_orders: number; referred_orders: number; referred_partners: number;
-    direct_paid_amount: number; referred_paid_amount: number;
+    orders: number;
+    paid_orders: number;
+    paid_amount: number;
+    direct_orders: number;
+    referred_orders: number;
+    referred_partners: number;
+    direct_paid_amount: number;
+    referred_paid_amount: number;
   };
   orders: PartnerOrder[];
   orders_page: { total: number; limit: number; offset: number; has_more: boolean };
   referred_partners: ReferredPartner[];
 };
 
-export type PartnerOrderScope = "all" | "direct" | "referred";
-export type PartnerDashboardQuery = { scope?: PartnerOrderScope; status?: string; limit?: number; offset?: number; dateFrom?: string; dateTo?: string; sort?: "newest" | "oldest" };
+export type PartnerInvitation = {
+  routing_slug: string;
+  full_name: string;
+};
 
 export type TikTokOrderTimeMode = "create_time" | "update_time";
 
@@ -423,6 +446,7 @@ export async function registerDoctor(payload: RegistrationPayload) {
   if (isSupabaseConfigured && supabase) {
     const { data, error } = await supabase.rpc("register_doctor", {
       p_full_name: payload.fullName,
+      p_name_prefix: payload.namePrefix,
       p_email: payload.email,
       p_mobile: payload.mobile,
       p_tiktok_username: payload.tiktokUsername,
@@ -433,10 +457,16 @@ export async function registerDoctor(payload: RegistrationPayload) {
 
     if (error) throw new Error(`Registration failed: ${error.message}`);
 
-    return {
+    const registration = {
       id: data as string,
       ...payload,
     };
+
+    if (payload.referrerSlug) {
+      void notifyPartnerReferral(registration.id);
+    }
+
+    return registration;
   }
 
   return {
@@ -445,19 +475,31 @@ export async function registerDoctor(payload: RegistrationPayload) {
   };
 }
 
-export async function getPartnerInvitation(slug: string): Promise<{ routing_slug: string; full_name: string } | null> {
-  if (!isSupabaseConfigured || !supabase) return null;
-  const { data, error } = await supabase.rpc("get_partner_invitation", { p_slug: slug });
+export async function getPartnerInvitation(slug: string): Promise<PartnerInvitation | null> {
+  const clean = slug.trim().toLowerCase();
+  if (!clean || !isSupabaseConfigured || !supabase) return null;
+
+  const { data, error } = await supabase.rpc("get_partner_invitation", { p_slug: clean });
   if (error) return null;
-  const row = Array.isArray(data) ? data[0] : data;
-  if (!row?.routing_slug) return null;
-  return { routing_slug: String(row.routing_slug), full_name: String(row.full_name ?? "") };
+
+  const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | null;
+  const routing_slug = String(row?.routing_slug ?? "").trim();
+  const full_name = String(row?.full_name ?? "").trim();
+  if (!routing_slug) return null;
+
+  return { routing_slug, full_name };
 }
 
-export async function sendPartnerReferralNotification(registrationId: string): Promise<void> {
+async function notifyPartnerReferral(registrationId: string) {
   if (!isSupabaseConfigured || !supabase || registrationId.startsWith("local-")) return;
-  const { error } = await supabase.functions.invoke("send-partner-referral-notification", { body: { registrationId } });
-  if (error) throw error;
+
+  try {
+    await supabase.functions.invoke("send-partner-referral-notification", {
+      body: { registrationId },
+    });
+  } catch {
+    // Registration already succeeded. The referrer email is best-effort.
+  }
 }
 
 type RegistrationEmailResponse = {
@@ -612,6 +654,7 @@ export async function updateDoctorRegistration(
     p_admin_password: adminPassword,
     p_doctor_id: doctor.id,
     p_full_name: doctor.full_name,
+    p_name_prefix: doctor.name_prefix,
     p_email: doctor.email,
     p_mobile: doctor.mobile,
     p_tiktok_username: doctor.tiktok_username,
@@ -803,14 +846,21 @@ export async function getPublicShopOrder(orderCode: string): Promise<PublicShopO
  * form cannot be used to test whether an address is a registered partner.
  *
  * Requires {{ .Token }} in the Supabase "Magic Link" email template, or the mail arrives
- * with a link and no code to type.
+ * with a link and no code to type. emailRedirectTo must be on the project's URI allow
+ * list; without it GoTrue uses Site URL (currently the Gema /my-account host).
  */
+function partnerAuthRedirectTo() {
+  if (typeof window !== "undefined") return `${window.location.origin}/partner`;
+  const site = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://partners.gutguard.ph").replace(/\/$/, "");
+  return `${site}/partner`;
+}
+
 export async function sendPartnerOtp(email: string): Promise<void> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
 
   const { error } = await supabase.auth.signInWithOtp({
     email: email.trim().toLowerCase(),
-    options: { shouldCreateUser: true },
+    options: { shouldCreateUser: true, emailRedirectTo: partnerAuthRedirectTo() },
   });
 
   if (error) throw error;
@@ -831,7 +881,7 @@ export async function verifyPartnerOtp(email: string, token: string): Promise<vo
   let session = null;
   let lastError: Error | null = null;
 
-  for (const type of ["email", "signup", "magiclink"] as const) {
+  for (const type of ["magiclink", "email", "signup"] as const) {
     const { data, error } = await supabase.auth.verifyOtp({
       email: normalizedEmail,
       token: normalizedToken,
@@ -871,13 +921,21 @@ export async function hasPartnerSession(): Promise<boolean> {
   return true;
 }
 
+export async function getPartnerAuthEmail(): Promise<string> {
+  if (!isSupabaseConfigured || !supabase) return "";
+  const { data } = await supabase.auth.getUser();
+  return (data.user?.email ?? "").trim().toLowerCase();
+}
+
+const DEFAULT_PARTNER_ORDER_PAGE_SIZE = 10;
+
 export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Promise<PartnerDashboard> {
   if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
 
   const { data, error } = await supabaseShop.rpc("partner_dashboard", {
     p_scope: query.scope ?? "all",
     p_status: query.status || null,
-    p_limit: query.limit ?? 25,
+    p_limit: query.limit ?? DEFAULT_PARTNER_ORDER_PAGE_SIZE,
     p_offset: query.offset ?? 0,
     p_date_from: query.dateFrom || null,
     p_date_to: query.dateTo || null,
@@ -889,9 +947,11 @@ export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Pr
   const partner = (row.partner ?? {}) as Record<string, unknown>;
   const clicks = (row.clicks ?? {}) as Record<string, unknown>;
   const totals = (row.totals ?? {}) as Record<string, unknown>;
+  const ordersPage = (row.orders_page ?? {}) as Record<string, unknown>;
 
   return {
     partner: {
+      id: String(partner.id ?? ""),
       full_name: String(partner.full_name ?? ""),
       routing_slug: String(partner.routing_slug ?? ""),
       joined_at: String(partner.joined_at ?? ""),
@@ -904,43 +964,48 @@ export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Pr
       orders: Number(totals.orders ?? 0),
       paid_orders: Number(totals.paid_orders ?? 0),
       paid_amount: Number(totals.paid_amount ?? 0),
-      direct_orders: Number(totals.direct_orders ?? 0),
+      direct_orders: Number(totals.direct_orders ?? totals.orders ?? 0),
       referred_orders: Number(totals.referred_orders ?? 0),
       referred_partners: Number(totals.referred_partners ?? 0),
       direct_paid_amount: Number(totals.direct_paid_amount ?? 0),
       referred_paid_amount: Number(totals.referred_paid_amount ?? 0),
     },
-    orders: (Array.isArray(row.orders) ? row.orders : []).map((entry) => {
-      const order = (entry ?? {}) as Record<string, unknown>;
-      return {
-        order_code: String(order.order_code ?? ""),
-        created_at: String(order.created_at ?? ""),
-        status: (order.status ?? "pending_payment") as ShopOrderStatus,
-        payment_status: (order.payment_status ?? "pending") as ShopPaymentStatus,
-        total_amount: Number(order.total_amount ?? 0),
-        buyer_first_name: String(order.buyer_first_name ?? ""),
-        city: String(order.city ?? ""),
-        province: String(order.province ?? ""),
-        source_type: order.source_type === "referred" ? "referred" : "direct",
-        source_partner_name: String(order.source_partner_name ?? ""),
-        source_partner_slug: String(order.source_partner_slug ?? ""),
-      };
-    }),
+    orders: (Array.isArray(row.orders) ? row.orders : []).map(normalizePartnerOrder),
     orders_page: {
-      total: Number(((row.orders_page ?? {}) as Record<string, unknown>).total ?? 0),
-      limit: Number(((row.orders_page ?? {}) as Record<string, unknown>).limit ?? 25),
-      offset: Number(((row.orders_page ?? {}) as Record<string, unknown>).offset ?? 0),
-      has_more: Boolean(((row.orders_page ?? {}) as Record<string, unknown>).has_more),
+      total: Number(ordersPage.total ?? 0),
+      limit: Number(ordersPage.limit ?? DEFAULT_PARTNER_ORDER_PAGE_SIZE),
+      offset: Number(ordersPage.offset ?? 0),
+      has_more: Boolean(ordersPage.has_more),
     },
     referred_partners: (Array.isArray(row.referred_partners) ? row.referred_partners : []).map((entry) => {
-      const partner = (entry ?? {}) as Record<string, unknown>;
+      const partnerRow = (entry ?? {}) as Record<string, unknown>;
       return {
-        full_name: String(partner.full_name ?? ""), routing_slug: String(partner.routing_slug ?? ""),
-        specialty: String(partner.specialty ?? ""), practice_location: String(partner.practice_location ?? ""),
-        joined_at: String(partner.joined_at ?? ""), orders: Number(partner.orders ?? 0),
-        paid_order_value: Number(partner.paid_order_value ?? 0),
+        full_name: String(partnerRow.full_name ?? ""),
+        routing_slug: String(partnerRow.routing_slug ?? ""),
+        specialty: String(partnerRow.specialty ?? ""),
+        practice_location: String(partnerRow.practice_location ?? ""),
+        joined_at: String(partnerRow.joined_at ?? ""),
+        orders: Number(partnerRow.orders ?? 0),
+        paid_order_value: Number(partnerRow.paid_order_value ?? 0),
       };
     }),
+  };
+}
+
+function normalizePartnerOrder(entry: unknown): PartnerOrder {
+  const order = (entry ?? {}) as Record<string, unknown>;
+  return {
+    order_code: String(order.order_code ?? ""),
+    created_at: String(order.created_at ?? ""),
+    status: (order.status ?? "pending_payment") as ShopOrderStatus,
+    payment_status: (order.payment_status ?? "pending") as ShopPaymentStatus,
+    total_amount: Number(order.total_amount ?? 0),
+    buyer_first_name: String(order.buyer_first_name ?? ""),
+    city: String(order.city ?? ""),
+    province: String(order.province ?? ""),
+    source_type: order.source_type === "referred" ? "referred" : "direct",
+    source_partner_name: String(order.source_partner_name ?? ""),
+    source_partner_slug: String(order.source_partner_slug ?? ""),
   };
 }
 
@@ -1140,6 +1205,7 @@ export async function getSequenceProgress(
 
 type SequenceStepSendResponse = {
   sent?: boolean;
+  skipped?: boolean;
   reason?: string;
   sendId?: string;
   step?: number;
@@ -1155,17 +1221,23 @@ export async function enrollDoctorInSequence(doctorId: string): Promise<Sequence
   return data;
 }
 
-export async function resendSequenceStep(
-  doctorId: string,
-  stepNumber: number,
-): Promise<SequenceStepSendResponse> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+/** Sends the welcome email once, after a new partner has verified their sign-in code. */
+export async function enrollWelcomeIfNeeded(doctorId: string): Promise<void> {
+  if (!doctorId || doctorId.startsWith("local-") || !isSupabaseConfigured || !supabase) return;
   const { data, error } = await supabase.functions.invoke<SequenceStepSendResponse>("send-sequence-step", {
+    body: { doctorId, stepNumber: 1, onlyIfUnenrolled: true },
+  });
+  if (error) throw error;
+  if (data?.skipped) return;
+  if (!data?.sent) throw new Error(data?.reason || "Welcome email was not sent.");
+}
+
+export async function resendSequenceStep(doctorId: string, stepNumber: number): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  const { error } = await supabase.functions.invoke("send-sequence-step", {
     body: { doctorId, stepNumber },
   });
   if (error) throw error;
-  if (!data?.sent) throw new Error(data?.reason || `Step ${stepNumber} was not sent.`);
-  return data;
 }
 
 // ─── Registration Email Settings ───────────────────────────────────────────
@@ -1211,27 +1283,39 @@ export async function sendRegistrationEmailTest(
 
 export async function getPartnerReferralEmailSettings(adminPassword: string): Promise<RegistrationEmailSettings> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
   const { data, error } = await supabase.functions.invoke("registration-email-settings", {
     body: { action: "get", templateKind: "partner-referral", adminPassword },
   });
+
   if (error) throw error;
   return (data as RegistrationEmailSettingsResponse).settings;
 }
 
-export async function savePartnerReferralEmailSettings(adminPassword: string, settings: RegistrationEmailSettings): Promise<RegistrationEmailSettings> {
+export async function savePartnerReferralEmailSettings(
+  adminPassword: string,
+  settings: RegistrationEmailSettings,
+): Promise<RegistrationEmailSettings> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
   const { data, error } = await supabase.functions.invoke("registration-email-settings", {
     body: { action: "save", templateKind: "partner-referral", adminPassword, settings },
   });
+
   if (error) throw error;
   return (data as RegistrationEmailSettingsResponse).settings;
 }
 
-export async function sendPartnerReferralEmailTest(adminPassword: string, testEmail: string): Promise<RegistrationEmailTestResponse> {
+export async function sendPartnerReferralEmailTest(
+  adminPassword: string,
+  testEmail: string,
+): Promise<RegistrationEmailTestResponse> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
   const { data, error } = await supabase.functions.invoke("registration-email-settings", {
     body: { action: "test", templateKind: "partner-referral", adminPassword, testEmail },
   });
+
   if (error) throw error;
   return data as RegistrationEmailTestResponse;
 }
@@ -1314,6 +1398,7 @@ function normalizeAdminDoctorRegistration(doctor: AdminDoctorRegistration): Admi
 
   return {
     ...doctor,
+    name_prefix: doctor.name_prefix ?? "",
     tiktok_username: tiktokUsername,
     routing_slug: routingSlug,
     redirect_url:
@@ -1410,4 +1495,107 @@ function isMissingSupabaseFunctionError(error: unknown) {
     maybeError.code === "PGRST202" ||
     (typeof maybeError.message === "string" && maybeError.message.includes("Could not find the function"))
   );
+}
+
+/* --- Testimonials ---------------------------------------------------------- */
+
+/**
+ * Photos go straight from the browser to Storage with the anon key; the bucket caps
+ * type and size, and `checkImageFile` rejects the obvious cases before the round trip.
+ * Paths are uuid-prefixed so two members uploading `photo.jpg` cannot collide, and so
+ * an uploader cannot guess or target someone else's object.
+ */
+export async function uploadTestimonialPhoto(file: File, folder: string): Promise<string> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const rejection = checkImageFile(file);
+  if (rejection) throw new Error(rejection);
+
+  const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const path = `${folder}/${crypto.randomUUID()}.${extension}`;
+
+  const { error } = await supabase.storage.from(TESTIMONIAL_BUCKET).upload(path, file, {
+    contentType: file.type,
+    upsert: false,
+  });
+
+  if (error) throw error;
+  return path;
+}
+
+export async function submitTestimonial(input: {
+  displayName: string;
+  email: string;
+  roleLine: string;
+  story: string;
+  avatarPath: string | null;
+  photoPaths: string[];
+  videoFileId: string | null;
+}): Promise<string> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.rpc("submit_testimonial", {
+    p_display_name: input.displayName.trim(),
+    p_email: input.email.trim().toLowerCase(),
+    p_role_line: input.roleLine.trim(),
+    p_story: input.story.trim(),
+    p_avatar_path: input.avatarPath,
+    p_photo_paths: input.photoPaths,
+    p_video_file_id: input.videoFileId,
+    p_consent: true,
+  });
+
+  if (error) throw error;
+  return data as string;
+}
+
+/**
+ * Approved rows only, and never the submitter's email - that filtering lives in the
+ * security-definer function, not here, because this runs with the public anon key.
+ * Returns an empty wall rather than throwing when Supabase is unconfigured, so a
+ * preview build without env vars still renders the page.
+ */
+export async function listTestimonials(limit = 60): Promise<PublicTestimonial[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+
+  const { data, error } = await supabase.rpc("list_testimonials", { p_limit: limit });
+
+  // The wall is a public marketing page, so it renders empty rather than 500ing in the
+  // window between this deploying and the testimonials migration being applied.
+  if (error && isMissingSupabaseFunctionError(error)) return [];
+  if (error) throw error;
+  return (data ?? []) as PublicTestimonial[];
+}
+
+export async function adminListTestimonials(
+  adminPassword: string,
+  status?: TestimonialStatus,
+): Promise<AdminTestimonial[]> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.rpc("admin_list_testimonials", {
+    p_admin_password: adminPassword,
+    p_status: status ?? null,
+  });
+
+  if (error) throw error;
+  return (data ?? []) as AdminTestimonial[];
+}
+
+export async function adminReviewTestimonial(
+  adminPassword: string,
+  input: { id: string; status: TestimonialStatus; featured?: boolean; reviewNote?: string },
+): Promise<AdminTestimonial> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.rpc("admin_review_testimonial", {
+    p_admin_password: adminPassword,
+    p_id: input.id,
+    p_status: input.status,
+    p_featured: input.featured ?? false,
+    p_review_note: input.reviewNote ?? "",
+  });
+
+  if (error) throw error;
+  return (Array.isArray(data) ? data[0] : data) as AdminTestimonial;
 }

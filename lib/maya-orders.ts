@@ -1,5 +1,5 @@
 import type { MayaPayment } from "@/lib/maya";
-import type { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { SHOP_SCHEMA, type getSupabaseAdmin } from "@/lib/supabase-admin";
 
 /** Schema-scoped admin client - the generic differs between `public` and `sandbox`. */
 type ShopAdminClient = ReturnType<typeof getSupabaseAdmin>;
@@ -83,7 +83,7 @@ export async function applyPaymentToOrder(
   if (!wasPaid && next.paymentStatus === "paid") {
     await supabase.functions
       .invoke("send-shop-order-email", {
-        body: { orderId: order.id, kind: "paid", schema: process.env.NEXT_PUBLIC_SHOP_DB_SCHEMA || "public" },
+        body: { orderId: order.id, kind: "paid", schema: SHOP_SCHEMA },
       })
       .catch(() => undefined);
   }

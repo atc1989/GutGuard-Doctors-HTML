@@ -5,14 +5,15 @@ export type TaskId = (typeof TASKS)[number]["id"];
 
 export type Registration = {
   id: string;
+  namePrefix: string;
   fullName: string;
   email: string;
   mobile: string;
   tiktokUsername: string;
   specialty: string;
   location: string;
-  referrerSlug?: string;
   registeredAt: number;
+  referrerSlug?: string;
 };
 
 export type RegistrationPayload = Omit<Registration, "id" | "registeredAt">;

@@ -2,11 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { QRCodeCanvas, QRCodeSVG } from "qrcode.react";
 import { LoaderCircle, X } from "lucide-react";
 import { Logo } from "@/components/GutguardSite";
+import PartnerApplyForm from "@/components/PartnerApplyForm";
 import {
+  enrollWelcomeIfNeeded,
+  getPartnerAuthEmail,
   getPartnerDashboard,
+  getPartnerInvitation,
   hasPartnerSession,
   sendPartnerOtp,
   signOutPartner,
@@ -15,6 +20,15 @@ import {
   type PartnerOrder,
   type PartnerOrderScope,
 } from "@/lib/api";
+import { PARTNER_REFERRER_KEY } from "@/lib/constants";
+import { partnerLinkKey } from "@/lib/referral";
+import {
+  clearPendingPartnerWelcome,
+  peekPendingPartnerWelcome,
+  stashPendingPartnerSignin,
+  stashPendingPartnerWelcome,
+  takePendingPartnerSignin,
+} from "@/lib/storage";
 
 const SHOP_ORIGIN = (process.env.NEXT_PUBLIC_SHOP_URL ?? "https://shop.gutguard.ph").replace(/\/$/, "");
 const PUBLIC_SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://partners.gutguard.ph").replace(/\/$/, "");
@@ -25,15 +39,64 @@ const QR_RENDER_PX = 1024;
 
 type PartnerQrMode = "shop" | "referral" | "profile";
 
+type PartnerPointLog = {
+  id: string;
+  date: string;
+  activity: string;
+  points: number;
+  type: "earned" | "redeemed";
+  balance: number;
+};
+
+type PartnerRebate = {
+  id: string;
+  date: string;
+  period: string;
+  amount: number;
+  status: "paid" | "processing" | "pending";
+  payout_method: string;
+  reference_no: string;
+};
+
+const SAMPLE_POINTS_LOG: PartnerPointLog[] = [
+  { id: "pt-1", date: "Sep 28, 2026", activity: "Direct order attributed #GG-9024", points: 15, type: "earned", balance: 352 },
+  { id: "pt-2", date: "Sep 26, 2026", activity: "Partner referral registration (Dr. Cruz)", points: 50, type: "earned", balance: 337 },
+  { id: "pt-3", date: "Sep 22, 2026", activity: "Direct order attributed #GG-8991", points: 15, type: "earned", balance: 287 },
+  { id: "pt-4", date: "Sep 18, 2026", activity: "Sample kit request redeemed", points: -50, type: "redeemed", balance: 272 },
+  { id: "pt-5", date: "Sep 15, 2026", activity: "Referred partner order attributed (Dr. Santos)", points: 25, type: "earned", balance: 322 },
+  { id: "pt-6", date: "Sep 10, 2026", activity: "Direct order attributed #GG-8910", points: 30, type: "earned", balance: 297 },
+  { id: "pt-7", date: "Sep 05, 2026", activity: "Monthly active partner reward", points: 100, type: "earned", balance: 267 },
+  { id: "pt-8", date: "Aug 30, 2026", activity: "Direct order attributed #GG-8842", points: 15, type: "earned", balance: 167 },
+  { id: "pt-9", date: "Aug 25, 2026", activity: "Partner referral registration (Dr. Reyes)", points: 50, type: "earned", balance: 152 },
+  { id: "pt-10", date: "Aug 20, 2026", activity: "Direct order attributed #GG-8790", points: 15, type: "earned", balance: 102 },
+  { id: "pt-11", date: "Aug 15, 2026", activity: "Educational webinars completion bonus", points: 40, type: "earned", balance: 87 },
+  { id: "pt-12", date: "Aug 10, 2026", activity: "Direct order attributed #GG-8721", points: 15, type: "earned", balance: 47 },
+  { id: "pt-13", date: "Aug 01, 2026", activity: "Welcome gift bonus", points: 32, type: "earned", balance: 32 },
+];
+
+const SAMPLE_REBATES_HISTORY: PartnerRebate[] = [
+  { id: "reb-1", date: "Sep 15, 2026", period: "August 2026", amount: 4250, status: "paid", payout_method: "GCash (0917***4829)", reference_no: "REB-202608-089" },
+  { id: "reb-2", date: "Aug 15, 2026", period: "July 2026", amount: 3800, status: "paid", payout_method: "Bank Transfer (BDO)", reference_no: "REB-202607-042" },
+  { id: "reb-3", date: "Jul 15, 2026", period: "June 2026", amount: 5100, status: "paid", payout_method: "Bank Transfer (BDO)", reference_no: "REB-202606-118" },
+  { id: "reb-4", date: "Jun 15, 2026", period: "May 2026", amount: 2950, status: "paid", payout_method: "Maya (0917***4829)", reference_no: "REB-202605-077" },
+  { id: "reb-5", date: "May 15, 2026", period: "April 2026", amount: 3100, status: "paid", payout_method: "Maya (0917***4829)", reference_no: "REB-202604-031" },
+  { id: "reb-6", date: "Apr 15, 2026", period: "March 2026", amount: 1850, status: "paid", payout_method: "GCash (0917***4829)", reference_no: "REB-202603-012" },
+  { id: "reb-7", date: "Mar 15, 2026", period: "February 2026", amount: 2400, status: "paid", payout_method: "GCash (0917***4829)", reference_no: "REB-202602-005" },
+];
+
 const peso = (value: number) =>
   new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value);
 
-type View = "checking" | "email" | "code" | "signing-in" | "dashboard";
+type View = "checking" | "email" | "apply" | "code" | "signing-in" | "dashboard";
 type AuthError = { field: "email" | "code" | "form"; message: string; expired?: boolean } | null;
+type PartnerPortalProps = {
+  initialView?: "email" | "apply";
+  referrerSlug?: string;
+};
 
-const RESEND_COOLDOWN_SECONDS = 30;
+const RESEND_COOLDOWN_SECONDS = 60;
 
-export default function PartnerPortal() {
+export default function PartnerPortal({ initialView = "email", referrerSlug = "" }: PartnerPortalProps) {
   const [view, setView] = useState<View>("checking");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -46,11 +109,33 @@ export default function PartnerPortal() {
   const codeInputRef = useRef<HTMLInputElement>(null);
   const codeHeadingRef = useRef<HTMLHeadingElement>(null);
   const requestPendingRef = useRef(false);
+  const initialViewRef = useRef(initialView);
+  const pendingWelcomeDoctorIdRef = useRef<string | null>(null);
+  const router = useRouter();
+  const pathname = usePathname();
+  const [invitation, setInvitation] = useState<{ slug: string; fullName: string } | null>(null);
 
   const load = useCallback(async () => {
     const dashboard = await getPartnerDashboard();
     setData(dashboard);
     setView("dashboard");
+    if (typeof window !== "undefined" && window.location.pathname === "/partner" && window.location.search) {
+      window.history.replaceState(null, "", "/partner");
+    }
+  }, []);
+
+  const deliverWelcomeAfterSignIn = useCallback((signedInEmail: string) => {
+    const doctorId =
+      pendingWelcomeDoctorIdRef.current || peekPendingPartnerWelcome(signedInEmail);
+    if (!doctorId) return;
+    pendingWelcomeDoctorIdRef.current = null;
+    void enrollWelcomeIfNeeded(doctorId)
+      .then(() => {
+        clearPendingPartnerWelcome();
+      })
+      .catch(() => {
+        pendingWelcomeDoctorIdRef.current = doctorId;
+      });
   }, []);
 
   useEffect(() => {
@@ -60,13 +145,32 @@ export default function PartnerPortal() {
       .then(async (signedIn) => {
         if (cancelled) return;
         if (!signedIn) {
-          setView("email");
+          const pending = takePendingPartnerSignin();
+          if (pending) {
+            setEmail(pending.email);
+            if (pending.doctorId) pendingWelcomeDoctorIdRef.current = pending.doctorId;
+            if (pending.otpSent) {
+              setView("code");
+              setNotice("Account created. Check your email for a sign-in code.");
+              setResendRemaining(RESEND_COOLDOWN_SECONDS);
+              return;
+            }
+            setError({
+              field: "form",
+              message: "Your account was created, but we couldn’t email a sign-in code. Request a code to open your dashboard.",
+            });
+            setView("email");
+            return;
+          }
+          setView(initialViewRef.current === "apply" ? "apply" : "email");
           return;
         }
         // A live session is not the same as being a partner: the account may exist while the
         // address is not on any registration. Let the failure land on the login screen.
         try {
           await load();
+          const signedInEmail = await getPartnerAuthEmail();
+          if (!cancelled && signedInEmail) deliverWelcomeAfterSignIn(signedInEmail);
         } catch {
           if (cancelled) return;
           await signOutPartner();
@@ -75,13 +179,35 @@ export default function PartnerPortal() {
         }
       })
       .catch(() => {
-        if (!cancelled) setView("email");
+        if (!cancelled) setView(initialViewRef.current === "apply" ? "apply" : "email");
       });
 
     return () => {
       cancelled = true;
     };
-  }, [load]);
+  }, [load, deliverWelcomeAfterSignIn]);
+
+  useEffect(() => {
+    const fromQuery = referrerSlug.trim().toLowerCase();
+    const stored = typeof window === "undefined" ? "" : window.sessionStorage.getItem(PARTNER_REFERRER_KEY) ?? "";
+    const slug = fromQuery || stored;
+    if (!slug) return;
+
+    let cancelled = false;
+    getPartnerInvitation(slug)
+      .then((invite) => {
+        if (cancelled || !invite) return;
+        window.sessionStorage.setItem(PARTNER_REFERRER_KEY, invite.routing_slug);
+        setInvitation({ slug: invite.routing_slug, fullName: invite.full_name });
+      })
+      .catch(() => {
+        // Invalid or unreachable slug: register with no referrer rather than blocking the form.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [referrerSlug]);
 
   useEffect(() => {
     if (resendRemaining <= 0) return;
@@ -153,19 +279,31 @@ export default function PartnerPortal() {
 
     try {
       await verifyPartnerOtp(email, code);
-      setView("signing-in");
-      setNotice("Signing you in…");
-      await load();
+      void deliverWelcomeAfterSignIn(email);
     } catch (caught) {
-      // Covers both a wrong code and a verified address with no partner row. Signing out
-      // on the second case stops a non-partner account from sitting in a broken half-state.
-      await signOutPartner();
       const nextError = getVerificationError(caught);
       setError(nextError);
       if (nextError.expired) setResendRemaining(0);
       setView("code");
       setNotice("");
       requestAnimationFrame(() => codeInputRef.current?.focus());
+      requestPendingRef.current = false;
+      setBusyAction(null);
+      return;
+    }
+
+    try {
+      setView("signing-in");
+      setNotice("Signing you in…");
+      await load();
+    } catch {
+      await signOutPartner();
+      setError({
+        field: "form",
+        message: "You signed in, but the partner dashboard could not load. Sign in again in a moment.",
+      });
+      setView("email");
+      setNotice("");
     } finally {
       requestPendingRef.current = false;
       setBusyAction(null);
@@ -205,6 +343,80 @@ export default function PartnerPortal() {
     });
   }
 
+  function showApply() {
+    setView("apply");
+    setCode("");
+    setError(null);
+    setNotice("");
+    setResendRemaining(0);
+    router.replace(pathname === "/partner" ? "/partner?apply=1" : "/physicians/register");
+  }
+
+  function showSignIn() {
+    setView("email");
+    setCode("");
+    setError(null);
+    setNotice("");
+    setResendRemaining(0);
+    router.replace("/partner");
+  }
+
+  async function handleRegistered(registeredEmail: string, doctorId: string) {
+    const normalizedEmail = registeredEmail.trim().toLowerCase();
+    setEmail(normalizedEmail);
+    setError(null);
+    setView("signing-in");
+    setNotice("Sending your sign-in code…");
+
+    try {
+      window.sessionStorage.removeItem(PARTNER_REFERRER_KEY);
+    } catch {
+      // sessionStorage is best-effort.
+    }
+    setInvitation(null);
+
+    if (doctorId && !doctorId.startsWith("local-")) {
+      pendingWelcomeDoctorIdRef.current = doctorId;
+      stashPendingPartnerWelcome({ email: normalizedEmail, doctorId });
+    }
+
+    let otpSent = false;
+    try {
+      await sendPartnerOtp(normalizedEmail);
+      otpSent = true;
+    } catch (caught) {
+      setError(getSendError(caught));
+    }
+
+    if (pathname !== "/partner") {
+      stashPendingPartnerSignin({
+        email: normalizedEmail,
+        otpSent,
+        doctorId: pendingWelcomeDoctorIdRef.current ?? undefined,
+      });
+      router.replace("/partner");
+      return;
+    }
+
+    if (otpSent) {
+      setCode("");
+      setResendRemaining(RESEND_COOLDOWN_SECONDS);
+      setView("code");
+      setNotice("Account created. Check your email for a sign-in code.");
+      setError(null);
+      if (typeof window !== "undefined" && window.location.search) {
+        window.history.replaceState(null, "", "/partner");
+      }
+      return;
+    }
+
+    setView("email");
+    setNotice("");
+    if (typeof window !== "undefined" && window.location.search) {
+      window.history.replaceState(null, "", "/partner");
+    }
+  }
+
   async function signOut() {
     await signOutPartner();
     setData(null);
@@ -238,8 +450,27 @@ export default function PartnerPortal() {
         <section className="partner-auth-card partner-auth-loading" aria-busy="true" aria-live="polite">
           <LoaderCircle className="partner-spinner" aria-hidden="true" />
           <p className="partner-eyebrow">Partner portal</p>
-          <h1>Signing you in…</h1>
-          <p>Opening your secure partner dashboard.</p>
+          <h1>{notice.startsWith("Sending") ? "Application received" : "Signing you in…"}</h1>
+          <p>{notice || "Opening your secure partner dashboard."}</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (view === "apply") {
+    return (
+      <main className="shop-shell partner-auth-shell">
+        <PartnerNav />
+        <section className="partner-auth-card partner-apply-card" aria-labelledby="partner-apply-title">
+          <p className="partner-eyebrow">Partner portal</p>
+          <h1 id="partner-apply-title">Apply to become a partner</h1>
+          <p className="partner-auth-lede">
+            Tell us how to reach you. We’ll create your partner account and email a sign-in code so you can open your dashboard right away.
+          </p>
+          <PartnerApplyForm invitedBy={invitation} onRegistered={handleRegistered} onSignIn={showSignIn} />
+          <p className="partner-auth-trust">
+            After you submit, we email a one-time code and open your dashboard. No Facebook follow or prize wheel.
+          </p>
         </section>
       </main>
     );
@@ -336,7 +567,10 @@ export default function PartnerPortal() {
               <span>{busyAction === "send" ? "Sending code…" : "Email me a sign-in code"}</span>
             </button>
             <p className="partner-apply-link">
-              New to GutGuard? <Link href="/physicians/register">Apply to become a partner</Link>
+              New to GutGuard?{" "}
+              <button type="button" className="partner-auth-text-button" onClick={showApply}>
+                Apply to become a partner
+              </button>
             </p>
           </form>
         )}
@@ -347,7 +581,7 @@ export default function PartnerPortal() {
   );
 }
 
-export function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () => void }) {
+function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignOut: () => void }) {
   const qrRef = useRef<HTMLDivElement>(null);
   const linkRef = useRef<HTMLParagraphElement>(null);
   const posterDialogRef = useRef<HTMLDivElement>(null);
@@ -356,7 +590,7 @@ export function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignO
   const [copied, setCopied] = useState(false);
   const [qrMode, setQrMode] = useState<PartnerQrMode>("shop");
   const [dashboard, setDashboard] = useState(data);
-  const [activityTab, setActivityTab] = useState<"orders" | "partners">("orders");
+  const [activityTab, setActivityTab] = useState<"orders" | "partners" | "points" | "rebates">("orders");
   const [orderScope, setOrderScope] = useState<PartnerOrderScope>("all");
   const [orderStatus, setOrderStatus] = useState("");
   const [orderDateFrom, setOrderDateFrom] = useState("");
@@ -366,13 +600,19 @@ export function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignO
   const [orderPageSize, setOrderPageSize] = useState(10);
   const [partnerOffset, setPartnerOffset] = useState(0);
   const [partnerPageSize, setPartnerPageSize] = useState(10);
+  const [pointsOffset, setPointsOffset] = useState(0);
+  const [pointsPageSize, setPointsPageSize] = useState(10);
+  const [rebatesOffset, setRebatesOffset] = useState(0);
+  const [rebatesPageSize, setRebatesPageSize] = useState(10);
   const [ordersBusy, setOrdersBusy] = useState(false);
   const [ordersError, setOrdersError] = useState("");
   const [posterOpen, setPosterOpen] = useState(false);
 
-  const link = getPartnerQrLink(dashboard.partner.routing_slug, qrMode);
+  const link = getPartnerQrLink(dashboard.partner, qrMode);
   const conversion = dashboard.clicks.total > 0 ? (dashboard.totals.direct_orders / dashboard.clicks.total) * 100 : 0;
   const visiblePartners = dashboard.referred_partners.slice(partnerOffset, partnerOffset + partnerPageSize);
+  const visiblePoints = SAMPLE_POINTS_LOG.slice(pointsOffset, pointsOffset + pointsPageSize);
+  const visibleRebates = SAMPLE_REBATES_HISTORY.slice(rebatesOffset, rebatesOffset + rebatesPageSize);
 
   useEffect(() => {
     const queryKey = [orderScope, orderStatus, orderDateFrom, orderDateTo, orderSort, orderPageSize, orderOffset].join("|");
@@ -540,8 +780,10 @@ export function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignO
 
         <section className="shop-order-panel partner-orders-panel">
           <div className="partner-activity-tabs" role="tablist" aria-label="Dashboard activity">
-            <button type="button" role="tab" aria-selected={activityTab === "orders"} className={activityTab === "orders" ? "active" : ""} onClick={() => setActivityTab("orders")}>Orders <span>{dashboard.totals.orders}</span></button>
-            <button type="button" role="tab" aria-selected={activityTab === "partners"} className={activityTab === "partners" ? "active" : ""} onClick={() => setActivityTab("partners")}>Referred partners <span>{dashboard.totals.referred_partners}</span></button>
+            <button type="button" role="tab" aria-selected={activityTab === "orders"} className={activityTab === "orders" ? "active" : ""} onClick={() => setActivityTab("orders")}>Orders</button>
+            <button type="button" role="tab" aria-selected={activityTab === "partners"} className={activityTab === "partners" ? "active" : ""} onClick={() => setActivityTab("partners")}>Referred partners</button>
+            <button type="button" role="tab" aria-selected={activityTab === "points"} className={activityTab === "points" ? "active" : ""} onClick={() => setActivityTab("points")}>Points Log</button>
+            <button type="button" role="tab" aria-selected={activityTab === "rebates"} className={activityTab === "rebates" ? "active" : ""} onClick={() => setActivityTab("rebates")}>Rebate History</button>
           </div>
 
           {activityTab === "orders" ? <>
@@ -550,10 +792,10 @@ export function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignO
 
           <div className="partner-order-toolbar">
             <div className="partner-order-tabs" role="tablist" aria-label="Order attribution">
-              {([['all', `All ${dashboard.totals.orders}`], ['direct', `Direct ${dashboard.totals.direct_orders}`], ['referred', `Referred ${dashboard.totals.referred_orders}`]] as const).map(([value, label]) => (
+              {(['all', 'direct', 'referred'] as const).map((value) => (
                 <button key={value} type="button" role="tab" aria-selected={orderScope === value}
                   className={orderScope === value ? "active" : ""}
-                  onClick={() => { setOrderScope(value); setOrderOffset(0); }}>{label}</button>
+                  onClick={() => { setOrderScope(value); setOrderOffset(0); }}>{value.charAt(0).toUpperCase() + value.slice(1)}</button>
               ))}
             </div>
             <label className="partner-order-filter">Status
@@ -593,7 +835,7 @@ export function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignO
           <p className="shop-note">
             Buyer details stay private. You only see their first name and area.
           </p>
-          </> : <>
+          </> : activityTab === "partners" ? <>
             <p className="shop-kicker">Partners you referred</p>
             <div className="partner-section-heading">
               <h2>{dashboard.totals.referred_partners ? `${dashboard.totals.referred_partners} partners` : "No referred partners yet"}</h2>
@@ -611,6 +853,54 @@ export function Dashboard({ data, onSignOut }: { data: PartnerDashboard; onSignO
               <button type="button" className="shop-secondary" disabled={ordersBusy || partnerOffset === 0} onClick={() => setPartnerOffset(Math.max(0, partnerOffset - partnerPageSize))}>Previous</button>
               <span>{dashboard.totals.referred_partners ? `${partnerOffset + 1}–${Math.min(partnerOffset + visiblePartners.length, dashboard.totals.referred_partners)} of ${dashboard.totals.referred_partners}` : "0 partners"}</span>
               <button type="button" className="shop-secondary" disabled={ordersBusy || partnerOffset + visiblePartners.length >= dashboard.totals.referred_partners} onClick={() => setPartnerOffset(partnerOffset + partnerPageSize)}>Next</button>
+            </div>
+          </> : activityTab === "points" ? <>
+            <p className="shop-kicker">Points log</p>
+            <div className="partner-section-heading">
+              <h2>352 pts current balance</h2>
+            </div>
+            {visiblePoints.length ? <div className="partner-log-list">{visiblePoints.map((item) => (
+              <div key={item.id} className="partner-log-row">
+                <div className="partner-log-info">
+                  <strong>{item.activity}</strong>
+                  <small>{item.date}</small>
+                </div>
+                <div className="partner-log-value">
+                  <span className={`partner-log-badge ${item.type}`}>
+                    {item.points > 0 ? `+${item.points} pts` : `${item.points} pts`}
+                  </span>
+                  <small>Balance: {item.balance} pts</small>
+                </div>
+              </div>
+            ))}</div> : <div className="partner-empty-orders"><strong>No points history yet.</strong><p>Points earned from orders and referrals will appear here.</p></div>}
+            <div className="partner-pagination" aria-label="Points log pages">
+              <label className="partner-pagination-size">Rows<select value={pointsPageSize} onChange={(event) => { setPointsPageSize(Number(event.target.value)); setPointsOffset(0); }}><option value="10">10</option><option value="25">25</option><option value="50">50</option></select></label>
+              <button type="button" className="shop-secondary" disabled={pointsOffset === 0} onClick={() => setPointsOffset(Math.max(0, pointsOffset - pointsPageSize))}>Previous</button>
+              <span>{SAMPLE_POINTS_LOG.length ? `${pointsOffset + 1}–${Math.min(pointsOffset + visiblePoints.length, SAMPLE_POINTS_LOG.length)} of ${SAMPLE_POINTS_LOG.length}` : "0 entries"}</span>
+              <button type="button" className="shop-secondary" disabled={pointsOffset + visiblePoints.length >= SAMPLE_POINTS_LOG.length} onClick={() => setPointsOffset(pointsOffset + pointsPageSize)}>Next</button>
+            </div>
+          </> : <>
+            <p className="shop-kicker">Rebate history</p>
+            <div className="partner-section-heading">
+              <h2>₱23,450.00 total payouts</h2>
+            </div>
+            {visibleRebates.length ? <div className="partner-log-list">{visibleRebates.map((rebate) => (
+              <div key={rebate.id} className="partner-log-row">
+                <div className="partner-log-info">
+                  <strong>{rebate.period}</strong>
+                  <small>{rebate.payout_method} · Ref: {rebate.reference_no}</small>
+                </div>
+                <div className="partner-log-value">
+                  <strong>{peso(rebate.amount)}</strong>
+                  <span className={`partner-status-badge ${rebate.status}`}>{rebate.status.charAt(0).toUpperCase() + rebate.status.slice(1)}</span>
+                </div>
+              </div>
+            ))}</div> : <div className="partner-empty-orders"><strong>No rebate history yet.</strong><p>Payout statements will appear here.</p></div>}
+            <div className="partner-pagination" aria-label="Rebate history pages">
+              <label className="partner-pagination-size">Rows<select value={rebatesPageSize} onChange={(event) => { setRebatesPageSize(Number(event.target.value)); setRebatesOffset(0); }}><option value="10">10</option><option value="25">25</option><option value="50">50</option></select></label>
+              <button type="button" className="shop-secondary" disabled={rebatesOffset === 0} onClick={() => setRebatesOffset(Math.max(0, rebatesOffset - rebatesPageSize))}>Previous</button>
+              <span>{SAMPLE_REBATES_HISTORY.length ? `${rebatesOffset + 1}–${Math.min(rebatesOffset + visibleRebates.length, SAMPLE_REBATES_HISTORY.length)} of ${SAMPLE_REBATES_HISTORY.length}` : "0 entries"}</span>
+              <button type="button" className="shop-secondary" disabled={rebatesOffset + visibleRebates.length >= SAMPLE_REBATES_HISTORY.length} onClick={() => setRebatesOffset(rebatesOffset + rebatesPageSize)}>Next</button>
             </div>
           </>}
         </section>
@@ -705,13 +995,17 @@ function PartnerNav({ onSignOut }: { onSignOut?: () => void }) {
   );
 }
 
-/** Mirrors getDoctorQrUrl in the admin, so both views generate the same two QR destinations. */
-function getPartnerQrLink(slug: string, mode: PartnerQrMode) {
-  if (!slug) return mode === "shop" ? SHOP_ORIGIN : PUBLIC_SITE_ORIGIN;
-  if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${encodeURIComponent(slug)}`;
-  if (mode === "referral") return `${PUBLIC_SITE_ORIGIN}/${encodeURIComponent(slug)}`;
-  if (slug === "dr-grace-saraza") return `${SHOP_ORIGIN}/beehive`;
-  return `${SHOP_ORIGIN}/r/${encodeURIComponent(slug)}`;
+/** Mirrors getDoctorQrUrl in the admin, so printed codes match across views. */
+function getPartnerQrLink(partner: { id: string; routing_slug: string }, mode: PartnerQrMode) {
+  if (!partner.id) {
+    if (mode === "shop") return SHOP_ORIGIN;
+    return `${PUBLIC_SITE_ORIGIN}/physicians/register`;
+  }
+  const key = partnerLinkKey(partner.id);
+  if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${key}`;
+  if (mode === "referral") return `${PUBLIC_SITE_ORIGIN}/physicians/register?ref=${key}`;
+  if (partner.routing_slug === "dr-grace-saraza") return `${SHOP_ORIGIN}/beehive`;
+  return `${SHOP_ORIGIN}/r/${key}`;
 }
 
 function statusLabel(order: PartnerOrder) {
@@ -750,16 +1044,34 @@ function getVerificationError(error: unknown): NonNullable<AuthError> {
 
 function getSendError(error: unknown): NonNullable<AuthError> {
   const message = error instanceof Error ? error.message.toLowerCase() : "";
-  if (message.includes("rate") || message.includes("too many") || message.includes("429")) {
-    return { field: "form", message: "Too many sign-in requests. Wait a moment and try again." };
+  if (message.includes("email rate limit") || message.includes("over_email_send_rate_limit")) {
+    return { field: "form", message: "Too many sign-in emails were sent. Wait a few minutes and try again." };
+  }
+  if (
+    message.includes("rate") ||
+    message.includes("too many") ||
+    message.includes("429") ||
+    message.includes("security purposes") ||
+    /after \d+ seconds/.test(message)
+  ) {
+    return { field: "form", message: "Too many sign-in requests. Wait a minute and try again." };
   }
   return { field: "form", message: "We couldn’t send a code. Check your connection and try again." };
 }
 
 function getResendError(error: unknown): NonNullable<AuthError> {
   const message = error instanceof Error ? error.message.toLowerCase() : "";
-  if (message.includes("rate") || message.includes("too many") || message.includes("429")) {
-    return { field: "code", message: "A new code can’t be sent yet. Wait a moment and try again." };
+  if (message.includes("email rate limit") || message.includes("over_email_send_rate_limit")) {
+    return { field: "code", message: "Too many sign-in emails were sent. Wait a few minutes and try again." };
+  }
+  if (
+    message.includes("rate") ||
+    message.includes("too many") ||
+    message.includes("429") ||
+    message.includes("security purposes") ||
+    /after \d+ seconds/.test(message)
+  ) {
+    return { field: "code", message: "A new code can’t be sent yet. Wait a minute and try again." };
   }
   return { field: "code", message: "We couldn’t resend the code. Check your connection and try again." };
 }
