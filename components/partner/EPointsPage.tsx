@@ -4,16 +4,16 @@ import { useState } from "react";
 import { CYCLE_TARGET, EmptyState, PageHeader, StatTile, formatDate, peso, usePartner } from "./shared";
 
 const MILESTONES = [
-  { pts: 300, rebate: 18000, label: "Initial group movement" },
-  { pts: 750, rebate: 70000, label: "Mid-level group movement" },
-  { pts: 1500, rebate: 150000, label: "Full group target" },
+  { pts: 300, rebate: 18000, label: "Initial movement milestone" },
+  { pts: 750, rebate: 70000, label: "Mid-level movement milestone" },
+  { pts: 1500, rebate: 150000, label: "Full cycle target milestone" },
 ];
 
 export default function EPointsPage() {
   const { dashboard } = usePartner();
   const { points, rebates, point_sources: sources = [] } = dashboard;
-  const [tab, setTab] = useState<"points" | "rebates">("points");
-  const [pointsFilter, setPointsFilter] = useState<"all" | "direct" | "referred">("all");
+  const [tab, setTab] = useState<"points" | "rebates">("rebates");
+  const [pointsFilter, setPointsFilter] = useState<"direct" | "referred" | "all">("direct");
   const [rebateOffset, setRebateOffset] = useState(0);
   const [rebatePageSize, setRebatePageSize] = useState(10);
 
@@ -24,32 +24,159 @@ export default function EPointsPage() {
 
   return (
     <>
-      <PageHeader kicker="E-Points" title={`${points.passup_points} Referred Pts · ${points.own_points} Direct Pts`} lede="Points from your direct orders and from partners you referred count towards cash rebate milestones." />
+      <PageHeader
+        kicker="E-Points & Rebates"
+        title="Point Balances & Cash Rebates"
+        lede="Track your personal shop sales points and group pass-up points separately. Unlock cash rebates as milestones are achieved."
+      />
 
-      <section className="pp-stats" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }} aria-label="E-Points summary">
-        <StatTile label="Pass-up points (Earned)" value={`${points.passup_points} pts`} note="earned from referred downline partners" />
-        <StatTile label="Passed up to upline" value={`${points.passed_up_to_upline_points} pts`} note="passed up to your sponsor/upline" />
-        <StatTile label="Direct points (Kept)" value={`${points.own_points} pts`} note="kept from direct customer orders" />
-        <StatTile label={`Cycle ${points.current_cycle}`} value={`${points.points_in_cycle} pts`} note={`target ${CYCLE_TARGET}`} />
+      {/* 📊 3. Top Overview Stats Bar */}
+      <section className="pp-stats" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }} aria-label="E-Points summary">
+        <StatTile label="🛒 Direct Shop Points" value={`${points.own_points} pts`} note="kept from direct customer orders" />
+        <StatTile label="👥 Referred Pass-Up Points" value={`${points.passup_points} pts`} note="earned from referred downline partners" />
+        <StatTile label="Passed Up to Upline" value={`${points.passed_up_to_upline_points} pts`} note="passed up to your sponsor/upline" />
+        <StatTile label={`Cycle ${points.current_cycle} Balance`} value={`${points.points_in_cycle} pts`} note={`Target: ${CYCLE_TARGET} pts`} />
       </section>
 
       <div className="pp-seg" role="tablist" aria-label="E-Points view">
-        <button type="button" role="tab" aria-selected={tab === "points"} className={tab === "points" ? "active" : ""} onClick={() => setTab("points")}>Points log <span>{sources.length}</span></button>
-        <button type="button" role="tab" aria-selected={tab === "rebates"} className={tab === "rebates" ? "active" : ""} onClick={() => setTab("rebates")}>Rebates <span>{rebates.length}</span></button>
+        <button type="button" role="tab" aria-selected={tab === "rebates"} className={tab === "rebates" ? "active" : ""} onClick={() => setTab("rebates")}>
+          Rebate History & Tracks <span>{rebates.length}</span>
+        </button>
+        <button type="button" role="tab" aria-selected={tab === "points"} className={tab === "points" ? "active" : ""} onClick={() => setTab("points")}>
+          Points Log <span>{sources.length}</span>
+        </button>
       </div>
 
-      {tab === "points" ? (
+      {tab === "rebates" ? (
         <>
+          {/* 🎨 1. Track A: My Shop Sales Rebate Track */}
+          <section className="pp-card" aria-label="Track A My Shop Sales Rebate Track" style={{ marginBottom: 24, border: "1px solid var(--rule)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)", margin: 0 }}>🛒 Track A: My Shop Sales Rebate Track</h3>
+                <small style={{ color: "var(--ink-3)", fontSize: 13 }}>Direct Customer Orders</small>
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--ink)", background: "var(--bone-soft)", padding: "4px 10px", borderRadius: 4 }}>
+                Direct Sales Track
+              </span>
+            </div>
+            <div className="pp-progress-labels">
+              <strong>{points.own_points} / {CYCLE_TARGET} Direct E-Points (Cycle {points.current_cycle})</strong>
+              <span>{Math.min(100, Math.round((points.own_points / CYCLE_TARGET) * 100))}%</span>
+            </div>
+            <div className="pp-progress" role="progressbar" aria-valuemin={0} aria-valuemax={CYCLE_TARGET} aria-valuenow={Math.min(points.own_points, CYCLE_TARGET)} aria-label="Direct sales cycle progress">
+              <div style={{ width: `${Math.min(100, (points.own_points / CYCLE_TARGET) * 100)}%`, background: "var(--gold)" }} />
+            </div>
+
+            <div className="pp-milestones" style={{ marginTop: 16 }}>
+              {MILESTONES.map((m) => {
+                const unlocked = points.own_points >= m.pts;
+                return (
+                  <article key={`direct-${m.pts}`} className={unlocked ? "pp-milestone unlocked" : "pp-milestone"}>
+                    <span>{unlocked ? "✓ Unlocked!" : `🎯 ${m.pts} Direct Pts (${points.own_points} / ${m.pts} pts)`}</span>
+                    <strong>{peso(m.rebate)}</strong>
+                    <small>{m.label}</small>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* 🎨 1. Track B: Referred Partners Rebate Track */}
+          <section className="pp-card" aria-label="Track B Referred Partners Rebate Track" style={{ marginBottom: 24, border: "1px solid var(--blue-soft, #eef2ff)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--blue)", margin: 0 }}>👥 Track B: Referred Partners Rebate Track</h3>
+                <small style={{ color: "var(--ink-3)", fontSize: 13 }}>Group Pass-Ups</small>
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--blue)", background: "rgba(4,6,122,0.08)", padding: "4px 10px", borderRadius: 4 }}>
+                Referred Group Target
+              </span>
+            </div>
+            <div className="pp-progress-labels">
+              <strong>{points.passup_points} / {CYCLE_TARGET} Referred E-Points (Cycle {points.current_cycle})</strong>
+              <span>{Math.min(100, Math.round((points.passup_points / CYCLE_TARGET) * 100))}%</span>
+            </div>
+            <div className="pp-progress" role="progressbar" aria-valuemin={0} aria-valuemax={CYCLE_TARGET} aria-valuenow={Math.min(points.passup_points, CYCLE_TARGET)} aria-label="Referred pass-up cycle progress">
+              <div style={{ width: `${Math.min(100, (points.passup_points / CYCLE_TARGET) * 100)}%`, background: "var(--blue)" }} />
+            </div>
+
+            <div className="pp-milestones" style={{ marginTop: 16 }}>
+              {MILESTONES.map((m) => {
+                const unlocked = points.passup_points >= m.pts;
+                return (
+                  <article key={`referred-${m.pts}`} className={unlocked ? "pp-milestone unlocked" : "pp-milestone"}>
+                    <span>{unlocked ? "✓ Unlocked!" : `🎯 ${m.pts} Referred Pts (${points.passup_points} / ${m.pts} pts)`}</span>
+                    <strong>{peso(m.rebate)}</strong>
+                    <small>{m.label}</small>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+
+          <h2 className="pp-h2">{rebates.length ? `${rebates.length} unlocked ${rebates.length === 1 ? "milestone" : "milestones"}` : "Rebate history"}</h2>
+          <section className="pp-card pp-card-flush" aria-label="Rebate history">
+            {rebates.length ? (
+              <>
+                <ul className="pp-log">
+                  {visibleRebates.map((rebate, index) => (
+                    <li key={index}>
+                      <span>
+                        <strong>Cycle {rebate.cycle_number} milestone</strong>
+                        <small>{rebate.milestone_pts} points reached</small>
+                      </span>
+                      <span className="pp-log-end" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: rebate.status === "paid" ? "#15803d" : "#b45309", background: rebate.status === "paid" ? "#dcfce7" : "#fef3c7", padding: "2px 6px", borderRadius: 10 }}>
+                            {rebate.status === "paid" ? "Paid out" : "Unlocked · Awaiting Payout"}
+                          </span>
+                          <b className="is-gold">{peso(rebate.rebate_amount)}</b>
+                        </div>
+                        <small>{formatDate(rebate.created_at)}</small>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="partner-pagination" aria-label="Rebate history pages">
+                  <label className="partner-pagination-size">Rows<select value={rebatePageSize} onChange={(event) => { setRebatePageSize(Number(event.target.value)); setRebateOffset(0); }}><option value="10">10</option><option value="25">25</option><option value="50">50</option></select></label>
+                  <button type="button" className="shop-secondary" disabled={rebateOffset === 0} onClick={() => setRebateOffset(Math.max(0, rebateOffset - rebatePageSize))}>Previous</button>
+                  <span>{rebates.length ? `${rebateOffset + 1}–${Math.min(rebateOffset + visibleRebates.length, rebates.length)} of ${rebates.length}` : "0 milestones"}</span>
+                  <button type="button" className="shop-secondary" disabled={rebateOffset + visibleRebates.length >= rebates.length} onClick={() => setRebateOffset(rebateOffset + rebatePageSize)}>Next</button>
+                </div>
+              </>
+            ) : (
+              <EmptyState title="No milestones unlocked yet.">Earn points from your direct referrals and their orders to unlock cash rebates.</EmptyState>
+            )}
+          </section>
+        </>
+      ) : (
+        <>
+          {/* ⚡ 2. Points Log Tab (Sub-Tab 1: My Shop Points / Sub-Tab 2: Referred Partners Points) */}
           <div className="pp-seg" style={{ marginTop: 0, marginBottom: 16 }} role="tablist" aria-label="Filter points origin">
-            <button type="button" role="tab" aria-selected={pointsFilter === "all"} className={pointsFilter === "all" ? "active" : ""} onClick={() => setPointsFilter("all")}>All points <span>{sources.length}</span></button>
-            <button type="button" role="tab" aria-selected={pointsFilter === "direct"} className={pointsFilter === "direct" ? "active" : ""} onClick={() => setPointsFilter("direct")}>My shop points <span>{points.own_points} pts</span></button>
-            <button type="button" role="tab" aria-selected={pointsFilter === "referred"} className={pointsFilter === "referred" ? "active" : ""} onClick={() => setPointsFilter("referred")}>Referred partners points <span>{points.passup_points} pts</span></button>
+            <button type="button" role="tab" aria-selected={pointsFilter === "direct"} className={pointsFilter === "direct" ? "active" : ""} onClick={() => setPointsFilter("direct")}>
+              🛒 Sub-Tab 1: My Shop Points <span style={{ marginLeft: 6, padding: "2px 8px", background: "var(--bone-soft)", borderRadius: 12, fontSize: 11, fontWeight: 700 }}>{points.own_points} Direct Pts</span>
+            </button>
+            <button type="button" role="tab" aria-selected={pointsFilter === "referred"} className={pointsFilter === "referred" ? "active" : ""} onClick={() => setPointsFilter("referred")}>
+              👥 Sub-Tab 2: Referred Partners Points <span style={{ marginLeft: 6, padding: "2px 8px", background: "var(--blue-soft, #eef2ff)", color: "var(--blue)", borderRadius: 12, fontSize: 11, fontWeight: 700 }}>{points.passup_points} Referred Pts</span>
+            </button>
+            <button type="button" role="tab" aria-selected={pointsFilter === "all"} className={pointsFilter === "all" ? "active" : ""} onClick={() => setPointsFilter("all")}>
+              All Activity <span>{sources.length}</span>
+            </button>
           </div>
 
+          {/* Leaderboard Grid when Referred Partners Points selected */}
           {pointsFilter === "referred" && referredSources.length ? (
-            <section className="pp-card" style={{ marginBottom: 16 }} aria-label="Pass-up points breakdown by partner">
-              <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--blue)", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px" }}>Pass-Up Points by Partner</h3>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
+            <section className="pp-card" style={{ marginBottom: 16 }} aria-label="Downline leaderboard">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--blue)", margin: 0, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Downline Leaderboard Grid
+                </h3>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--blue)" }}>
+                  {points.passup_points} Referred Pts Total
+                </span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
                 {Array.from(
                   referredSources.reduce((map, item) => {
                     const name = item.source_partner || "Unknown Partner";
@@ -57,9 +184,12 @@ export default function EPointsPage() {
                     return map;
                   }, new Map<string, number>())
                 ).map(([partnerName, pts]) => (
-                  <div key={partnerName} style={{ background: "var(--paper)", padding: "12px 14px", borderRadius: "var(--r-md)", border: "1px solid var(--rule)" }}>
-                    <small style={{ color: "var(--ink-3)", fontSize: 12, display: "block" }}>{partnerName}</small>
-                    <strong style={{ color: "var(--blue)", fontSize: 16 }}>+{pts} pts</strong>
+                  <div key={partnerName} style={{ background: "var(--paper)", padding: "14px 16px", borderRadius: "var(--r-md)", border: "1px solid var(--rule-soft)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <small style={{ color: "var(--ink-3)", fontSize: 12, display: "block" }}>Partner</small>
+                      <strong style={{ color: "var(--ink)", fontSize: 14, display: "block", marginTop: 2 }}>{partnerName}</strong>
+                    </div>
+                    <strong style={{ color: "var(--blue)", fontSize: 15, background: "var(--blue-soft, #eef2ff)", padding: "4px 8px", borderRadius: 6 }}>+{pts} pts</strong>
                   </div>
                 ))}
               </div>
@@ -110,89 +240,6 @@ export default function EPointsPage() {
                   ? "Points passed up when partners you referred get paid orders will appear here."
                   : "Points from direct orders and referred partners will appear here."}
               </EmptyState>
-            )}
-          </section>
-        </>
-      ) : (
-        <>
-          <section className="pp-card" aria-label="Cycle progress" style={{ marginBottom: 24 }}>
-            <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)", marginBottom: 12 }}>My Shop Points Accumulation</h3>
-            <div className="pp-progress-labels">
-              <strong>{points.own_points} Direct E-Points Earned</strong>
-              <span>Personal Sales</span>
-            </div>
-            <p className="pp-muted" style={{ marginTop: 8 }}>
-              Accumulated directly from customers purchasing through your shop link.
-            </p>
-          </section>
-
-          <section className="pp-card" aria-label="Referred partners cycle progress">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--blue)", margin: 0 }}>Referred Partners Points Accumulation</h3>
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--blue)", background: "rgba(4,6,122,0.08)", padding: "2px 8px", borderRadius: 4 }}>
-                Referred Group Target
-              </span>
-            </div>
-            <div className="pp-progress-labels">
-              <strong>{points.passup_points % CYCLE_TARGET} E-Points · Cycle {points.current_cycle}</strong>
-              <span>Target {CYCLE_TARGET}</span>
-            </div>
-            <div className="pp-progress" role="progressbar" aria-valuemin={0} aria-valuemax={CYCLE_TARGET} aria-valuenow={Math.min(points.passup_points % CYCLE_TARGET, CYCLE_TARGET)} aria-label="Pass-up cycle progress">
-              <div style={{ width: `${Math.min(100, ((points.passup_points % CYCLE_TARGET) / CYCLE_TARGET) * 100)}%` }} />
-            </div>
-            <p className="pp-muted">
-              {(points.passup_points % CYCLE_TARGET) < CYCLE_TARGET
-                ? `Earn ${CYCLE_TARGET - (points.passup_points % CYCLE_TARGET)} more pass-up points to complete Cycle ${points.current_cycle}.`
-                : `Cycle ${points.current_cycle} completed.`}
-            </p>
-          </section>
-
-          <h2 className="pp-h2">Group target milestones</h2>
-          <div className="pp-milestones">
-            {MILESTONES.map((milestone) => {
-              const unlocked = points.points_in_cycle >= milestone.pts;
-              return (
-                <article key={milestone.pts} className={unlocked ? "pp-milestone unlocked" : "pp-milestone"}>
-                  <span>{unlocked ? "✓ Unlocked" : `${points.points_in_cycle} / ${milestone.pts} pts`}</span>
-                  <strong>{peso(milestone.rebate)}</strong>
-                  <small>{milestone.label}</small>
-                </article>
-              );
-            })}
-          </div>
-
-          <h2 className="pp-h2">{rebates.length ? `${rebates.length} unlocked ${rebates.length === 1 ? "milestone" : "milestones"}` : "Rebate history"}</h2>
-          <section className="pp-card pp-card-flush" aria-label="Rebate history">
-            {rebates.length ? (
-              <>
-                <ul className="pp-log">
-                  {visibleRebates.map((rebate, index) => (
-                    <li key={index}>
-                      <span>
-                        <strong>Cycle {rebate.cycle_number} milestone</strong>
-                        <small>{rebate.milestone_pts} points reached</small>
-                      </span>
-                      <span className="pp-log-end" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: rebate.status === "paid" ? "#15803d" : "#b45309", background: rebate.status === "paid" ? "#dcfce7" : "#fef3c7", padding: "2px 6px", borderRadius: 10 }}>
-                            {rebate.status === "paid" ? "Paid out" : "Unlocked · Awaiting Payout"}
-                          </span>
-                          <b className="is-gold">{peso(rebate.rebate_amount)}</b>
-                        </div>
-                        <small>{formatDate(rebate.created_at)}</small>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                <div className="partner-pagination" aria-label="Rebate history pages">
-                  <label className="partner-pagination-size">Rows<select value={rebatePageSize} onChange={(event) => { setRebatePageSize(Number(event.target.value)); setRebateOffset(0); }}><option value="10">10</option><option value="25">25</option><option value="50">50</option></select></label>
-                  <button type="button" className="shop-secondary" disabled={rebateOffset === 0} onClick={() => setRebateOffset(Math.max(0, rebateOffset - rebatePageSize))}>Previous</button>
-                  <span>{rebates.length ? `${rebateOffset + 1}–${Math.min(rebateOffset + visibleRebates.length, rebates.length)} of ${rebates.length}` : "0 milestones"}</span>
-                  <button type="button" className="shop-secondary" disabled={rebateOffset + visibleRebates.length >= rebates.length} onClick={() => setRebateOffset(rebateOffset + rebatePageSize)}>Next</button>
-                </div>
-              </>
-            ) : (
-              <EmptyState title="No milestones unlocked yet.">Earn points from your direct referrals and their orders to unlock cash rebates.</EmptyState>
             )}
           </section>
         </>
