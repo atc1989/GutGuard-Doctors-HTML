@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { CYCLE_TARGET, EmptyState, PageHeader, Pagination, StatTile, formatDate, peso, usePartner } from "./shared";
+import { useEffect, useState } from "react";
+import { Check, ChevronRight, Copy, X } from "lucide-react";
+import { CYCLE_TARGET, EmptyState, PageHeader, Pagination, StatTile, formatDate, peso, useCopy, usePartner } from "./shared";
 
 const MILESTONES = [
   { pts: 300, rebate: 18000, label: "Initial movement milestone" },
@@ -12,12 +13,27 @@ const MILESTONES = [
 export default function EPointsPage() {
   const { dashboard } = usePartner();
   const { points, rebates, point_sources: sources = [] } = dashboard;
-  const [tab, setTab] = useState<"points" | "rebates">("rebates");
+  const { copied, copy } = useCopy();
+  const [tab, setTab] = useState<"rebates" | "points">("rebates");
   const [pointsFilter, setPointsFilter] = useState<"direct" | "referred" | "all">("direct");
   const [pointsOffset, setPointsOffset] = useState(0);
   const [pointsPageSize, setPointsPageSize] = useState(10);
   const [rebateOffset, setRebateOffset] = useState(0);
   const [rebatePageSize, setRebatePageSize] = useState(10);
+  const [selectedSource, setSelectedSource] = useState<typeof sources[number] | null>(null);
+  const [selectedRebate, setSelectedRebate] = useState<typeof rebates[number] | null>(null);
+
+  useEffect(() => {
+    if (!selectedSource && !selectedRebate) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSelectedSource(null);
+        setSelectedRebate(null);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [selectedSource, selectedRebate]);
 
   const directSources = sources.filter((s) => s.depth === 0);
   const referredSources = sources.filter((s) => s.depth === 1);
@@ -125,36 +141,33 @@ export default function EPointsPage() {
               <>
                 <ul className="pp-log">
                   {visibleRebates.map((rebate, index) => (
-                    <li key={index} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "14px 16px" }}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                          <strong style={{ fontSize: 14 }}>Cycle {rebate.cycle_number} Milestone</strong>
-                          <span style={{
-                            fontSize: 10,
-                            fontWeight: 700,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.04em",
-                            color: rebate.status === "paid" ? "#15803d" : "#b45309",
-                            background: rebate.status === "paid" ? "#dcfce7" : "#fef3c7",
-                            padding: "2px 7px",
-                            borderRadius: 10,
-                            whiteSpace: "nowrap"
-                          }}>
+                    <li
+                      key={index}
+                      className="pp-log-item-interactive"
+                      onClick={() => setSelectedRebate(rebate)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setSelectedRebate(rebate);
+                        }
+                      }}
+                      aria-label={`View details for Cycle ${rebate.cycle_number} milestone`}
+                    >
+                      <div className="pp-log-lead">
+                        <div className="pp-log-title-row">
+                          <strong className="pp-log-title">Cycle {rebate.cycle_number} Milestone</strong>
+                          <span className={rebate.status === "paid" ? "pp-tag pp-tag-success" : "pp-tag pp-tag-warning"}>
                             {rebate.status === "paid" ? "Paid Out" : "Awaiting Payout"}
                           </span>
                         </div>
-                        <small style={{ color: "var(--ink-3)", fontSize: 12 }}>
-                          {rebate.milestone_pts} points reached
-                        </small>
+                        <span className="pp-log-date">{formatDate(rebate.created_at)} · {rebate.milestone_pts} pts</span>
                       </div>
 
-                      <div style={{ textAlign: "right", flexShrink: 0 }}>
-                        <b className="is-gold" style={{ display: "block", fontSize: 18, lineHeight: 1.2 }}>
-                          {peso(rebate.rebate_amount)}
-                        </b>
-                        <small style={{ color: "var(--ink-3)", fontSize: 11 }}>
-                          {formatDate(rebate.created_at)}
-                        </small>
+                      <div className="pp-log-trail">
+                        <b className="is-gold pp-log-pts">{peso(rebate.rebate_amount)}</b>
+                        <ChevronRight size={16} className="pp-log-chevron" aria-hidden="true" />
                       </div>
                     </li>
                   ))}
@@ -221,43 +234,46 @@ export default function EPointsPage() {
             </section>
           ) : null}
 
-          {/* Points Log Card with Pagination (Badges removed from My Shop & Referred tabs) */}
+          {/* Points Log Card with Pagination */}
           <section className="pp-card pp-card-flush" aria-label="Points log">
             {activeSources.length ? (
               <>
                 <ul className="pp-log">
                   {visibleSources.map((source, index) => {
                     const isPassup = source.depth === 1;
+                    const title = isPassup ? (source.source_partner || "Referred Partner") : `Order ${source.order_code}`;
                     return (
-                      <li key={`${source.order_code}-${index}`} style={{ padding: "14px 16px" }}>
-                        <span>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                      <li
+                        key={`${source.order_code}-${index}`}
+                        className="pp-log-item-interactive"
+                        onClick={() => setSelectedSource(source)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setSelectedSource(source);
+                          }
+                        }}
+                        aria-label={`View details for ${title}`}
+                      >
+                        <div className="pp-log-lead">
+                          <div className="pp-log-title-row">
+                            <strong className="pp-log-title">{title}</strong>
                             {pointsFilter === "all" ? (
-                              <span style={{
-                                fontSize: 10,
-                                fontWeight: 700,
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                padding: "2px 6px",
-                                borderRadius: 4,
-                                background: isPassup ? "var(--blue-soft, #eef2ff)" : "var(--bone-soft, #f4f4f5)",
-                                color: isPassup ? "var(--blue, #2563eb)" : "var(--ink-2, #52525b)",
-                                whiteSpace: "nowrap"
-                              }}>
-                                {isPassup ? "Pass-Up" : "Direct Order"}
+                              <span className={isPassup ? "pp-tag pp-tag-blue" : "pp-tag pp-tag-bone"}>
+                                {isPassup ? "Pass-Up" : "Direct"}
                               </span>
                             ) : null}
-                            <strong style={{ fontSize: 14 }}>
-                              {isPassup ? `Pass-up from ${source.source_partner}` : `Direct Order ${source.order_code}`}
-                            </strong>
                           </div>
-                          <small style={{ color: "var(--ink-3)", fontSize: 12 }}>
-                            {isPassup ? `Earned from downline order ${source.order_code}` : `Direct shop purchase via your link`} · {formatDate(source.created_at)}
-                          </small>
-                        </span>
-                        <b className={isPassup ? "is-passup" : undefined} style={{ fontSize: 16 }}>
-                          +{source.points} {source.points === 1 ? "pt" : "pts"}
-                        </b>
+                          <span className="pp-log-date">{formatDate(source.created_at)}</span>
+                        </div>
+                        <div className="pp-log-trail">
+                          <b className={isPassup ? "is-passup pp-log-pts" : "pp-log-pts"}>
+                            +{source.points} {source.points === 1 ? "pt" : "pts"}
+                          </b>
+                          <ChevronRight size={16} className="pp-log-chevron" aria-hidden="true" />
+                        </div>
                       </li>
                     );
                   })}
@@ -285,6 +301,172 @@ export default function EPointsPage() {
           </section>
         </>
       )}
+
+      {/* Detail Bottom Sheet / Modal (GutGuard Design System Drawer & Modal) */}
+      {selectedSource ? (
+        <div className="pp-sheet-wrap" role="dialog" aria-modal="true" aria-labelledby="pp-sheet-source-title">
+          <div className="pp-sheet-backdrop" onClick={() => setSelectedSource(null)} aria-hidden="true" />
+          <div className="pp-sheet">
+            <div className="pp-sheet-grab" aria-hidden="true" />
+            <div className="pp-sheet-head">
+              <h3 id="pp-sheet-source-title" className="pp-sheet-title">Point Transaction</h3>
+              <button
+                type="button"
+                className="pp-sheet-close"
+                onClick={() => setSelectedSource(null)}
+                aria-label="Close transaction details"
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
+            </div>
+
+            <div className="pp-sheet-body">
+              <div className="pp-sheet-hero">
+                <span className="pp-sheet-hero-kicker">
+                  {selectedSource.depth === 1 ? "Referred Partner Pass-Up" : "Direct Shop Commission"}
+                </span>
+                <h2 className="pp-sheet-hero-val">+{selectedSource.points} E-Points</h2>
+                <span className={selectedSource.depth === 1 ? "pp-tag pp-tag-blue" : "pp-tag pp-tag-bone"}>
+                  {selectedSource.depth === 1 ? "Downline Pass-Up" : "Direct Customer Order"}
+                </span>
+              </div>
+
+              <div className="pp-sheet-dl">
+                <div className="pp-sheet-row">
+                  <span className="pp-sheet-dt">Source</span>
+                  <strong className="pp-sheet-dd">
+                    {selectedSource.depth === 1
+                      ? (selectedSource.source_partner || "Referred Partner")
+                      : "Direct Shop Customer"}
+                  </strong>
+                </div>
+
+                <div className="pp-sheet-row">
+                  <span className="pp-sheet-dt">Order Reference</span>
+                  <div className="pp-sheet-dd-with-action">
+                    <span className="pp-sheet-code">{selectedSource.order_code}</span>
+                    <button
+                      type="button"
+                      className="pp-sheet-copy-btn"
+                      onClick={() => copy(selectedSource.order_code)}
+                      aria-label="Copy order code"
+                    >
+                      {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+                      <span>{copied ? "Copied" : "Copy"}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pp-sheet-row">
+                  <span className="pp-sheet-dt">Transaction Date</span>
+                  <strong className="pp-sheet-dd">{formatDate(selectedSource.created_at)}</strong>
+                </div>
+
+                <div className="pp-sheet-row">
+                  <span className="pp-sheet-dt">Rebate Track</span>
+                  <strong className="pp-sheet-dd">
+                    {selectedSource.depth === 1
+                      ? "Track B · Referred Partners Track"
+                      : "Track A · My Shop Sales Track"}
+                  </strong>
+                </div>
+
+                <div className="pp-sheet-row">
+                  <span className="pp-sheet-dt">Activity Detail</span>
+                  <p className="pp-sheet-note">
+                    {selectedSource.depth === 1
+                      ? `Points passed up from qualifying order placed through referred doctor ${selectedSource.source_partner || "partner"}. Contributes to your group target.`
+                      : "Commission points earned directly from a customer purchase through your GutGuard shop link."}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="pp-sheet-footer">
+              <button
+                type="button"
+                className="shop-secondary pp-sheet-action-btn"
+                onClick={() => setSelectedSource(null)}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {selectedRebate ? (
+        <div className="pp-sheet-wrap" role="dialog" aria-modal="true" aria-labelledby="pp-sheet-rebate-title">
+          <div className="pp-sheet-backdrop" onClick={() => setSelectedRebate(null)} aria-hidden="true" />
+          <div className="pp-sheet">
+            <div className="pp-sheet-grab" aria-hidden="true" />
+            <div className="pp-sheet-head">
+              <h3 id="pp-sheet-rebate-title" className="pp-sheet-title">Milestone Details</h3>
+              <button
+                type="button"
+                className="pp-sheet-close"
+                onClick={() => setSelectedRebate(null)}
+                aria-label="Close milestone details"
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
+            </div>
+
+            <div className="pp-sheet-body">
+              <div className="pp-sheet-hero">
+                <span className="pp-sheet-hero-kicker">Cycle {selectedRebate.cycle_number} Unlocked Milestone</span>
+                <h2 className="pp-sheet-hero-val is-gold">{peso(selectedRebate.rebate_amount)}</h2>
+                <span className={selectedRebate.status === "paid" ? "pp-tag pp-tag-success" : "pp-tag pp-tag-warning"}>
+                  {selectedRebate.status === "paid" ? "Paid Out" : "Awaiting Payout"}
+                </span>
+              </div>
+
+              <div className="pp-sheet-dl">
+                <div className="pp-sheet-row">
+                  <span className="pp-sheet-dt">Milestone Target</span>
+                  <strong className="pp-sheet-dd">{selectedRebate.milestone_pts} Points Reached</strong>
+                </div>
+
+                <div className="pp-sheet-row">
+                  <span className="pp-sheet-dt">Cycle Stage</span>
+                  <strong className="pp-sheet-dd">Cycle {selectedRebate.cycle_number} ({CYCLE_TARGET} pts target)</strong>
+                </div>
+
+                <div className="pp-sheet-row">
+                  <span className="pp-sheet-dt">Date Unlocked</span>
+                  <strong className="pp-sheet-dd">{formatDate(selectedRebate.created_at)}</strong>
+                </div>
+
+                <div className="pp-sheet-row">
+                  <span className="pp-sheet-dt">Disbursement Status</span>
+                  <strong className="pp-sheet-dd">
+                    {selectedRebate.status === "paid"
+                      ? "Paid Out — Transferred to bank account"
+                      : "Awaiting Payout — Pending admin disbursement batch"}
+                  </strong>
+                </div>
+
+                <div className="pp-sheet-row">
+                  <span className="pp-sheet-dt">Information</span>
+                  <p className="pp-sheet-note">
+                    Cash rebates are audited and disbursed directly to your registered bank account by administration upon cycle validation.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="pp-sheet-footer">
+              <button
+                type="button"
+                className="shop-secondary pp-sheet-action-btn"
+                onClick={() => setSelectedRebate(null)}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }

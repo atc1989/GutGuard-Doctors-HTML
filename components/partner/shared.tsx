@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { LoaderCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, LoaderCircle } from "lucide-react";
 import type { PartnerDashboard, PartnerOrder } from "@/lib/api";
 import { partnerLinkKey } from "@/lib/referral";
 
@@ -138,9 +138,33 @@ export function Pagination({
           <option value="10">10</option><option value="25">25</option><option value="50">50</option>
         </select>
       </label>
-      <button type="button" className="shop-secondary" disabled={busy || offset === 0} onClick={() => onOffset(Math.max(0, offset - pageSize))}>Previous</button>
-      <span>{total ? `${offset + 1}–${Math.min(offset + shown, total)} of ${total}` : `0 ${noun}`}</span>
-      <button type="button" className="shop-secondary" disabled={busy || offset + shown >= total} onClick={() => onOffset(offset + pageSize)}>Next</button>
+      <div className="partner-pagination-nav">
+        <span className="partner-pagination-count">
+          {total ? `${offset + 1}–${Math.min(offset + shown, total)} of ${total}` : `0 ${noun}`}
+        </span>
+        <div className="partner-pagination-buttons">
+          <button
+            type="button"
+            className="partner-pagination-btn"
+            disabled={busy || offset === 0}
+            onClick={() => onOffset(Math.max(0, offset - pageSize))}
+            aria-label="Previous page"
+          >
+            <ChevronLeft size={16} aria-hidden="true" />
+            <span className="pp-btn-text">Prev</span>
+          </button>
+          <button
+            type="button"
+            className="partner-pagination-btn"
+            disabled={busy || offset + shown >= total}
+            onClick={() => onOffset(offset + pageSize)}
+            aria-label="Next page"
+          >
+            <span className="pp-btn-text">Next</span>
+            <ChevronRight size={16} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
