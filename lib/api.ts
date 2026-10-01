@@ -305,6 +305,7 @@ export type PartnerDashboard = {
   };
   rebates: Array<{
     cycle_number: number;
+    milestone_type?: "direct" | "referred";
     milestone_pts: number;
     rebate_amount: number;
     status: string;
@@ -1038,6 +1039,7 @@ export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Pr
       const rebateRow = (entry ?? {}) as Record<string, unknown>;
       return {
         cycle_number: Number(rebateRow.cycle_number ?? 1),
+        milestone_type: (rebateRow.milestone_type as "direct" | "referred") ?? "referred",
         milestone_pts: Number(rebateRow.milestone_pts ?? 0),
         rebate_amount: Number(rebateRow.rebate_amount ?? 0),
         status: String(rebateRow.status ?? "unlocked"),
