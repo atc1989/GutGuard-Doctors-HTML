@@ -14,15 +14,17 @@ export default function EPointsPage() {
   const { points, rebates, point_sources: sources = [] } = dashboard;
   const [tab, setTab] = useState<"points" | "rebates">("points");
   const [pointsFilter, setPointsFilter] = useState<"all" | "direct" | "referred">("all");
-  const cyclePct = Math.min(100, (points.points_in_cycle / CYCLE_TARGET) * 100);
+  const [rebateOffset, setRebateOffset] = useState(0);
+  const [rebatePageSize, setRebatePageSize] = useState(10);
 
   const directSources = sources.filter((s) => s.depth === 0);
   const referredSources = sources.filter((s) => s.depth === 1);
   const activeSources = pointsFilter === "direct" ? directSources : pointsFilter === "referred" ? referredSources : sources;
+  const visibleRebates = rebates.slice(rebateOffset, rebateOffset + rebatePageSize);
 
   return (
     <>
-      <PageHeader kicker="E-Points" title={`${points.lifetime_points} pts earned`} lede="Points from your direct orders and from partners you referred count towards cash rebate milestones." />
+      <PageHeader kicker="E-Points" title={`${points.passup_points} Referred Pts · ${points.own_points} Direct Pts`} lede="Points from your direct orders and from partners you referred count towards cash rebate milestones." />
 
       <section className="pp-stats" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }} aria-label="E-Points summary">
         <StatTile label="Pass-up points (Earned)" value={`${points.passup_points} pts`} note="earned from referred downline partners" />
@@ -125,7 +127,12 @@ export default function EPointsPage() {
           </section>
 
           <section className="pp-card" aria-label="Referred partners cycle progress">
-            <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--blue)", marginBottom: 12 }}>Referred Partners Points Accumulation</h3>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--blue)", margin: 0 }}>Referred Partners Points Accumulation</h3>
+              <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--blue)", background: "rgba(4,6,122,0.08)", padding: "2px 8px", borderRadius: 4 }}>
+                Referred Group Target
+              </span>
+            </div>
             <div className="pp-progress-labels">
               <strong>{points.passup_points % CYCLE_TARGET} E-Points · Cycle {points.current_cycle}</strong>
               <span>Target {CYCLE_TARGET}</span>
@@ -157,20 +164,33 @@ export default function EPointsPage() {
           <h2 className="pp-h2">{rebates.length ? `${rebates.length} unlocked ${rebates.length === 1 ? "milestone" : "milestones"}` : "Rebate history"}</h2>
           <section className="pp-card pp-card-flush" aria-label="Rebate history">
             {rebates.length ? (
-              <ul className="pp-log">
-                {rebates.map((rebate, index) => (
-                  <li key={index}>
-                    <span>
-                      <strong>Cycle {rebate.cycle_number} milestone</strong>
-                      <small>{rebate.milestone_pts} points reached</small>
-                    </span>
-                    <span className="pp-log-end">
-                      <b className="is-gold">{peso(rebate.rebate_amount)}</b>
-                      <small>{formatDate(rebate.created_at)}</small>
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <>
+                <ul className="pp-log">
+                  {visibleRebates.map((rebate, index) => (
+                    <li key={index}>
+                      <span>
+                        <strong>Cycle {rebate.cycle_number} milestone</strong>
+                        <small>{rebate.milestone_pts} points reached</small>
+                      </span>
+                      <span className="pp-log-end" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: rebate.status === "paid" ? "#15803d" : "#b45309", background: rebate.status === "paid" ? "#dcfce7" : "#fef3c7", padding: "2px 6px", borderRadius: 10 }}>
+                            {rebate.status === "paid" ? "Paid out" : "Unlocked · Awaiting Payout"}
+                          </span>
+                          <b className="is-gold">{peso(rebate.rebate_amount)}</b>
+                        </div>
+                        <small>{formatDate(rebate.created_at)}</small>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="partner-pagination" aria-label="Rebate history pages">
+                  <label className="partner-pagination-size">Rows<select value={rebatePageSize} onChange={(event) => { setRebatePageSize(Number(event.target.value)); setRebateOffset(0); }}><option value="10">10</option><option value="25">25</option><option value="50">50</option></select></label>
+                  <button type="button" className="shop-secondary" disabled={rebateOffset === 0} onClick={() => setRebateOffset(Math.max(0, rebateOffset - rebatePageSize))}>Previous</button>
+                  <span>{rebates.length ? `${rebateOffset + 1}–${Math.min(rebateOffset + visibleRebates.length, rebates.length)} of ${rebates.length}` : "0 milestones"}</span>
+                  <button type="button" className="shop-secondary" disabled={rebateOffset + visibleRebates.length >= rebates.length} onClick={() => setRebateOffset(rebateOffset + rebatePageSize)}>Next</button>
+                </div>
+              </>
             ) : (
               <EmptyState title="No milestones unlocked yet.">Earn points from your direct referrals and their orders to unlock cash rebates.</EmptyState>
             )}
