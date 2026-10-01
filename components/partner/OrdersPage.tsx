@@ -174,7 +174,6 @@ export default function OrdersPage() {
           label="Order pages" offset={offset} pageSize={size} total={total} shown={orders.length} busy={busy} noun="orders"
           onOffset={(next) => update({ offset: next })} onPageSize={(next) => update({ size: next })}
         />
-        <p className="shop-note pp-note">Buyer contact details are shown so you can follow up on your own orders. Treat them as confidential.</p>
       </section>
 
       {selected ? <OrderDrawer order={selected} onClose={closeDrawer} /> : null}

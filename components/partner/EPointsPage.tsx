@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CYCLE_TARGET, EmptyState, PageHeader, StatTile, formatDate, peso, usePartner } from "./shared";
+import { CYCLE_TARGET, EmptyState, PageHeader, Pagination, StatTile, formatDate, peso, usePartner } from "./shared";
 
 const MILESTONES = [
   { pts: 300, rebate: 18000, label: "Initial movement milestone" },
@@ -14,12 +14,15 @@ export default function EPointsPage() {
   const { points, rebates, point_sources: sources = [] } = dashboard;
   const [tab, setTab] = useState<"points" | "rebates">("rebates");
   const [pointsFilter, setPointsFilter] = useState<"direct" | "referred" | "all">("direct");
+  const [pointsOffset, setPointsOffset] = useState(0);
+  const [pointsPageSize, setPointsPageSize] = useState(10);
   const [rebateOffset, setRebateOffset] = useState(0);
   const [rebatePageSize, setRebatePageSize] = useState(10);
 
   const directSources = sources.filter((s) => s.depth === 0);
   const referredSources = sources.filter((s) => s.depth === 1);
   const activeSources = pointsFilter === "direct" ? directSources : pointsFilter === "referred" ? referredSources : sources;
+  const visibleSources = activeSources.slice(pointsOffset, pointsOffset + pointsPageSize);
   const visibleRebates = rebates.slice(rebateOffset, rebateOffset + rebatePageSize);
 
   return (
@@ -30,17 +33,17 @@ export default function EPointsPage() {
         lede="Track your personal shop sales points and group pass-up points separately. Unlock cash rebates as milestones are achieved."
       />
 
-      {/* 📊 3. Top Overview Stats Bar */}
+      {/* Top Overview Stats Bar */}
       <section className="pp-stats" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }} aria-label="E-Points summary">
-        <StatTile label="🛒 Direct Shop Points" value={`${points.own_points} pts`} note="kept from direct customer orders" />
-        <StatTile label="👥 Referred Pass-Up Points" value={`${points.passup_points} pts`} note="earned from referred downline partners" />
+        <StatTile label="Direct Shop Points" value={`${points.own_points} pts`} note="kept from direct customer orders" />
+        <StatTile label="Referred Pass-Up Points" value={`${points.passup_points} pts`} note="earned from referred downline partners" />
         <StatTile label="Passed Up to Upline" value={`${points.passed_up_to_upline_points} pts`} note="passed up to your sponsor/upline" />
         <StatTile label={`Cycle ${points.current_cycle} Balance`} value={`${points.points_in_cycle} pts`} note={`Target: ${CYCLE_TARGET} pts`} />
       </section>
 
       <div className="pp-seg" role="tablist" aria-label="E-Points view">
         <button type="button" role="tab" aria-selected={tab === "rebates"} className={tab === "rebates" ? "active" : ""} onClick={() => setTab("rebates")}>
-          Rebate History & Tracks <span>{rebates.length}</span>
+          Rebate Tracks & Milestones <span>{rebates.length}</span>
         </button>
         <button type="button" role="tab" aria-selected={tab === "points"} className={tab === "points" ? "active" : ""} onClick={() => setTab("points")}>
           Points Log <span>{sources.length}</span>
@@ -49,11 +52,11 @@ export default function EPointsPage() {
 
       {tab === "rebates" ? (
         <>
-          {/* 🎨 1. Track A: My Shop Sales Rebate Track */}
+          {/* Track A: My Shop Sales Rebate Track */}
           <section className="pp-card" aria-label="Track A My Shop Sales Rebate Track" style={{ marginBottom: 24, border: "1px solid var(--rule)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
               <div>
-                <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)", margin: 0 }}>🛒 Track A: My Shop Sales Rebate Track</h3>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)", margin: 0 }}>Track A: My Shop Sales Rebate Track</h3>
                 <small style={{ color: "var(--ink-3)", fontSize: 13 }}>Direct Customer Orders</small>
               </div>
               <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--ink)", background: "var(--bone-soft)", padding: "4px 10px", borderRadius: 4 }}>
@@ -82,11 +85,11 @@ export default function EPointsPage() {
             </div>
           </section>
 
-          {/* 🎨 1. Track B: Referred Partners Rebate Track */}
+          {/* Track B: Referred Partners Rebate Track */}
           <section className="pp-card" aria-label="Track B Referred Partners Rebate Track" style={{ marginBottom: 24, border: "1px solid var(--blue-soft, #eef2ff)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
               <div>
-                <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--blue)", margin: 0 }}>👥 Track B: Referred Partners Rebate Track</h3>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--blue)", margin: 0 }}>Track B: Referred Partners Rebate Track</h3>
                 <small style={{ color: "var(--ink-3)", fontSize: 13 }}>Group Pass-Ups</small>
               </div>
               <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--blue)", background: "rgba(4,6,122,0.08)", padding: "4px 10px", borderRadius: 4 }}>
@@ -138,12 +141,16 @@ export default function EPointsPage() {
                     </li>
                   ))}
                 </ul>
-                <div className="partner-pagination" aria-label="Rebate history pages">
-                  <label className="partner-pagination-size">Rows<select value={rebatePageSize} onChange={(event) => { setRebatePageSize(Number(event.target.value)); setRebateOffset(0); }}><option value="10">10</option><option value="25">25</option><option value="50">50</option></select></label>
-                  <button type="button" className="shop-secondary" disabled={rebateOffset === 0} onClick={() => setRebateOffset(Math.max(0, rebateOffset - rebatePageSize))}>Previous</button>
-                  <span>{rebates.length ? `${rebateOffset + 1}–${Math.min(rebateOffset + visibleRebates.length, rebates.length)} of ${rebates.length}` : "0 milestones"}</span>
-                  <button type="button" className="shop-secondary" disabled={rebateOffset + visibleRebates.length >= rebates.length} onClick={() => setRebateOffset(rebateOffset + rebatePageSize)}>Next</button>
-                </div>
+                <Pagination
+                  label="Rebate history pages"
+                  offset={rebateOffset}
+                  pageSize={rebatePageSize}
+                  total={rebates.length}
+                  shown={visibleRebates.length}
+                  noun="milestones"
+                  onOffset={(next) => setRebateOffset(next)}
+                  onPageSize={(next) => { setRebatePageSize(next); setRebateOffset(0); }}
+                />
               </>
             ) : (
               <EmptyState title="No milestones unlocked yet.">Earn points from your direct referrals and their orders to unlock cash rebates.</EmptyState>
@@ -152,25 +159,25 @@ export default function EPointsPage() {
         </>
       ) : (
         <>
-          {/* ⚡ 2. Points Log Tab (Sub-Tab 1: My Shop Points / Sub-Tab 2: Referred Partners Points) */}
+          {/* Points Log Tab (Shortened labels, no emojis, no inline badge spans) */}
           <div className="pp-seg" style={{ marginTop: 0, marginBottom: 16 }} role="tablist" aria-label="Filter points origin">
-            <button type="button" role="tab" aria-selected={pointsFilter === "direct"} className={pointsFilter === "direct" ? "active" : ""} onClick={() => setPointsFilter("direct")}>
-              🛒 Sub-Tab 1: My Shop Points <span style={{ marginLeft: 6, padding: "2px 8px", background: "var(--bone-soft)", borderRadius: 12, fontSize: 11, fontWeight: 700 }}>{points.own_points} Direct Pts</span>
+            <button type="button" role="tab" aria-selected={pointsFilter === "direct"} className={pointsFilter === "direct" ? "active" : ""} onClick={() => { setPointsFilter("direct"); setPointsOffset(0); }}>
+              My Shop <span>{directSources.length}</span>
             </button>
-            <button type="button" role="tab" aria-selected={pointsFilter === "referred"} className={pointsFilter === "referred" ? "active" : ""} onClick={() => setPointsFilter("referred")}>
-              👥 Sub-Tab 2: Referred Partners Points <span style={{ marginLeft: 6, padding: "2px 8px", background: "var(--blue-soft, #eef2ff)", color: "var(--blue)", borderRadius: 12, fontSize: 11, fontWeight: 700 }}>{points.passup_points} Referred Pts</span>
+            <button type="button" role="tab" aria-selected={pointsFilter === "referred"} className={pointsFilter === "referred" ? "active" : ""} onClick={() => { setPointsFilter("referred"); setPointsOffset(0); }}>
+              Referred Partners <span>{referredSources.length}</span>
             </button>
-            <button type="button" role="tab" aria-selected={pointsFilter === "all"} className={pointsFilter === "all" ? "active" : ""} onClick={() => setPointsFilter("all")}>
+            <button type="button" role="tab" aria-selected={pointsFilter === "all"} className={pointsFilter === "all" ? "active" : ""} onClick={() => { setPointsFilter("all"); setPointsOffset(0); }}>
               All Activity <span>{sources.length}</span>
             </button>
           </div>
 
-          {/* Leaderboard Grid when Referred Partners Points selected */}
+          {/* Leaderboard Grid when Referred Partners selected */}
           {pointsFilter === "referred" && referredSources.length ? (
             <section className="pp-card" style={{ marginBottom: 16 }} aria-label="Downline leaderboard">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                 <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--blue)", margin: 0, textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                  Downline Leaderboard Grid
+                  Downline Leaderboard
                 </h3>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "var(--blue)" }}>
                   {points.passup_points} Referred Pts Total
@@ -196,42 +203,55 @@ export default function EPointsPage() {
             </section>
           ) : null}
 
+          {/* Points Log Card with Pagination */}
           <section className="pp-card pp-card-flush" aria-label="Points log">
             {activeSources.length ? (
-              <ul className="pp-log">
-                {activeSources.map((source, index) => {
-                  const isPassup = source.depth === 1;
-                  return (
-                    <li key={`${source.order_code}-${index}`} style={{ padding: "14px 16px" }}>
-                      <span>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                          <span style={{
-                            fontSize: 10,
-                            fontWeight: 700,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.5px",
-                            padding: "2px 6px",
-                            borderRadius: 4,
-                            background: isPassup ? "var(--blue-soft, #eef2ff)" : "var(--bone-soft, #f4f4f5)",
-                            color: isPassup ? "var(--blue, #2563eb)" : "var(--ink-2, #52525b)"
-                          }}>
-                            {isPassup ? "👥 Pass-Up" : "🛒 Direct Order"}
-                          </span>
-                          <strong style={{ fontSize: 14 }}>
-                            {isPassup ? `Pass-up from ${source.source_partner}` : `Direct Order ${source.order_code}`}
-                          </strong>
-                        </div>
-                        <small style={{ color: "var(--ink-3)", fontSize: 12 }}>
-                          {isPassup ? `Earned from downline order ${source.order_code}` : `Direct shop purchase via your link`} · {formatDate(source.created_at)}
-                        </small>
-                      </span>
-                      <b className={isPassup ? "is-passup" : undefined} style={{ fontSize: 16 }}>
-                        +{source.points} {source.points === 1 ? "pt" : "pts"}
-                      </b>
-                    </li>
-                  );
-                })}
-              </ul>
+              <>
+                <ul className="pp-log">
+                  {visibleSources.map((source, index) => {
+                    const isPassup = source.depth === 1;
+                    return (
+                      <li key={`${source.order_code}-${index}`} style={{ padding: "14px 16px" }}>
+                        <span>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                            <span style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.5px",
+                              padding: "2px 6px",
+                              borderRadius: 4,
+                              background: isPassup ? "var(--blue-soft, #eef2ff)" : "var(--bone-soft, #f4f4f5)",
+                              color: isPassup ? "var(--blue, #2563eb)" : "var(--ink-2, #52525b)"
+                            }}>
+                              {isPassup ? "Pass-Up" : "Direct Order"}
+                            </span>
+                            <strong style={{ fontSize: 14 }}>
+                              {isPassup ? `Pass-up from ${source.source_partner}` : `Direct Order ${source.order_code}`}
+                            </strong>
+                          </div>
+                          <small style={{ color: "var(--ink-3)", fontSize: 12 }}>
+                            {isPassup ? `Earned from downline order ${source.order_code}` : `Direct shop purchase via your link`} · {formatDate(source.created_at)}
+                          </small>
+                        </span>
+                        <b className={isPassup ? "is-passup" : undefined} style={{ fontSize: 16 }}>
+                          +{source.points} {source.points === 1 ? "pt" : "pts"}
+                        </b>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <Pagination
+                  label="Points log pages"
+                  offset={pointsOffset}
+                  pageSize={pointsPageSize}
+                  total={activeSources.length}
+                  shown={visibleSources.length}
+                  noun="transactions"
+                  onOffset={(next) => setPointsOffset(next)}
+                  onPageSize={(next) => { setPointsPageSize(next); setPointsOffset(0); }}
+                />
+              </>
             ) : (
               <EmptyState title={pointsFilter === "direct" ? "No direct shop points yet." : pointsFilter === "referred" ? "No pass-up points from referred partners yet." : "No points recorded yet."}>
                 {pointsFilter === "direct"
