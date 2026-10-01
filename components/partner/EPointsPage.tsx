@@ -41,12 +41,13 @@ export default function EPointsPage() {
         <StatTile label={`Cycle ${points.current_cycle} Balance`} value={`${points.points_in_cycle} pts`} note={`Target: ${CYCLE_TARGET} pts`} />
       </section>
 
+      {/* Main Tab Bar (Shortened, no numbers) */}
       <div className="pp-seg" role="tablist" aria-label="E-Points view">
         <button type="button" role="tab" aria-selected={tab === "rebates"} className={tab === "rebates" ? "active" : ""} onClick={() => setTab("rebates")}>
-          Rebate Tracks & Milestones <span>{rebates.length}</span>
+          Rebates
         </button>
         <button type="button" role="tab" aria-selected={tab === "points"} className={tab === "points" ? "active" : ""} onClick={() => setTab("points")}>
-          Points Log <span>{sources.length}</span>
+          Points Log
         </button>
       </div>
 
@@ -124,20 +125,37 @@ export default function EPointsPage() {
               <>
                 <ul className="pp-log">
                   {visibleRebates.map((rebate, index) => (
-                    <li key={index}>
-                      <span>
-                        <strong>Cycle {rebate.cycle_number} milestone</strong>
-                        <small>{rebate.milestone_pts} points reached</small>
-                      </span>
-                      <span className="pp-log-end" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: rebate.status === "paid" ? "#15803d" : "#b45309", background: rebate.status === "paid" ? "#dcfce7" : "#fef3c7", padding: "2px 6px", borderRadius: 10 }}>
-                            {rebate.status === "paid" ? "Paid out" : "Unlocked · Awaiting Payout"}
+                    <li key={index} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "14px 16px" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          <strong style={{ fontSize: 14 }}>Cycle {rebate.cycle_number} Milestone</strong>
+                          <span style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.04em",
+                            color: rebate.status === "paid" ? "#15803d" : "#b45309",
+                            background: rebate.status === "paid" ? "#dcfce7" : "#fef3c7",
+                            padding: "2px 7px",
+                            borderRadius: 10,
+                            whiteSpace: "nowrap"
+                          }}>
+                            {rebate.status === "paid" ? "Paid Out" : "Awaiting Payout"}
                           </span>
-                          <b className="is-gold">{peso(rebate.rebate_amount)}</b>
                         </div>
-                        <small>{formatDate(rebate.created_at)}</small>
-                      </span>
+                        <small style={{ color: "var(--ink-3)", fontSize: 12 }}>
+                          {rebate.milestone_pts} points reached
+                        </small>
+                      </div>
+
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <b className="is-gold" style={{ display: "block", fontSize: 18, lineHeight: 1.2 }}>
+                          {peso(rebate.rebate_amount)}
+                        </b>
+                        <small style={{ color: "var(--ink-3)", fontSize: 11 }}>
+                          {formatDate(rebate.created_at)}
+                        </small>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -159,16 +177,16 @@ export default function EPointsPage() {
         </>
       ) : (
         <>
-          {/* Points Log Tab (Shortened labels, no emojis, no inline badge spans) */}
+          {/* Sub-Tab Bar (Shortened, no numbers, clean layout) */}
           <div className="pp-seg" style={{ marginTop: 0, marginBottom: 16 }} role="tablist" aria-label="Filter points origin">
             <button type="button" role="tab" aria-selected={pointsFilter === "direct"} className={pointsFilter === "direct" ? "active" : ""} onClick={() => { setPointsFilter("direct"); setPointsOffset(0); }}>
-              My Shop <span>{directSources.length}</span>
+              My Shop
             </button>
             <button type="button" role="tab" aria-selected={pointsFilter === "referred"} className={pointsFilter === "referred" ? "active" : ""} onClick={() => { setPointsFilter("referred"); setPointsOffset(0); }}>
-              Referred Partners <span>{referredSources.length}</span>
+              Referred
             </button>
             <button type="button" role="tab" aria-selected={pointsFilter === "all"} className={pointsFilter === "all" ? "active" : ""} onClick={() => { setPointsFilter("all"); setPointsOffset(0); }}>
-              All Activity <span>{sources.length}</span>
+              All Activity
             </button>
           </div>
 
@@ -203,7 +221,7 @@ export default function EPointsPage() {
             </section>
           ) : null}
 
-          {/* Points Log Card with Pagination */}
+          {/* Points Log Card with Pagination (Badges removed from My Shop & Referred tabs) */}
           <section className="pp-card pp-card-flush" aria-label="Points log">
             {activeSources.length ? (
               <>
@@ -214,18 +232,21 @@ export default function EPointsPage() {
                       <li key={`${source.order_code}-${index}`} style={{ padding: "14px 16px" }}>
                         <span>
                           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                            <span style={{
-                              fontSize: 10,
-                              fontWeight: 700,
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              padding: "2px 6px",
-                              borderRadius: 4,
-                              background: isPassup ? "var(--blue-soft, #eef2ff)" : "var(--bone-soft, #f4f4f5)",
-                              color: isPassup ? "var(--blue, #2563eb)" : "var(--ink-2, #52525b)"
-                            }}>
-                              {isPassup ? "Pass-Up" : "Direct Order"}
-                            </span>
+                            {pointsFilter === "all" ? (
+                              <span style={{
+                                fontSize: 10,
+                                fontWeight: 700,
+                                textTransform: "uppercase",
+                                letterSpacing: "0.5px",
+                                padding: "2px 6px",
+                                borderRadius: 4,
+                                background: isPassup ? "var(--blue-soft, #eef2ff)" : "var(--bone-soft, #f4f4f5)",
+                                color: isPassup ? "var(--blue, #2563eb)" : "var(--ink-2, #52525b)",
+                                whiteSpace: "nowrap"
+                              }}>
+                                {isPassup ? "Pass-Up" : "Direct Order"}
+                              </span>
+                            ) : null}
                             <strong style={{ fontSize: 14 }}>
                               {isPassup ? `Pass-up from ${source.source_partner}` : `Direct Order ${source.order_code}`}
                             </strong>
