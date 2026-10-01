@@ -89,20 +89,27 @@ export default function SharePage() {
       <div className="pp-screen">
         <PageHeader kicker="Share & grow" title="Your QR codes" lede="Choose what you want people to open when they scan." />
 
+        {/* Universal Tab Navigation (Outside Card) */}
+        <div className="pp-seg" role="tablist" aria-label="QR code mode" style={{ marginTop: 20, marginBottom: 16 }}>
+          {MODES.map((item) => (
+            <button
+              key={item.mode}
+              type="button"
+              role="tab"
+              data-qr-mode={item.mode}
+              className={qrMode === item.mode ? "active" : ""}
+              aria-selected={qrMode === item.mode}
+              tabIndex={qrMode === item.mode ? 0 : -1}
+              onKeyDown={(event) => moveQrTab(event, item.mode)}
+              onClick={() => setQrMode(item.mode)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
         <section className="pp-card pp-share">
           <div className="pp-share-controls">
-            <div className="partner-qr-toggle" role="tablist" aria-label="QR code type">
-              {MODES.map((item) => (
-                <button
-                  key={item.mode} type="button" role="tab" data-qr-mode={item.mode}
-                  className={qrMode === item.mode ? "active" : ""} aria-selected={qrMode === item.mode}
-                  tabIndex={qrMode === item.mode ? 0 : -1} onKeyDown={(event) => moveQrTab(event, item.mode)}
-                  onClick={() => setQrMode(item.mode)}
-                >
-                  <strong>{item.label}</strong>
-                </button>
-              ))}
-            </div>
             <p className="partner-qr-description" role="tabpanel">{active.description}</p>
             <p className="partner-link" ref={linkRef}>{link}</p>
             <button type="button" className="shop-primary pp-block-btn" onClick={copyLink}><span>{copied ? "Copied" : "Copy link"}</span></button>
