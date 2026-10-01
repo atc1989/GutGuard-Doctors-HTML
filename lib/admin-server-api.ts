@@ -1,4 +1,9 @@
-import { isSupabaseConfigured, supabase, supabaseShop, SHOP_SCHEMA } from "@/lib/supabase";
+import { SHOP_SCHEMA } from "@/lib/supabase";
+import {
+  isSupabaseAdminConfigured as isSupabaseConfigured,
+  supabaseAdmin as supabase,
+  supabaseAdminShop as supabaseShop,
+} from "@/lib/supabase-admin";
 import type { AdminTestimonial, TestimonialStatus } from "@/lib/testimonials";
 import type { Prize, WheelPrize, WheelPrizeInput } from "@/lib/types";
 import type {
