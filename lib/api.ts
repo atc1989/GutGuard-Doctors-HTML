@@ -295,6 +295,8 @@ export type PartnerDashboard = {
     referred_paid_amount: number;
   };
   points: {
+    direct_points: number;
+    referred_points: number;
     current_cycle: number;
     points_in_cycle: number;
     lifetime_points: number;
@@ -1032,6 +1034,8 @@ export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Pr
       referred_paid_amount: Number(totals.referred_paid_amount ?? 0),
     },
     points: {
+      direct_points: Number(points.own_points ?? points.direct_points ?? 0),
+      referred_points: Number(points.passup_points ?? points.referred_points ?? 0),
       current_cycle: Number(points.current_cycle ?? 1),
       points_in_cycle: Number(points.points_in_cycle ?? 0),
       lifetime_points: Number(points.total_all_time ?? points.lifetime_points ?? 0),
