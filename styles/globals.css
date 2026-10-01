@@ -4889,6 +4889,8 @@
   justify-content: center;
   gap: 12px;
   flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
 }
 
 .partner-pagination .shop-secondary {
@@ -4896,6 +4898,9 @@
   width: auto;
   margin: 0;
   padding: 8px 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .partner-pagination span {
