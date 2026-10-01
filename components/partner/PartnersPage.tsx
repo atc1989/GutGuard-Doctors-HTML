@@ -159,7 +159,6 @@ export default function PartnersPage() {
           className={tab === "hierarchy" ? "active" : ""}
           onClick={() => setTab("hierarchy")}
         >
-          <Layers size={16} aria-hidden="true" style={{ marginRight: 6 }} />
           Team Hierarchy
         </button>
         <button
@@ -169,7 +168,6 @@ export default function PartnersPage() {
           className={tab === "directory" ? "active" : ""}
           onClick={() => setTab("directory")}
         >
-          <List size={16} aria-hidden="true" style={{ marginRight: 6 }} />
           Partner Directory
         </button>
       </div>
@@ -504,19 +502,17 @@ export default function PartnersPage() {
               </div>
             </div>
 
-            <div className="pp-sheet-footer" style={{ display: "flex", gap: 10 }}>
+            <div className="pp-sheet-footer">
               <Link
                 href="/partner/orders?scope=referred"
-                className="shop-primary"
-                style={{ flex: 1, minHeight: 44, justifyContent: "center" }}
+                className="shop-primary pp-sheet-btn-primary"
                 onClick={() => setSelectedPartner(null)}
               >
                 View Referred Orders
               </Link>
               <button
                 type="button"
-                className="shop-secondary"
-                style={{ minHeight: 44, padding: "0 20px" }}
+                className="shop-secondary pp-sheet-btn-secondary"
                 onClick={() => setSelectedPartner(null)}
               >
                 Done

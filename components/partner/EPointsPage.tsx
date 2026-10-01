@@ -386,7 +386,7 @@ export default function EPointsPage() {
             <div className="pp-sheet-footer">
               <button
                 type="button"
-                className="shop-secondary pp-sheet-action-btn"
+                className="shop-secondary pp-sheet-btn-secondary pp-sheet-action-btn"
                 onClick={() => setSelectedSource(null)}
               >
                 Done
@@ -459,7 +459,7 @@ export default function EPointsPage() {
             <div className="pp-sheet-footer">
               <button
                 type="button"
-                className="shop-secondary pp-sheet-action-btn"
+                className="shop-secondary pp-sheet-btn-secondary pp-sheet-action-btn"
                 onClick={() => setSelectedRebate(null)}
               >
                 Done
