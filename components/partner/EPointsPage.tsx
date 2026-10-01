@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, ChevronRight, Copy, X } from "lucide-react";
+import Link from "next/link";
+import { Check, ChevronRight, Copy, Users, X } from "lucide-react";
 import { CYCLE_TARGET, EmptyState, PageHeader, Pagination, StatTile, formatDate, peso, useCopy, usePartner } from "./shared";
 
 const MILESTONES = [
@@ -203,36 +204,36 @@ export default function EPointsPage() {
             </button>
           </div>
 
-          {/* Leaderboard Grid when Referred Partners selected */}
-          {pointsFilter === "referred" && referredSources.length ? (
-            <section className="pp-card" style={{ marginBottom: 16 }} aria-label="Downline leaderboard">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <h3 style={{ fontSize: 14, fontWeight: 700, color: "var(--blue)", margin: 0, textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                  Downline Leaderboard
-                </h3>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--blue)" }}>
-                  {points.passup_points} Referred Pts Total
+          {/* Link banner to Team Hierarchy when Referred filter is active */}
+          {pointsFilter === "referred" && (
+            <div
+              className="pp-card"
+              style={{
+                marginBottom: 16,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "14px 18px",
+                background: "var(--paper)",
+                border: "1px solid var(--rule-soft)",
+                flexWrap: "wrap",
+                gap: 12,
+              }}
+            >
+              <div>
+                <span style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-3)" }}>
+                  Network Performance
                 </span>
+                <strong style={{ display: "block", fontSize: 15, color: "var(--ink)", marginTop: 2 }}>
+                  {points.passup_points} Referred E-Points from {referredSources.length} Downline Orders
+                </strong>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
-                {Array.from(
-                  referredSources.reduce((map, item) => {
-                    const name = item.source_partner || "Unknown Partner";
-                    map.set(name, (map.get(name) || 0) + item.points);
-                    return map;
-                  }, new Map<string, number>())
-                ).map(([partnerName, pts]) => (
-                  <div key={partnerName} style={{ background: "var(--paper)", padding: "14px 16px", borderRadius: "var(--r-md)", border: "1px solid var(--rule-soft)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <small style={{ color: "var(--ink-3)", fontSize: 12, display: "block" }}>Partner</small>
-                      <strong style={{ color: "var(--ink)", fontSize: 14, display: "block", marginTop: 2 }}>{partnerName}</strong>
-                    </div>
-                    <strong style={{ color: "var(--blue)", fontSize: 15, background: "var(--blue-soft, #eef2ff)", padding: "4px 8px", borderRadius: 6 }}>+{pts} pts</strong>
-                  </div>
-                ))}
-              </div>
-            </section>
-          ) : null}
+              <Link href="/partner/partners" className="shop-secondary" style={{ minHeight: 38, padding: "0 16px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <Users size={16} aria-hidden="true" />
+                <span>View Team Hierarchy →</span>
+              </Link>
+            </div>
+          )}
 
           {/* Points Log Card with Pagination */}
           <section className="pp-card pp-card-flush" aria-label="Points log">
