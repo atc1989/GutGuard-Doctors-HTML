@@ -1,3 +1,4 @@
+import { adminErrorMessage } from "@/lib/admin-error";
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
 import { serverSendNewsletter } from "@/lib/admin-server-api";
@@ -14,7 +15,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to send newsletter." },
+      { error: adminErrorMessage(error, "Failed to send newsletter.") },
       { status: 500 },
     );
   }

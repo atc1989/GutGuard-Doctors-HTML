@@ -1,3 +1,4 @@
+import { adminErrorMessage } from "@/lib/admin-error";
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
 import { serverAdminListWheelPrizes, serverAdminSaveWheelPrize } from "@/lib/admin-server-api";
@@ -13,7 +14,7 @@ export async function GET() {
     return NextResponse.json({ prizes });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to load wheel prizes." },
+      { error: adminErrorMessage(error, "Failed to load wheel prizes.") },
       { status: 500 },
     );
   }
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ prize: saved });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to save wheel prize." },
+      { error: adminErrorMessage(error, "Failed to save wheel prize.") },
       { status: 500 },
     );
   }

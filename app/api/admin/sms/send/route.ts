@@ -1,3 +1,4 @@
+import { adminErrorMessage } from "@/lib/admin-error";
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
 import { serverSendSmsBlast } from "@/lib/admin-server-api";
@@ -14,7 +15,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to send SMS blast." },
+      { error: adminErrorMessage(error, "Failed to send SMS blast.") },
       { status: 500 },
     );
   }

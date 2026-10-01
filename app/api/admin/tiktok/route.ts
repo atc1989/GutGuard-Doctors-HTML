@@ -1,3 +1,4 @@
+import { adminErrorMessage } from "@/lib/admin-error";
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
 import { serverCallTikTokAdminApi } from "@/lib/admin-server-api";
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "TikTok admin action failed." },
+      { error: adminErrorMessage(error, "TikTok admin action failed.") },
       { status: 500 },
     );
   }
