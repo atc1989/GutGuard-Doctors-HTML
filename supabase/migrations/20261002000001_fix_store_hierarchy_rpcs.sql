@@ -325,6 +325,21 @@ BEGIN
       FROM doctors.milestone_unlocks m
       WHERE m.partner_id = v_doctor.id
     ),
+    'point_sources', (
+      SELECT coalesce(jsonb_agg(
+        jsonb_build_object(
+          'order_code', coalesce(o.order_code, pp.order_id::text),
+          'points', pp.points,
+          'depth', pp.depth,
+          'source_partner', coalesce(seller.full_name, 'Direct Customer'),
+          'created_at', pp.created_at
+        ) ORDER BY pp.created_at DESC
+      ), '[]'::jsonb)
+      FROM doctors.partner_points pp
+      LEFT JOIN public.shop_orders o ON o.id = pp.order_id
+      LEFT JOIN doctors.doctor_registrations seller ON seller.id = o.referral_doctor_id
+      WHERE pp.partner_id = v_doctor.id
+    ),
     'totals', (
       select jsonb_build_object(
         'direct_orders', count(*) filter (where source.id = v_doctor.id),
@@ -530,6 +545,21 @@ BEGIN
       ), '[]'::jsonb)
       FROM sandbox.milestone_unlocks m
       WHERE m.partner_id = v_doctor.id
+    ),
+    'point_sources', (
+      SELECT coalesce(jsonb_agg(
+        jsonb_build_object(
+          'order_code', coalesce(o.order_code, pp.order_id::text),
+          'points', pp.points,
+          'depth', pp.depth,
+          'source_partner', coalesce(seller.full_name, 'Direct Customer'),
+          'created_at', pp.created_at
+        ) ORDER BY pp.created_at DESC
+      ), '[]'::jsonb)
+      FROM sandbox.partner_points pp
+      LEFT JOIN sandbox.shop_orders o ON o.id = pp.order_id
+      LEFT JOIN doctors.doctor_registrations seller ON seller.id = o.referral_doctor_id
+      WHERE pp.partner_id = v_doctor.id
     ),
     'totals', (
       select jsonb_build_object(
