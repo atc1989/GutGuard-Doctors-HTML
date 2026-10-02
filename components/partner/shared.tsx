@@ -84,12 +84,11 @@ export function useCopy() {
   return { copied, copy };
 }
 
-export function PageHeader({ kicker, title, lede }: { kicker: string; title: string; lede?: string }) {
+export function PageHeader({ kicker, title }: { kicker: string; title: string }) {
   return (
     <header className="pp-page-head">
       <p className="shop-kicker">{kicker}</p>
       <h1>{title}</h1>
-      {lede ? <p className="pp-lede">{lede}</p> : null}
     </header>
   );
 }

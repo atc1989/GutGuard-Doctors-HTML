@@ -108,12 +108,11 @@ export default function SharePage() {
 
   return (
     <>
-      <div className="pp-screen">
-        <PageHeader kicker="Share & grow" title="Your QR codes" lede="Choose what you want people to open when they scan." />
+      <PageHeader kicker="Share & grow" title="Your QR codes" />
 
-        {/* Universal Tab Navigation (Outside Card) */}
-        <div className="pp-seg" role="tablist" aria-label="QR code mode" style={{ marginTop: 20, marginBottom: 16 }}>
-          {MODES.map((item) => (
+      {/* Universal Tab Navigation (Outside Card) */}
+      <div className="pp-seg" role="tablist" aria-label="QR code mode">
+        {MODES.map((item) => (
             <button
               key={item.mode}
               type="button"
@@ -193,7 +192,6 @@ export default function SharePage() {
             )}
           </div>
         </section>
-      </div>
 
       {posterOpen ? (
         <div className="partner-poster-modal" role="dialog" aria-modal="true" aria-labelledby="poster-title">

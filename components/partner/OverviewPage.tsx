@@ -27,7 +27,6 @@ export default function OverviewPage() {
       <PageHeader
         kicker={isAffiliate ? "🌱 Affiliate Partner Dashboard" : "🛍️ Lifestyle Partner Dashboard"}
         title={dashboard.partner.full_name}
-        lede="Track orders placed through your shop link and through partners you referred."
       />
 
       {isAffiliate && (

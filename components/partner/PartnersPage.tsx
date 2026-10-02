@@ -123,7 +123,6 @@ export default function PartnersPage() {
       <PageHeader
         kicker="Downline & Referrals"
         title="Partner Network & Team Hierarchy"
-        lede="Explore your referred doctors network, view individual E-Point pass-up contributions, and track team growth."
       />
 
       {/* Overview Stats Strip */}

@@ -53,7 +53,6 @@ export default function EPointsPage() {
       <PageHeader
         kicker="E-Points & Rebates"
         title="Point Balances & Cash Rebates"
-        lede="Track your personal shop sales points and group pass-up points separately. Unlock cash rebates as milestones are achieved."
       />
 
       {/* Top Overview Stats Bar */}

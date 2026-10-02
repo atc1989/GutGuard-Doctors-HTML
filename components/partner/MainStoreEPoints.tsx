@@ -69,7 +69,6 @@ export default function MainStoreEPointsPage() {
       <PageHeader
         kicker="E-Points & rebates"
         title="Points & Cash Rebates"
-        lede="Track points pooled from your direct Shop sales and downline store pass-ups toward 1,500-point cash rebate cycles."
       />
 
       {/* Top Overview Stats Bar */}

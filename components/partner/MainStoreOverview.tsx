@@ -58,7 +58,6 @@ export default function MainStoreOverview() {
       <PageHeader
         kicker="Main store umbrella"
         title={dashboard.partner.full_name}
-        lede="Oversee all descendant Lifestyle and Affiliate stores under your Main Store umbrella."
       />
 
       <section className="pp-stats" aria-label="Summary">
