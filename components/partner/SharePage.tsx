@@ -33,7 +33,7 @@ export default function SharePage() {
     },
     {
       mode: "referral",
-      label: isMainStore ? "Partner Registration QR" : isReferralLocked ? "🔒 Referral QR" : "Referral QR",
+      label: isMainStore ? "Partner Registration QR" : isReferralLocked ? "Referral QR (Locked)" : "Referral QR",
       description: isMainStore
         ? "Invite new partner stores to register under your Main Store umbrella."
         : isReferralLocked
@@ -134,18 +134,18 @@ export default function SharePage() {
           <div className="pp-share-controls">
             {qrMode === "referral" && isReferralLocked ? (
               <div style={{
-                background: "#fef3c7",
-                border: "1px solid #fde047",
-                borderRadius: "8px",
+                background: "var(--bone-soft)",
+                border: "1px solid var(--rule-soft)",
+                borderRadius: "var(--r-md)",
                 padding: "16px",
                 marginTop: "16px",
-                color: "#92400e",
+                color: "var(--ink)",
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 700, marginBottom: "6px" }}>
                   <Lock size={18} />
                   <span>Referral QR is Locked for Affiliate Stores</span>
                 </div>
-                <p style={{ margin: 0, fontSize: "13px", lineHeight: 1.5 }}>
+                <p style={{ margin: 0, fontSize: "13px", lineHeight: 1.5, color: "var(--ink-2)" }}>
                   New partner accounts start in Affiliate mode with partner recruitment disabled. As soon as a customer completes a paid purchase through your <strong>Shop QR</strong>, your account will automatically promote to a <strong>Lifestyle Store</strong> and activate this Referral QR!
                 </p>
               </div>
@@ -167,13 +167,13 @@ export default function SharePage() {
                 alignItems: "center",
                 justifyContent: "center",
                 padding: "48px 24px",
-                background: "var(--bone-soft, #f8fafc)",
-                borderRadius: "12px",
-                border: "1px dashed var(--rule, #cbd5e1)",
+                background: "var(--bone-soft)",
+                borderRadius: "var(--r-md)",
+                border: "1px dashed var(--rule)",
                 textAlign: "center",
                 minHeight: "260px"
               }}>
-                <Lock size={40} color="#94a3b8" style={{ marginBottom: "12px" }} />
+                <Lock size={40} color="var(--ink-3)" style={{ marginBottom: "12px" }} />
                 <strong style={{ color: "var(--ink-2)" }}>Referral QR Inactive</strong>
                 <p style={{ margin: "8px 0 0", fontSize: "13px", color: "var(--ink-3)", maxWidth: "260px" }}>
                   Make your 1st paid shop sale to automatically unlock!
