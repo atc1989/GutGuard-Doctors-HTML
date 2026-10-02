@@ -2,7 +2,7 @@
 // The order, Maya and first-buyer endpoints are intercepted, so it runs without Supabase or Maya keys.
 const { chromium } = require('playwright');
 const B = process.env.BASE || 'http://localhost:3100';
-const OUT = process.env.SHOTS || "shots";
+const OUT = process.env.SHOTS || require('os').tmpdir() + '/gg-shots';
 require('fs').mkdirSync(OUT, { recursive: true });
 let fails = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fails++; };
 

@@ -11,8 +11,15 @@ let buyerLimiter: Ratelimit | null = null;
 
 // 30 first-buyer checks (and 30 order attempts) per IP per 10 minutes. Both answer whether a
 // number has a recent paid order, so they must not be usable to test numbers in bulk.
+let warnedNoLimiter = false;
 function getBuyerLimiter(): Ratelimit | null {
-  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) return null;
+  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+    if (process.env.VERCEL_ENV === "production" && !warnedNoLimiter) {
+      warnedNoLimiter = true;
+      console.warn("[shop] UPSTASH_REDIS_REST_URL/TOKEN not set: /api/shop/* is not rate limited");
+    }
+    return null;
+  }
   if (!buyerLimiter) {
     buyerLimiter = new Ratelimit({
       redis: Redis.fromEnv(),
@@ -69,7 +76,9 @@ function getLoginLimiter(): Ratelimit | null {
 export async function proxy(req: NextRequest) {
   // 1. Canonical Host Redirect: Redirect any *.vercel.app request to custom domain
   const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "").toLowerCase();
-  if (host.endsWith(".vercel.app") && !host.includes("localhost")) {
+  // Production only (Addendum 05): preview deployments stay on their own *.vercel.app address,
+  // so a pull request can be tested before it reaches the live domains.
+  if (host.endsWith(".vercel.app") && !host.includes("localhost") && process.env.VERCEL_ENV === "production") {
     const targetOrigin = (process.env.NEXT_PUBLIC_SITE_URL || "https://partners.gutguard.ph").replace(/\/$/, "");
     const targetUrl = new URL(req.nextUrl.pathname + req.nextUrl.search, targetOrigin);
     return NextResponse.redirect(targetUrl, 308);

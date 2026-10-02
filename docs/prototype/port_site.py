@@ -263,6 +263,21 @@ rep('''href={LIFESTYLE_HOME + "#" + (order.forOther ? (order.newMember ? "card" 
 rep('''<div className="sl-conote" style={{ marginTop: 6 }}>By paying, you agree to the <u>Terms of Sale</u> and the <u>Privacy Notice</u>.{!member ? " Your free Lifestyle card is made from these details." : ""}</div>''',
     '''<div className="sl-conote" style={{ marginTop: 6 }}>By paying, you agree to the <u>Terms of Sale</u> and the <u>Privacy Notice</u>.{!member ? (DEMO ? " Your free Lifestyle card is made from these details." : " We email you a link to finish your free Lifestyle card.") : ""}</div>''')
 
+# ── 9f. Final pass: promise only what is built. No "we emailed / we texted" until the back end sends
+#        it (Addendum 05, tasks 2 and 8). The SMS opt-in is hidden until it is saved. ─────────────────
+rep(''' We email you a link to finish your free Lifestyle card.") : ""}</div>''', ''' After paying, you finish your free Lifestyle card in one step.") : ""}</div>''')
+rep(''' Check your email to finish your free Lifestyle card.") : ""}</>''', ''' Finish your own free Lifestyle card below.") : ""}</>''')
+rep(''' We text you when it ships.{order.pay === "cod"''', '''{DEMO ? " We text you when it ships." : " We emailed your order details."}{order.pay === "cod"''')
+rep('''<div className="ld2">We sent it by SMS. They track their doses there and join under you. The E-Points are yours{order.daily ? `. You manage their plan in your Lifestyle page` : ""}.</div>''',
+    '''<div className="ld2">{DEMO ? <>We sent it by SMS. They track their doses there and join under you. The E-Points are yours{order.daily ? `. You manage their plan in your Lifestyle page` : ""}.</> : <>They sign up free on the Lifestyle page with their own number, then track their doses there.</>}</div>''')
+rep('''<div className="ld2">We sent a link to your email. Set your password, then track doses, reminders and E-Points{order.daily ? `, and your next refill on ${addDays(30)}` : ""} there.</div>''',
+    '''<div className="ld2">Tap the button below and sign up with the same email. Already a member? Log in there instead. Then track doses, reminders and E-Points{order.daily ? `, and your next refill on ${addDays(30)}` : ""}.</div>''')
+rep('''            <label className="co-agree" style={{ marginTop: 0, textAlign: "left" }}><input type="checkbox" checked={smsOk} onChange={(e) => setSmsOk(e.target.checked)} /><span style={{ textAlign: "left" }}>Send me Gutguard tips and offers by SMS (optional)</span></label>''',
+    '''            {DEMO ? <label className="co-agree" style={{ marginTop: 0, textAlign: "left" }}><input type="checkbox" checked={smsOk} onChange={(e) => setSmsOk(e.target.checked)} /><span style={{ textAlign: "left" }}>Send me Gutguard tips and offers by SMS (optional)</span></label> : null}''')
+rep(''': order.newMember ? LIFESTYLE_URL + "/register?from=shop" :''', ''': order.newMember ? LIFESTYLE_URL + "/?join=shop" :''')
+rep("Guard your family too. We text them their own free Lifestyle card, and they join under you.", "Guard your family too. {DEMO_RCP_NOTE}")
+rep('''"Guard your family too. {DEMO_RCP_NOTE}"''', '''(DEMO ? "Guard your family too. We text them their own free Lifestyle card, and they join under you." : "Guard your family too. They can get their own free Lifestyle card with this number.")''')
+
 # ── 9b. Lint: one apostrophe in JSX text ───────────────────────────────────────────────
 rep("Holds a Master's in Entrepreneurship from Ateneo de Manila University.", "Holds a Master&apos;s in Entrepreneurship from Ateneo de Manila University.")
 

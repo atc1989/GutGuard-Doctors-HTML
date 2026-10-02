@@ -21,3 +21,6 @@ design-qa.md
 NAV_STICKY_FOOTER_REDESIGN.md
 PARTNER_AUTH_REDESIGN.md
 SCIENCE_TRUST_FOOTER_REFINEMENT.md
+
+# port scripts (Addendum 05)
+__pycache__/
