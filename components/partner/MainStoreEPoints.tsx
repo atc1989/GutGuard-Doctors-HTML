@@ -65,7 +65,7 @@ export default function MainStoreEPointsPage() {
   const visibleRebates = rebates.slice(rebateOffset, rebateOffset + rebatePageSize);
 
   return (
-    <div className="pp-screen">
+    <>
       <PageHeader
         kicker="E-Points & rebates"
         title="Points & Cash Rebates"
@@ -73,11 +73,7 @@ export default function MainStoreEPointsPage() {
       />
 
       {/* Top Overview Stats Bar */}
-      <section
-        className="pp-stats"
-        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}
-        aria-label="E-Points summary"
-      >
+      <section className="pp-stats" aria-label="E-Points summary">
         <StatTile
           label="Direct shop points"
           value={`${points.own_points} pts`}
@@ -128,31 +124,22 @@ export default function MainStoreEPointsPage() {
       {/* TAB 1: REBATES */}
       {tab === "rebates" && (
         <>
-          <section className="pp-card" aria-label="Combined Rebate Track" style={{ marginBottom: 24 }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                marginBottom: 12,
-                flexWrap: "wrap",
-                gap: 8,
-              }}
-            >
+          <section className="pp-card" aria-label="Combined Rebate Track">
+            <div className="pp-card-head">
               <div>
-                <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)", margin: 0 }}>
+                <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "var(--ink)" }}>
                   Combined rebate track · Cycle {cycleNumber}
-                </h3>
-                <small style={{ color: "var(--ink-3)", fontSize: 13 }}>
+                </h2>
+                <p className="pp-muted" style={{ margin: "2px 0 0" }}>
                   Own direct sales and referral pass-up points pooled together
-                </small>
+                </p>
               </div>
               <span className="pp-tag pp-tag-blue">
                 Pooled track
               </span>
             </div>
 
-            <div className="pp-progress-labels" style={{ marginTop: 16 }}>
+            <div className="pp-progress-labels">
               <strong>
                 {pointsInCycle} / {CYCLE_TARGET} points
               </strong>
@@ -169,7 +156,7 @@ export default function MainStoreEPointsPage() {
               <div style={{ width: `${cyclePct}%`, background: "var(--gold)" }} />
             </div>
 
-            <div className="pp-milestones" style={{ marginTop: 20 }}>
+            <div className="pp-milestones">
               {MILESTONES.map((m) => {
                 const unlocked = pointsInCycle >= m.pts;
                 return (
@@ -187,12 +174,11 @@ export default function MainStoreEPointsPage() {
 
             {nextMilestone ? (
               <p
+                className="pp-muted"
                 style={{
-                  margin: "16px 0 0",
-                  fontSize: 13,
-                  color: "var(--ink-3)",
-                  borderTop: "1px solid var(--rule-soft)",
+                  margin: 0,
                   paddingTop: 12,
+                  borderTop: "1px solid var(--rule-soft)",
                 }}
               >
                 Earn <strong>{pointsToNext} more {pointsToNext === 1 ? "point" : "points"}</strong> to unlock {nextMilestone.label} ({peso(nextMilestone.rebate)} cash rebate).
@@ -200,12 +186,12 @@ export default function MainStoreEPointsPage() {
             ) : (
               <p
                 style={{
-                  margin: "16px 0 0",
+                  margin: 0,
+                  paddingTop: 12,
+                  borderTop: "1px solid var(--rule-soft)",
                   fontSize: 13,
                   color: "var(--green, #107e3e)",
                   fontWeight: 600,
-                  borderTop: "1px solid var(--rule-soft)",
-                  paddingTop: 12,
                 }}
               >
                 All milestones in Cycle {cycleNumber} unlocked! Additional points roll into the next cycle.
@@ -294,7 +280,6 @@ export default function MainStoreEPointsPage() {
         <>
           <div
             className="pp-seg"
-            style={{ marginTop: 0, marginBottom: 16 }}
             role="tablist"
             aria-label="Filter points origin"
           >
@@ -522,6 +507,6 @@ export default function MainStoreEPointsPage() {
           </div>
         </div>
       ) : null}
-    </div>
+    </>
   );
 }

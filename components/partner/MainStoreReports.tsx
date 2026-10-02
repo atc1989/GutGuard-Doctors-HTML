@@ -86,15 +86,14 @@ export default function MainStoreReportsPage() {
     });
 
   return (
-    <div className="pp-screen">
+    <>
       <PageHeader
         kicker="Aggregated reports"
         title="Main Store Network Reports"
-        lede="Inspect all descendant Lifestyle & Affiliate store performances and cross-store order attributions."
       />
 
       {/* Universal Tab Navigation (Outside Card) */}
-      <div className="pp-seg" role="tablist" aria-label="Main Store report tabs" style={{ marginTop: 20, marginBottom: 16 }}>
+      <div className="pp-seg" role="tablist" aria-label="Main Store report tabs">
         <button
           type="button"
           role="tab"
@@ -401,7 +400,7 @@ export default function MainStoreReportsPage() {
       {selectedOrder ? (
         <MainStoreOrderDrawer order={selectedOrder} onClose={() => setSelectedOrder(null)} />
       ) : null}
-    </div>
+    </>
   );
 }
 
