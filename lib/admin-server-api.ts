@@ -253,6 +253,57 @@ export async function serverUpdateDoctorRegistration(
   return normalizeAdminDoctorRegistration((Array.isArray(data) ? data[0] : data) as AdminDoctorRegistration);
 }
 
+export async function serverAdminUpgradeToMainStore(
+  adminPassword: string,
+  partnerId: string,
+  note?: string,
+): Promise<{ success: boolean; descendants_moved: number }> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.rpc("admin_upgrade_to_main_store", {
+    p_admin_password: adminPassword,
+    p_partner_id: partnerId,
+    p_note: note || null,
+  });
+
+  if (error) throw error;
+  return data as { success: boolean; descendants_moved: number };
+}
+
+export async function serverAdminToggleReferralQr(
+  adminPassword: string,
+  partnerId: string,
+  enabled: boolean,
+): Promise<{ success: boolean; referral_qr_enabled: boolean }> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.rpc("admin_toggle_referral_qr", {
+    p_admin_password: adminPassword,
+    p_partner_id: partnerId,
+    p_enabled: enabled,
+  });
+
+  if (error) throw error;
+  return data as { success: boolean; referral_qr_enabled: boolean };
+}
+
+export async function serverAdminPromotePartner(
+  adminPassword: string,
+  partnerId: string,
+  note?: string,
+): Promise<{ success: boolean; store_type: string }> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.rpc("admin_promote_partner", {
+    p_admin_password: adminPassword,
+    p_partner_id: partnerId,
+    p_note: note || null,
+  });
+
+  if (error) throw error;
+  return data as { success: boolean; store_type: string };
+}
+
 // ─── Newsletter ─────────────────────────────────────────────────────────────
 
 export async function serverGetNewsletterSendHistory(adminPassword: string): Promise<NewsletterSendHistory[]> {

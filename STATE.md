@@ -1,18 +1,19 @@
 # Current Task State
 
 ## 🎯 Goal
-- [x] Set up workspace configuration and state tracking
+- [ ] Implement 3-tier store hierarchy (Main -> Lifestyle -> Affiliate) with breakaway upgrade
 
-## ⛔ Constraints & Rules
-- Follow `.antigravity/rules.md`
-- Keep this file under 20 lines
+## 🛠️ Decisions & Architecture
+- Registrations start as Affiliate (Referral QR off); 1st paid shop sale auto-promotes to Lifestyle.
+- Admin upgrades Lifestyle -> Main Store (breakaway: severs parent pass-up, takes downline).
+- Main Store has combined 1,500 rebate track (own sales + direct children pass-up) & aggregate reports.
+- Migration `20261002000000_store_hierarchy.sql`, admin APIs & full partner/main frontend implemented.
 
-## 🛠️ Decisions & Progress
-- Created `.antigravity/rules.md` with execution rules
-- Initialized `STATE.md` for context management
-
-## 📌 Pending Actions / Next Steps
-- [ ] Await next task definition
-
----
-*Note: Maintain this file under 20 lines. Keep active goals, key decisions, and next steps here so old context can be cleared.*
+## 📌 Active / Next Steps
+- [x] **Phase 1: Database Foundation** (Migration, RPCs, Triggers, Server APIs)
+- [x] **Phase 2: Affiliate, Main Store & Admin Frontend UI**
+  - [x] Locked Referral QR for affiliates in `SharePage.tsx`
+  - [x] Added Affiliate promotion banner in `OverviewPage.tsx`
+  - [x] Added Main Store dashboard views (`MainStoreOverview.tsx`, `MainStoreReports.tsx`, `MainStoreEPoints.tsx`)
+  - [x] Updated Admin Doctors tab with Breakaway Upgrade Modal, QR toggles, and filters
+- [ ] **Phase 3: Sandbox Verification & QA**

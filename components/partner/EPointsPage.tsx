@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CYCLE_TARGET, EmptyState, PageHeader, Pagination, StatTile, formatDate, peso, usePartner } from "./shared";
+import MainStoreEPointsPage from "./MainStoreEPoints";
 
 const MILESTONES = [
   { pts: 300, rebate: 18000, label: "Initial movement milestone" },
@@ -11,6 +12,11 @@ const MILESTONES = [
 
 export default function EPointsPage() {
   const { dashboard } = usePartner();
+
+  if (dashboard.partner.store_type === "main") {
+    return <MainStoreEPointsPage />;
+  }
+
   const { points, rebates, point_sources: sources = [] } = dashboard;
   const [tab, setTab] = useState<"points" | "rebates">("rebates");
   const [pointsFilter, setPointsFilter] = useState<"direct" | "referred" | "all">("direct");

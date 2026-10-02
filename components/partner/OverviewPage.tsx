@@ -1,15 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Check, Copy } from "lucide-react";
+import { ArrowRight, Check, Copy, Sparkles } from "lucide-react";
 import {
   CYCLE_TARGET, EmptyState, PageHeader, StatTile, StatusBadge, formatDate, getPartnerQrLink, peso, useCopy, usePartner,
 } from "./shared";
+import MainStoreOverview from "./MainStoreOverview";
 
 export default function OverviewPage() {
   const { dashboard } = usePartner();
   const { copied, copy } = useCopy();
+
+  if (dashboard.partner.store_type === "main") {
+    return <MainStoreOverview />;
+  }
+
   const { totals, clicks, points } = dashboard;
+  const isAffiliate = dashboard.partner.store_type === "affiliate";
   const conversion = clicks.total > 0 ? (totals.direct_orders / clicks.total) * 100 : 0;
   const shopLink = getPartnerQrLink(dashboard.partner, "shop");
   const recent = dashboard.orders.slice(0, 5);
@@ -17,7 +24,35 @@ export default function OverviewPage() {
 
   return (
     <>
-      <PageHeader kicker="Partner dashboard" title={dashboard.partner.full_name} lede="Track orders placed through your shop link and through partners you referred." />
+      <PageHeader
+        kicker={isAffiliate ? "🌱 Affiliate Partner Dashboard" : "🛍️ Lifestyle Partner Dashboard"}
+        title={dashboard.partner.full_name}
+        lede="Track orders placed through your shop link and through partners you referred."
+      />
+
+      {isAffiliate && (
+        <div style={{
+          background: "linear-gradient(135deg, #064e3b 0%, #047857 100%)",
+          color: "#ffffff",
+          borderRadius: "10px",
+          padding: "16px 20px",
+          marginBottom: "24px",
+          display: "flex",
+          alignItems: "flex-start",
+          gap: "14px",
+          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+        }}>
+          <Sparkles aria-hidden="true" size={24} style={{ flexShrink: 0, marginTop: "2px", color: "#fde047" }} />
+          <div>
+            <strong style={{ fontSize: "15px", display: "block", marginBottom: "4px" }}>
+              Welcome to the GutGuard Affiliate Track!
+            </strong>
+            <p style={{ margin: 0, fontSize: "13px", opacity: 0.95, lineHeight: 1.5 }}>
+              Your account starts as an <strong>Affiliate Store</strong>. Share your <strong>Shop QR</strong> to generate your first customer purchase. Once paid, you will automatically upgrade to a <strong>Lifestyle Store</strong> with your personal <strong>Referral QR unlocked</strong>!
+            </p>
+          </div>
+        </div>
+      )}
 
       <section className="pp-stats" aria-label="Summary">
         <StatTile label="Direct orders" value={String(totals.direct_orders)} note={`${clicks.total} shop-link clicks`} />

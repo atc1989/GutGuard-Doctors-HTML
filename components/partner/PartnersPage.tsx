@@ -22,7 +22,20 @@ export default function PartnersPage() {
               <li key={partner.routing_slug}>
                 <Link href="/partner/orders?scope=referred" className="pp-partner-row">
                   <span>
-                    <strong>{partner.full_name}</strong>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                      <strong>{partner.full_name}</strong>
+                      <span style={{
+                        fontSize: "10px",
+                        fontWeight: 700,
+                        textTransform: "uppercase",
+                        padding: "1px 6px",
+                        borderRadius: "3px",
+                        background: partner.store_type === "lifestyle" ? "#dbeafe" : "#fef3c7",
+                        color: partner.store_type === "lifestyle" ? "#1e40af" : "#92400e",
+                      }}>
+                        {partner.store_type === "lifestyle" ? "🛍️ Lifestyle" : "🌱 Affiliate"}
+                      </span>
+                    </div>
                     <small>{[partner.specialty, partner.practice_location].filter(Boolean).join(" · ") || "Partner"}</small>
                   </span>
                   <span><strong>{partner.orders}</strong><small>orders</small></span>

@@ -2,28 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { QRCodeCanvas, QRCodeSVG } from "qrcode.react";
-import { X } from "lucide-react";
+import { Lock, Sparkles, X } from "lucide-react";
 import { Logo } from "@/components/GutguardSite";
 import { PageHeader, getPartnerQrLink, useCopy, usePartner, type PartnerQrMode } from "./shared";
 
 // Rendered large and scaled down by CSS so the download and the print sheet are both sharp.
 const QR_RENDER_PX = 1024;
-
-const MODES: Array<{ mode: PartnerQrMode; label: string; description: string }> = [
-  { mode: "shop", label: "Shop QR", description: "Send customers to your GutGuard shop and attribute their orders to you." },
-  { mode: "referral", label: "Referral QR", description: "Invite another partner. Their registration and future attributed orders will be connected to you." },
-  { mode: "profile", label: "Profile QR", description: "Send visitors directly to your TikTok profile." },
-];
-
-function posterTitle(mode: PartnerQrMode) {
-  if (mode === "shop") return "Scan to order GutGuard";
-  if (mode === "referral") return "Scan to become a GutGuard partner";
-  return "Scan to visit my TikTok profile";
-}
-
-function PosterLogo() {
-  return <div className="partner-poster-logo"><Logo h={44} /></div>;
-}
 
 export default function SharePage() {
   const { dashboard } = usePartner();
@@ -34,6 +18,45 @@ export default function SharePage() {
   const posterTriggerRef = useRef<HTMLButtonElement>(null);
   const [qrMode, setQrMode] = useState<PartnerQrMode>("shop");
   const [posterOpen, setPosterOpen] = useState(false);
+
+  const isMainStore = dashboard.partner.store_type === "main";
+  const isAffiliate = dashboard.partner.store_type === "affiliate";
+  const isReferralLocked = isAffiliate && !dashboard.partner.referral_qr_enabled;
+
+  const MODES: Array<{ mode: PartnerQrMode; label: string; description: string; locked?: boolean }> = [
+    {
+      mode: "shop",
+      label: isMainStore ? "Main Shop QR" : "Shop QR",
+      description: isMainStore
+        ? "Send retail customers directly to your Main Store shop link."
+        : "Send customers to your GutGuard shop and attribute their orders to you.",
+    },
+    {
+      mode: "referral",
+      label: isMainStore ? "Partner Registration QR" : isReferralLocked ? "🔒 Referral QR" : "Referral QR",
+      description: isMainStore
+        ? "Invite new partner stores to register under your Main Store umbrella."
+        : isReferralLocked
+        ? "Referral QR is currently locked for Affiliate stores. Unlock by getting your first Shop QR sale!"
+        : "Invite another partner. Their registration and future attributed orders will be connected to you.",
+      locked: isReferralLocked,
+    },
+    {
+      mode: "profile",
+      label: "Profile QR",
+      description: "Send visitors directly to your TikTok profile.",
+    },
+  ];
+
+  function posterTitle(mode: PartnerQrMode) {
+    if (mode === "shop") return isMainStore ? "Scan to order from Main Store" : "Scan to order GutGuard";
+    if (mode === "referral") return isMainStore ? "Scan to register as a partner" : "Scan to become a GutGuard partner";
+    return "Scan to visit my TikTok profile";
+  }
+
+  function PosterLogo() {
+    return <div className="partner-poster-logo"><Logo h={44} /></div>;
+  }
 
   const link = getPartnerQrLink(dashboard.partner, qrMode);
   const active = MODES.find((item) => item.mode === qrMode)!;
@@ -65,7 +88,6 @@ export default function SharePage() {
 
   async function copyLink() {
     if (await copy(link)) return;
-    // The link is shown in full above the button, so select it as the fallback.
     const selection = window.getSelection();
     if (selection && linkRef.current) {
       const range = document.createRange();
@@ -103,21 +125,66 @@ export default function SharePage() {
                 </button>
               ))}
             </div>
-            <p className="partner-qr-description" role="tabpanel">{active.description}</p>
-            <p className="partner-link" ref={linkRef}>{link}</p>
-            <button type="button" className="shop-primary pp-block-btn" onClick={copyLink}><span>{copied ? "Copied" : "Copy link"}</span></button>
-            <span className="visually-hidden" aria-live="polite">{copied ? "Link copied" : ""}</span>
+
+            {qrMode === "referral" && isReferralLocked ? (
+              <div style={{
+                background: "#fef3c7",
+                border: "1px solid #fde047",
+                borderRadius: "8px",
+                padding: "16px",
+                marginTop: "16px",
+                color: "#92400e",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 700, marginBottom: "6px" }}>
+                  <Lock size={18} />
+                  <span>Referral QR is Locked for Affiliate Stores</span>
+                </div>
+                <p style={{ margin: 0, fontSize: "13px", lineHeight: 1.5 }}>
+                  New partner accounts start in Affiliate mode with partner recruitment disabled. As soon as a customer completes a paid purchase through your <strong>Shop QR</strong>, your account will automatically promote to a <strong>Lifestyle Store</strong> and activate this Referral QR!
+                </p>
+              </div>
+            ) : (
+              <>
+                <p className="partner-qr-description" role="tabpanel">{active.description}</p>
+                <p className="partner-link" ref={linkRef}>{link}</p>
+                <button type="button" className="shop-primary pp-block-btn" onClick={copyLink}><span>{copied ? "Copied" : "Copy link"}</span></button>
+                <span className="visually-hidden" aria-live="polite">{copied ? "Link copied" : ""}</span>
+              </>
+            )}
           </div>
 
           <div className="pp-share-qr">
-            <div className="partner-qr" ref={qrRef}>
-              <QRCodeSVG key={qrMode} value={link} size={QR_RENDER_PX} level="M" marginSize={2} style={{ width: "100%", height: "auto" }} />
-              <QRCodeCanvas className="partner-qr-download-canvas" value={link} size={QR_RENDER_PX} level="M" marginSize={4} />
-            </div>
-            <div className="partner-qr-actions">
-              <button type="button" className="shop-secondary" onClick={downloadQr}>Download PNG</button>
-              <button ref={posterTriggerRef} type="button" className="shop-secondary" onClick={() => setPosterOpen(true)}>Preview poster</button>
-            </div>
+            {qrMode === "referral" && isReferralLocked ? (
+              <div style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "48px 24px",
+                background: "var(--bone-soft, #f8fafc)",
+                borderRadius: "12px",
+                border: "1px dashed var(--rule, #cbd5e1)",
+                textAlign: "center",
+                minHeight: "260px"
+              }}>
+                <Lock size={40} color="#94a3b8" style={{ marginBottom: "12px" }} />
+                <strong style={{ color: "var(--ink-2)" }}>Referral QR Inactive</strong>
+                <p style={{ margin: "8px 0 0", fontSize: "13px", color: "var(--ink-3)", maxWidth: "260px" }}>
+                  Make your 1st paid shop sale to automatically unlock!
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="partner-qr" ref={qrRef}>
+                  <QRCodeSVG key={qrMode} value={link} size={QR_RENDER_PX} level="M" marginSize={2} style={{ width: "100%", height: "auto" }} />
+                  <QRCodeCanvas className="partner-qr-download-canvas" value={link} size={QR_RENDER_PX} level="M" marginSize={4} />
+                </div>
+                <div className="partner-qr-actions">
+                  <button type="button" className="shop-secondary" onClick={downloadQr}>Download PNG</button>
+                  <button ref={posterTriggerRef} type="button" className="shop-secondary" onClick={() => setPosterOpen(true)}>Preview poster</button>
+                </div>
+              </>
+            )}
           </div>
         </section>
       </div>
