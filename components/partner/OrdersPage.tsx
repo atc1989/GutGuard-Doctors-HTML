@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { SlidersHorizontal, X } from "lucide-react";
+import { ArrowUpDown, SlidersHorizontal, X } from "lucide-react";
 import { getPartnerDashboard, type PartnerDashboard, type PartnerOrder, type PartnerOrderScope } from "@/lib/api";
 import {
   EmptyState, Loading, PageHeader, Pagination, StatusBadge, formatDate, orderAddress, peso, usePartner,
@@ -72,43 +72,103 @@ export default function OrdersPage() {
   const total = page?.orders_page.total ?? 0;
   const activeFilters = [status, from, to, sort === "oldest" ? "x" : ""].filter(Boolean).length;
   const scopeLabels: Array<[PartnerOrderScope, string]> = [
-    ["all", `All ${dashboard.totals.orders}`],
-    ["direct", `Direct ${dashboard.totals.direct_orders}`],
-    ["referred", `Referred ${dashboard.totals.referred_orders}`],
+    ["all", "All Orders"],
+    ["direct", "Direct Orders"],
+    ["referred", "Referred Orders"],
   ];
 
   return (
     <>
       <PageHeader kicker="Your orders" title={page ? (total > 0 ? `${total} attributed` : "No orders yet") : "Orders"} />
 
-      <section className="pp-card pp-card-flush">
-        <div className="pp-toolbar">
-          <div className="partner-order-tabs" role="tablist" aria-label="Order attribution">
-            {scopeLabels.map(([value, label]) => (
-              <button key={value} type="button" role="tab" aria-selected={scope === value} className={scope === value ? "active" : ""} onClick={() => update({ scope: value })}>{label}</button>
-            ))}
-          </div>
-          <button type="button" className="shop-secondary pp-filter-toggle" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((open) => !open)}>
-            <SlidersHorizontal aria-hidden="true" size={16} /> Filters{activeFilters ? ` (${activeFilters})` : ""}
+      {/* Universal Tab Switcher (Outside Card, No Numbers) */}
+      <div className="pp-seg" role="tablist" aria-label="Order attribution" style={{ marginTop: 20, marginBottom: 16 }}>
+        {scopeLabels.map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={scope === value}
+            className={scope === value ? "active" : ""}
+            onClick={() => update({ scope: value })}
+          >
+            {label}
           </button>
-          <div className={filtersOpen ? "pp-filters open" : "pp-filters"}>
-            <label className="partner-order-filter">Status
-              <select value={status} onChange={(event) => update({ status: event.target.value })}>
-                <option value="">All statuses</option><option value="paid">Paid</option>
-                <option value="pending">Awaiting payment</option><option value="fulfilled">Delivered</option>
-                <option value="cancelled">Cancelled</option><option value="refunded">Refunded</option>
-              </select>
-            </label>
-            <label className="partner-order-filter">From<input type="date" value={from} max={to || undefined} onChange={(event) => update({ from: event.target.value })} /></label>
-            <label className="partner-order-filter">To<input type="date" value={to} min={from || undefined} onChange={(event) => update({ to: event.target.value })} /></label>
-            <label className="partner-order-filter">Sort
-              <select value={sort} onChange={(event) => update({ sort: event.target.value as "newest" | "oldest" })}>
-                <option value="newest">Newest first</option><option value="oldest">Oldest first</option>
-              </select>
-            </label>
-          </div>
+        ))}
+      </div>
+
+      {/* Universal Filter Toolbar (Outside Card) */}
+      <div className="pp-partner-toolbar">
+        <div className="pp-partner-actions" style={{ flex: 1, justifyContent: "flex-start", gap: 10, flexWrap: "wrap" }}>
+          <label className="pp-partner-sort">
+            <span>Status:</span>
+            <select
+              value={status}
+              onChange={(event) => update({ status: event.target.value })}
+              aria-label="Filter order status"
+            >
+              <option value="">All statuses</option>
+              <option value="paid">Paid</option>
+              <option value="pending">Awaiting payment</option>
+              <option value="fulfilled">Delivered</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="refunded">Refunded</option>
+            </select>
+          </label>
+
+          <label className="pp-partner-sort">
+            <span>From:</span>
+            <input
+              type="date"
+              value={from}
+              max={to || undefined}
+              onChange={(event) => update({ from: event.target.value })}
+              className="pp-date-input"
+              aria-label="Filter from date"
+            />
+          </label>
+
+          <label className="pp-partner-sort">
+            <span>To:</span>
+            <input
+              type="date"
+              value={to}
+              min={from || undefined}
+              onChange={(event) => update({ to: event.target.value })}
+              className="pp-date-input"
+              aria-label="Filter to date"
+            />
+          </label>
         </div>
 
+        <div className="pp-partner-actions">
+          <label className="pp-partner-sort">
+            <ArrowUpDown size={14} aria-hidden="true" />
+            <span>Sort:</span>
+            <select
+              value={sort}
+              onChange={(event) => update({ sort: event.target.value as "newest" | "oldest" })}
+              aria-label="Sort orders"
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+            </select>
+          </label>
+
+          {activeFilters ? (
+            <button
+              type="button"
+              className="shop-secondary pp-tree-quick-btn"
+              onClick={() => update({ status: "", from: "", to: "", sort: "newest" })}
+              aria-label="Clear active filters"
+            >
+              Reset
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      <section className="pp-card pp-card-flush" aria-label="Orders table">
         {error ? <div className="partner-orders-error" role="alert">{error}</div> : null}
 
         {busy ? <Loading>Loading orders…</Loading> : orders.length === 0 ? (
@@ -206,7 +266,9 @@ function OrderDrawer({ order, onClose }: { order: PartnerOrder; onClose: () => v
             <p className="shop-kicker">{order.order_code}</p>
             <h2 id="pp-drawer-title">{order.buyer_name || order.buyer_first_name || "A customer"}</h2>
           </div>
-          <button type="button" className="partner-poster-close" aria-label="Close order details" onClick={onClose}><X aria-hidden="true" /></button>
+          <button type="button" className="pp-sheet-close" aria-label="Close order details" onClick={onClose}>
+            <X size={18} aria-hidden="true" />
+          </button>
         </div>
         <dl className="pp-dl">
           <div><dt>Status</dt><dd><StatusBadge order={order} /></dd></div>
@@ -217,7 +279,12 @@ function OrderDrawer({ order, onClose }: { order: PartnerOrder; onClose: () => v
           <div><dt>Email</dt><dd>{order.buyer_email ? <a href={`mailto:${order.buyer_email}`}>{order.buyer_email}</a> : "--"}</dd></div>
           <div><dt>Delivery address</dt><dd>{address || "--"}</dd></div>
         </dl>
-        <p className="shop-note">Buyer contact details are confidential. Use them only to follow up on this order.</p>
+        <p className="shop-note" style={{ margin: "14px 0 0" }}>Buyer contact details are confidential. Use them only to follow up on this order.</p>
+        <div className="pp-sheet-footer" style={{ marginTop: "auto", padding: "16px 0 0", background: "transparent" }}>
+          <button type="button" className="shop-secondary pp-sheet-btn-secondary" style={{ width: "100%" }} onClick={onClose}>
+            Done
+          </button>
+        </div>
       </div>
     </div>
   );

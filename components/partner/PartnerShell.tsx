@@ -62,7 +62,7 @@ export default function PartnerShell({ children }: { children: React.ReactNode }
         <Link className="pp-brand" href="/" aria-label="GutGuard home"><Logo h={26} /></Link>
         <span className="pp-portal-name">Partner Portal</span>
         <div className="pp-topbar-spacer" />
-        <button type="button" className="shop-primary pp-copy-btn" onClick={() => copy(shopLink)} aria-label="Copy shop link">
+        <button type="button" className="pp-copy-btn" onClick={() => copy(shopLink)} aria-label="Copy shop link">
           {copied ? <Check aria-hidden="true" size={16} /> : <Copy aria-hidden="true" size={16} />}
           <span>{copied ? "Copied" : "Copy shop link"}</span>
         </button>
