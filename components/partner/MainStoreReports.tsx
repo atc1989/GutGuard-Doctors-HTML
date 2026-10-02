@@ -16,8 +16,8 @@ export default function MainStoreReportsPage() {
   const [search, setSearch] = useState("");
   const [storeFilter, setStoreFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
-  const [page, setPage] = useState(1);
-  const pageSize = 20;
+  const [offset, setOffset] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
 
   useEffect(() => {
     let cancelled = false;
@@ -27,7 +27,7 @@ export default function MainStoreReportsPage() {
       storeId: storeFilter || undefined,
       status: statusFilter || undefined,
       limit: pageSize,
-      offset: (page - 1) * pageSize,
+      offset,
     })
       .then((res) => {
         if (!cancelled) {
@@ -43,7 +43,7 @@ export default function MainStoreReportsPage() {
     return () => {
       cancelled = true;
     };
-  }, [storeFilter, statusFilter, page]);
+  }, [storeFilter, statusFilter, offset, pageSize]);
 
   const stores = reportsData?.stores ?? [];
   const orders = reportsData?.orders ?? [];
@@ -179,7 +179,7 @@ export default function MainStoreReportsPage() {
               value={storeFilter}
               onChange={(e) => {
                 setStoreFilter(e.target.value);
-                setPage(1);
+                setOffset(0);
               }}
               style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--rule, #e2e8f0)", fontSize: "14px" }}
             >
@@ -195,7 +195,7 @@ export default function MainStoreReportsPage() {
               value={statusFilter}
               onChange={(e) => {
                 setStatusFilter(e.target.value);
-                setPage(1);
+                setOffset(0);
               }}
               style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--rule, #e2e8f0)", fontSize: "14px" }}
             >
@@ -267,10 +267,17 @@ export default function MainStoreReportsPage() {
 
               <div style={{ marginTop: "16px" }}>
                 <Pagination
+                  label="Network orders pagination"
+                  offset={offset}
+                  pageSize={pageSize}
                   total={totalOrders}
-                  limit={pageSize}
-                  offset={(page - 1) * pageSize}
-                  onPageChange={(newOffset) => setPage(Math.floor(newOffset / pageSize) + 1)}
+                  shown={orders.length}
+                  noun="orders"
+                  onOffset={setOffset}
+                  onPageSize={(size) => {
+                    setPageSize(size);
+                    setOffset(0);
+                  }}
                 />
               </div>
             </>
