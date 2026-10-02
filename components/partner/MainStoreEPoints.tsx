@@ -54,7 +54,7 @@ export default function MainStoreEPointsPage() {
   return (
     <div className="pp-screen">
       <PageHeader
-        kicker="🏢 Main Store Combined Rebates"
+        kicker="Main Store combined rebates"
         title="Combined E-Points & Cash Rebates"
         lede="Your own direct Shop QR orders and pass-up points from directly referred partner stores are pooled into a single 1,500-point rebate cycle."
       />
@@ -85,7 +85,7 @@ export default function MainStoreEPointsPage() {
           className={tab === "log" ? "active" : ""}
           onClick={() => { setTab("log"); setOffset(0); }}
         >
-          Points & Orders Log ({sources.length})
+          Points & Orders Log
         </button>
         <button
           type="button"
@@ -100,7 +100,7 @@ export default function MainStoreEPointsPage() {
 
       {/* TAB 1: COMBINED REBATES */}
       {tab === "rebates" && (
-        <section className="pp-card" aria-label="Combined Rebate Track" style={{ marginBottom: 24, border: "1px solid var(--rule)" }}>
+        <section className="pp-card" aria-label="Combined Rebate Track" style={{ marginBottom: 24 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
             <div>
               <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--ink)", margin: 0 }}>
@@ -110,7 +110,7 @@ export default function MainStoreEPointsPage() {
                 Own Sales + Direct Referral Pass-Ups Pooled Together
               </small>
             </div>
-            <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#166534", background: "#dcfce7", padding: "4px 10px", borderRadius: 4 }}>
+            <span className="pp-tag pp-tag-blue">
               Combined Track
             </span>
           </div>
@@ -128,7 +128,7 @@ export default function MainStoreEPointsPage() {
               const unlocked = pointsInCycle >= m.pts;
               return (
                 <article key={`combined-${m.pts}`} className={unlocked ? "pp-milestone unlocked" : "pp-milestone"}>
-                  <span>{unlocked ? "✓ Unlocked!" : `🎯 ${m.pts} Combined Pts (${pointsInCycle} / ${m.pts} pts)`}</span>
+                  <span>{unlocked ? "Unlocked" : `${m.pts} Combined Pts (${pointsInCycle} / ${m.pts} pts)`}</span>
                   <strong>{peso(m.rebate)}</strong>
                   <small style={{ color: "var(--ink-3)" }}>{m.label}</small>
                 </article>
@@ -136,8 +136,8 @@ export default function MainStoreEPointsPage() {
             })}
           </div>
 
-          <div style={{ marginTop: 24, padding: "16px", background: "var(--bone-soft, #f8fafc)", borderRadius: "8px", fontSize: "13px", color: "var(--ink-2)" }}>
-            💡 <strong>How Main Store Rebates Work:</strong> When customers purchase through your Shop QR, you earn 1 point per ₱1,000 spent. When stores directly referred by your registration link make sales, you earn pass-up points. Both flow directly into this combined 1,500-point rebate tracker!
+          <div style={{ marginTop: 24, padding: "16px", background: "var(--bone-soft)", border: "1px solid var(--rule-soft)", borderRadius: "var(--r-md)", fontSize: "13px", color: "var(--ink-2)", lineHeight: 1.5 }}>
+            <strong>How Main Store Rebates Work:</strong> When customers purchase through your Shop QR, you earn 1 point per ₱1,000 spent. When stores directly referred by your registration link make sales, you earn pass-up points. Both flow directly into this combined 1,500-point rebate tracker!
           </div>
         </section>
       )}
@@ -153,7 +153,7 @@ export default function MainStoreEPointsPage() {
               className={pointsFilter === "all" ? "active" : ""}
               onClick={() => { setPointsFilter("all"); setOffset(0); }}
             >
-              All Activity ({sources.length})
+              All Activity
             </button>
             <button
               type="button"
@@ -162,7 +162,7 @@ export default function MainStoreEPointsPage() {
               className={pointsFilter === "direct" ? "active" : ""}
               onClick={() => { setPointsFilter("direct"); setOffset(0); }}
             >
-              My Direct Shop ({directSources.length})
+              My Direct Shop
             </button>
             <button
               type="button"
@@ -171,7 +171,7 @@ export default function MainStoreEPointsPage() {
               className={pointsFilter === "referred" ? "active" : ""}
               onClick={() => { setPointsFilter("referred"); setOffset(0); }}
             >
-              Downline Referrals ({referredSources.length})
+              Downline Referrals
             </button>
           </div>
 
@@ -241,13 +241,13 @@ export default function MainStoreEPointsPage() {
         <section className="pp-card" aria-label="Point Source Breakdown">
           <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 16px" }}>Point Contributions</h3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
-            <div style={{ padding: 16, borderRadius: 8, border: "1px solid var(--rule)" }}>
-              <div style={{ color: "var(--ink-3)", fontSize: 13 }}>Direct Shop Sales (Depth 0)</div>
+            <div style={{ padding: 16, borderRadius: "var(--r-md)", background: "var(--bone-soft)", border: "1px solid var(--rule-soft)" }}>
+              <div style={{ color: "var(--ink-3)", fontSize: 13, fontWeight: 600 }}>Direct Shop Sales (Depth 0)</div>
               <div style={{ fontSize: 24, fontWeight: 700, color: "var(--ink)", margin: "4px 0" }}>{points.own_points} pts</div>
               <small style={{ color: "var(--ink-3)" }}>Points generated directly from your Main Store retail link</small>
             </div>
-            <div style={{ padding: 16, borderRadius: 8, border: "1px solid var(--rule)" }}>
-              <div style={{ color: "var(--ink-3)", fontSize: 13 }}>Direct Referrals Pass-Up (Depth 1)</div>
+            <div style={{ padding: 16, borderRadius: "var(--r-md)", background: "var(--bone-soft)", border: "1px solid var(--rule-soft)" }}>
+              <div style={{ color: "var(--ink-3)", fontSize: 13, fontWeight: 600 }}>Direct Referrals Pass-Up (Depth 1)</div>
               <div style={{ fontSize: 24, fontWeight: 700, color: "var(--ink)", margin: "4px 0" }}>{points.passup_points} pts</div>
               <small style={{ color: "var(--ink-3)" }}>Pass-up points generated by Lifestyle stores directly referred by you</small>
             </div>

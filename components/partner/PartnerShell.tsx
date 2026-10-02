@@ -76,9 +76,9 @@ export default function PartnerShell({ children }: { children: React.ReactNode }
                 fontWeight: 700,
                 textTransform: "uppercase",
                 letterSpacing: "0.04em",
-                color: isMainStore ? "#b45309" : dashboard.partner.store_type === "affiliate" ? "#047857" : "#1d4ed8",
+                color: isMainStore ? "var(--gold-text, var(--gold))" : dashboard.partner.store_type === "affiliate" ? "#047857" : "var(--blue)",
               }}>
-                {isMainStore ? "🏢 Main Store" : dashboard.partner.store_type === "affiliate" ? "🌱 Affiliate" : "🛍️ Lifestyle"}
+                {isMainStore ? "Main Store" : dashboard.partner.store_type === "affiliate" ? "Affiliate" : "Lifestyle"}
               </span>
             </div>
             <ChevronDown aria-hidden="true" size={16} />

@@ -50,9 +50,9 @@ export default function MainStoreOverview() {
   const cyclePct = Math.min(100, (ptsInCycle / CYCLE_TARGET) * 100);
 
   return (
-    <>
+    <div className="pp-screen">
       <PageHeader
-        kicker="🏢 Main Store Umbrella"
+        kicker="Main Store umbrella"
         title={dashboard.partner.full_name}
         lede="Oversee all descendant Lifestyle and Affiliate stores under your Main Store umbrella."
       />
@@ -102,15 +102,7 @@ export default function MainStoreOverview() {
                     </small>
                   </span>
                   <span className="pp-recent-end">
-                    <span style={{
-                      fontSize: "11px",
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                      padding: "2px 8px",
-                      borderRadius: "4px",
-                      background: order.source_type === "direct" ? "var(--gold-soft, #fef3c7)" : "var(--bone-soft, #f3f4f6)",
-                      color: "var(--ink)"
-                    }}>
+                    <span className={order.source_type === "direct" ? "pp-tag pp-tag-bone" : "pp-tag pp-tag-blue"}>
                       {order.source_type === "direct" ? "Main Store" : "Child Store"}
                     </span>
                     <b>{peso(order.total_amount)}</b>
@@ -166,7 +158,7 @@ export default function MainStoreOverview() {
               </Link>
             </div>
             <div style={{ marginBottom: "16px" }}>
-              <p className="shop-kicker">1. Main Shop Link (Direct Retail)</p>
+              <p className="shop-kicker">1. Main shop link (direct retail)</p>
               <p className="partner-link" style={{ fontSize: "13px" }}>{shopLink}</p>
               <button type="button" className="shop-secondary pp-block-btn" onClick={() => copy(shopLink)}>
                 {copied ? <Check aria-hidden="true" size={14} /> : <Copy aria-hidden="true" size={14} />}
@@ -174,7 +166,7 @@ export default function MainStoreOverview() {
               </button>
             </div>
             <div>
-              <p className="shop-kicker">2. Partner Registration Link (Invite Stores)</p>
+              <p className="shop-kicker">2. Partner registration link (invite stores)</p>
               <p className="partner-link" style={{ fontSize: "13px" }}>{regLink}</p>
               <button type="button" className="shop-secondary pp-block-btn" onClick={() => copy(regLink)}>
                 {copied ? <Check aria-hidden="true" size={14} /> : <Copy aria-hidden="true" size={14} />}
@@ -184,6 +176,6 @@ export default function MainStoreOverview() {
           </section>
         </div>
       </div>
-    </>
+    </div>
   );
 }
