@@ -1,11 +1,13 @@
 -- Prototype shop port (Addendum 05).
 -- 1. Orders paid for someone else keep who takes the capsules.
 -- 2. The 5-Night Watch first-buyer rule, checked on the server.
+-- 3. Orders are created by the server only (POST /api/shop/order), never straight from the browser.
 -- Applied to both shop schemas: `doctors` (production) and `sandbox` (sandbox.gutguard.ph).
 
 do $$
 declare
   s text;
+  fn regprocedure;
 begin
   foreach s in array array['doctors', 'sandbox'] loop
     if to_regclass(format('%I.shop_orders', s)) is null then
@@ -16,10 +18,12 @@ begin
     execute format('alter table %I.shop_orders add column if not exists recipient_name text', s);
     execute format('alter table %I.shop_orders add column if not exists recipient_mobile text', s);
 
-    -- The Watch is for a first order: a number with no paid order in the last 12 months.
-    -- It checks the person who takes the capsules: the buyer, or the recipient when bought for someone else.
+    -- The Watch is for a first order: no paid order in the last 12 months on the number of the
+    -- person who takes the capsules (the buyer, or the recipient when bought for someone else).
+    -- A Watch order still waiting for payment (last 24 hours) also counts, so two orders cannot
+    -- both get the Watch. p_exclude is the order being paid, so it does not count against itself.
     execute format($f$
-      create or replace function %1$I.shop_watch_eligible(p_mobile text)
+      create or replace function %1$I.shop_watch_eligible(p_mobile text, p_exclude uuid default null)
       returns boolean
       language sql
       stable
@@ -31,16 +35,84 @@ begin
           and not exists (
             select 1
             from %1$I.shop_orders o, n
-            where o.payment_status = 'paid'
-              and o.created_at > now() - interval '12 months'
+            where (p_exclude is null or o.id <> p_exclude)
               and right(regexp_replace(
                     case when o.for_other then coalesce(o.recipient_mobile, '') else coalesce(o.mobile, '') end,
                     '\D', '', 'g'), 10) = n.d
+              and (
+                (o.payment_status = 'paid' and o.created_at > now() - interval '12 months')
+                or (o.payment_status in ('pending', 'review')
+                    and o.status <> 'cancelled'
+                    and o.items @> '[{"id":"watch"}]'::jsonb
+                    and o.created_at > now() - interval '24 hours')
+              )
           );
       $body$;
     $f$, s);
 
-    -- Server routes only (service role). Not exposed to anon: it would let anyone test numbers.
-    execute format('revoke all on function %I.shop_watch_eligible(text) from public, anon, authenticated', s);
+    -- A buyer who starts again (new address, new items) replaces their own unpaid Watch order.
+    execute format($f$
+      create or replace function %1$I.shop_cancel_unpaid_watch(p_mobile text)
+      returns integer
+      language sql
+      security definer
+      set search_path = %1$I
+      as $body$
+        with n as (select right(regexp_replace(coalesce(p_mobile, ''), '\D', '', 'g'), 10) as d),
+        upd as (
+          update %1$I.shop_orders o
+             set status = 'cancelled', updated_at = now()
+            from n
+           where o.payment_status = 'pending'
+             and o.status = 'pending_payment'
+             and o.items @> '[{"id":"watch"}]'::jsonb
+             and right(regexp_replace(
+                   case when o.for_other then coalesce(o.recipient_mobile, '') else coalesce(o.mobile, '') end,
+                   '\D', '', 'g'), 10) = n.d
+          returning 1
+        )
+        select count(*)::integer from upd;
+      $body$;
+    $f$, s);
+
+    -- Paid Watches one payer has bought for other people in the last 12 months (gift limit).
+    execute format($f$
+      create or replace function %1$I.shop_watch_gifts(p_payer_mobile text)
+      returns integer
+      language sql
+      stable
+      security definer
+      set search_path = %1$I
+      as $body$
+        select count(*)::integer
+        from %1$I.shop_orders o
+        where o.for_other
+          and o.payment_status = 'paid'
+          and o.items @> '[{"id":"watch"}]'::jsonb
+          and o.created_at > now() - interval '12 months'
+          and right(regexp_replace(coalesce(o.mobile, ''), '\D', '', 'g'), 10)
+            = right(regexp_replace(coalesce(p_payer_mobile, ''), '\D', '', 'g'), 10);
+      $body$;
+    $f$, s);
+
+    -- Server routes only. Not for anon: they would let anyone test numbers.
+    execute format('revoke all on function %I.shop_watch_eligible(text, uuid) from public, anon, authenticated', s);
+    execute format('revoke all on function %I.shop_cancel_unpaid_watch(text) from public, anon, authenticated', s);
+    execute format('revoke all on function %I.shop_watch_gifts(text) from public, anon, authenticated', s);
+    execute format('grant execute on function %I.shop_watch_eligible(text, uuid) to service_role', s);
+    execute format('grant execute on function %I.shop_cancel_unpaid_watch(text) to service_role', s);
+    execute format('grant execute on function %I.shop_watch_gifts(text) to service_role', s);
+
+  end loop;
+
+  -- Orders now come only from POST /api/shop/order (service role), which applies the Watch
+  -- rule and builds every price. The browser can no longer call create_shop_order directly.
+  for fn in
+    select p.oid::regprocedure
+    from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+    where ns.nspname in ('public', 'doctors', 'sandbox') and p.proname = 'create_shop_order'
+  loop
+    execute format('revoke execute on function %s from public, anon, authenticated', fn);
+    execute format('grant execute on function %s to service_role', fn);
   end loop;
 end $$;

@@ -9,8 +9,8 @@ let ipLimiter: Ratelimit | null = null;
 let emailLimiter: Ratelimit | null = null;
 let buyerLimiter: Ratelimit | null = null;
 
-// 30 first-buyer checks per IP per 10 minutes. The check says whether a number has a
-// recent paid order, so it must not be usable to test numbers in bulk.
+// 30 first-buyer checks (and 30 order attempts) per IP per 10 minutes. Both answer whether a
+// number has a recent paid order, so they must not be usable to test numbers in bulk.
 function getBuyerLimiter(): Ratelimit | null {
   if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) return null;
   if (!buyerLimiter) {
@@ -90,11 +90,13 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  if (req.nextUrl.pathname === "/api/shop/first-buyer") {
+  if (req.nextUrl.pathname === "/api/shop/first-buyer" || req.nextUrl.pathname === "/api/shop/order") {
     const limiter = getBuyerLimiter();
     if (!limiter) return NextResponse.next();
+    // x-real-ip is set by Vercel from the connection, so a client cannot choose it.
     const fwd = req.headers.get("x-forwarded-for");
-    const result = await limiter.limit(fwd ? fwd.split(",")[0].trim() : "127.0.0.1");
+    const ip = req.headers.get("x-real-ip") || (fwd ? fwd.split(",")[0].trim() : "127.0.0.1");
+    const result = await limiter.limit(req.nextUrl.pathname + ":" + ip);
     if (!result.success) return NextResponse.json({ error: "Too many checks. Please wait a few minutes." }, { status: 429 });
     return NextResponse.next();
   }

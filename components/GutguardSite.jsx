@@ -2290,7 +2290,11 @@ function Shop({ params = {} }) {
       window.location.assign(co.redirectUrl || co.orderUrl);
     } catch (err) {
       setPaying(false);
-      setPayErr(err && err.message ? err.message : "The payment could not start. Please try again.");
+      const m = err && err.message ? err.message : "The payment could not start. Please try again.";
+      /* the saved order can no longer be paid: the next try makes a new one */
+      if (/5-Night Watch|replaced|could not be verified/.test(m)) { try { sessionStorage.removeItem("gg-pending-order"); } catch (e) {} }
+      if (/5-Night Watch is for new buyers/.test(m)) { setSrvUsed(true); return; }
+      setPayErr(m);
     }
   };
   /* back from Maya */

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { flatShippingFee, recomputeSubtotal } from "@/lib/catalog";
+import { buildOrderItems, flatShippingFee, hasKind, recomputeSubtotal } from "@/lib/catalog";
+import { isWatchEligible } from "@/lib/shop-order";
 import { createMayaCheckout, isMayaConfigured, toMayaAmount } from "@/lib/maya";
 import { getSupabaseAdmin, isSupabaseAdminConfigured } from "@/lib/supabase-admin";
 import type { ShopOrderItem } from "@/lib/api";
@@ -14,6 +15,8 @@ type OrderRow = {
   payment_status: string;
   customer_name: string;
   first_name: string | null;
+  for_other: boolean | null;
+  recipient_mobile: string | null;
   last_name: string | null;
   email: string;
   mobile: string;
@@ -46,7 +49,7 @@ export async function POST(request: Request) {
   const { data, error } = await supabase
     .from("shop_orders")
     .select(
-      "id, order_code, status, payment_status, customer_name, first_name, last_name, email, mobile, address, city, province, zip, shipping_fee, subtotal, total_amount, items, payment_attempts",
+      "id, order_code, status, payment_status, customer_name, first_name, last_name, email, mobile, address, city, province, zip, shipping_fee, subtotal, total_amount, items, payment_attempts, for_other, recipient_mobile",
     )
     .eq("id", orderId)
     .single();
@@ -64,10 +67,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ alreadyPaid: true, orderUrl });
   }
 
+  if (order.status === "cancelled") {
+    return NextResponse.json({ error: "This order was replaced by a newer one. Please check out again." }, { status: 409 });
+  }
+
   const amounts = verifyAmounts(order);
   if (!amounts) {
     return NextResponse.json(
       { error: "Order totals could not be verified. Please rebuild your basket or contact support." },
+      { status: 409 },
+    );
+  }
+
+  // The Watch rule again, just before payment: another order for the same number may have been
+  // paid since this one was created.
+  if (hasKind(order.items, "watch") && !(await isWatchEligible(supabase, order.for_other ? order.recipient_mobile ?? "" : order.mobile, order.id))) {
+    return NextResponse.json(
+      { error: "This number has a recent order with us. The 5-Night Watch is for new buyers.", code: "watch_not_eligible" },
       { status: 409 },
     );
   }
@@ -144,6 +160,11 @@ export async function POST(request: Request) {
  * flat fee for these items before any amount is sent to Maya.
  */
 function verifyAmounts(order: OrderRow) {
+  // The order rules (one Watch, one plan, no Watch with a plan, quantities) must hold for the
+  // stored lines too, not only for orders made through /api/shop/order.
+  const rules = buildOrderItems((order.items ?? []).map((item) => ({ id: item.id, qty: Number(item.qty) })));
+  if ("error" in rules) return null;
+
   const subtotal = recomputeSubtotal(order.items);
   if (subtotal === null) return null;
 
@@ -204,5 +225,6 @@ function getReturnOrigin(request: Request) {
   const allowed = [process.env.NEXT_PUBLIC_SHOP_URL, process.env.NEXT_PUBLIC_MARKETING_URL]
     .filter(Boolean)
     .map((u) => String(u).replace(/\/$/, ""));
-  return allowed.includes(origin) || origin.startsWith("http://localhost") ? origin : getSiteUrl(request);
+  if (process.env.NODE_ENV !== "production" && /^http:\/\/localhost:\d+$/.test(origin)) return origin;
+  return allowed.includes(origin) ? origin : getSiteUrl(request);
 }

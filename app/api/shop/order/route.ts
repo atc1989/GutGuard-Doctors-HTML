@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { buildOrderItems, flatShippingFee, hasKind, recomputeSubtotal } from "@/lib/catalog";
 import { getSupabaseAdmin, isSupabaseAdminConfigured } from "@/lib/supabase-admin";
-import { isWatchEligible, normalizeMobile } from "@/lib/shop-order";
+import { WATCH_GIFT_LIMIT, cancelUnpaidWatch, isWatchEligible, normalizeMobile, watchGiftsBought } from "@/lib/shop-order";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -79,12 +79,24 @@ export async function POST(request: Request) {
 
   const supabase = getSupabaseAdmin();
 
-  // The Watch checks the person who takes the capsules.
-  if (hasKind(items, "watch") && !(await isWatchEligible(supabase, forOther ? recipientMobile : mobile))) {
-    return NextResponse.json(
-      { error: "This number has a recent order with us. The 5-Night Watch is for new buyers.", code: "watch_not_eligible" },
-      { status: 409 },
-    );
+  // The Watch checks the person who takes the capsules. Their own unpaid Watch order (an earlier
+  // try) is replaced first, so starting again does not lock them out. Paid and recent orders still count.
+  if (hasKind(items, "watch")) {
+    const taker = forOther ? recipientMobile : mobile;
+    await cancelUnpaidWatch(supabase, taker);
+    if (!(await isWatchEligible(supabase, taker))) {
+      return NextResponse.json(
+        { error: "This number has a recent order with us. The 5-Night Watch is for new buyers.", code: "watch_not_eligible" },
+        { status: 409 },
+      );
+    }
+    // Recipient numbers are not verified, so one payer may gift only a few Watches a year.
+    if (forOther && (await watchGiftsBought(supabase, mobile)) >= WATCH_GIFT_LIMIT) {
+      return NextResponse.json(
+        { error: `You have sent ${WATCH_GIFT_LIMIT} 5-Night Watches this year. Choose a Blister or a plan for them instead.`, code: "watch_gift_limit" },
+        { status: 409 },
+      );
+    }
   }
 
   const subtotal = recomputeSubtotal(items);
@@ -119,12 +131,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Your order could not be saved. Please try again." }, { status: 500 });
   }
 
+  // create_shop_order has no recipient fields, so they are written straight after. If that write
+  // fails, the order is cancelled: an order for someone else must never be saved as the buyer's own.
   if (forOther) {
     const { error: rcpError } = await supabase
       .from("shop_orders")
       .update({ for_other: true, recipient_name: recipientName, recipient_mobile: recipientMobile })
       .eq("id", row.id);
-    if (rcpError) console.error("shop order recipient update failed", rcpError.message);
+    if (rcpError) {
+      console.error("shop order recipient update failed", rcpError.message);
+      await supabase.from("shop_orders").update({ status: "cancelled" }).eq("id", row.id);
+      return NextResponse.json({ error: "Your order could not be saved. Please try again." }, { status: 500 });
+    }
   }
 
   return NextResponse.json({ id: row.id, orderCode: row.order_code });
