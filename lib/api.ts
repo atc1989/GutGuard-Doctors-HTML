@@ -367,8 +367,24 @@ export type MainStoreOrder = {
   created_at: string;
   status: ShopOrderStatus;
   payment_status: ShopPaymentStatus;
+  payment_method?: string;
+  maya_reference?: string | null;
+  maya_payment_status?: string | null;
+  maya_fund_source?: string | null;
+  paid_at?: string | null;
   total_amount: number;
+  subtotal?: number;
+  shipping_fee?: number;
+  shipping_region?: string | null;
   buyer_name: string;
+  email?: string;
+  mobile?: string;
+  address?: string;
+  city?: string;
+  province?: string;
+  barangay?: string;
+  zip?: string;
+  items?: Array<{ id: string; name: string; caps: number; qty: number; price: number }>;
   store_id: string;
   store_name: string;
   store_type: StoreType;
@@ -1229,8 +1245,24 @@ export async function getMainStoreReports(query: {
         created_at: String(order.created_at ?? ""),
         status: (order.status ?? "pending_payment") as ShopOrderStatus,
         payment_status: (order.payment_status ?? "pending") as ShopPaymentStatus,
+        payment_method: String(order.payment_method ?? "maya"),
+        maya_reference: typeof order.maya_reference === "string" ? order.maya_reference : null,
+        maya_payment_status: typeof order.maya_payment_status === "string" ? order.maya_payment_status : null,
+        maya_fund_source: typeof order.maya_fund_source === "string" ? order.maya_fund_source : null,
+        paid_at: typeof order.paid_at === "string" ? order.paid_at : null,
         total_amount: Number(order.total_amount ?? 0),
+        subtotal: Number(order.subtotal ?? 0),
+        shipping_fee: Number(order.shipping_fee ?? 0),
+        shipping_region: typeof order.shipping_region === "string" ? order.shipping_region : null,
         buyer_name: String(order.buyer_name ?? ""),
+        email: String(order.email ?? ""),
+        mobile: String(order.mobile ?? ""),
+        address: String(order.address ?? ""),
+        city: String(order.city ?? ""),
+        province: String(order.province ?? ""),
+        barangay: String(order.barangay ?? ""),
+        zip: String(order.zip ?? ""),
+        items: Array.isArray(order.items) ? (order.items as any[]) : [],
         store_id: String(order.store_id ?? ""),
         store_name: String(order.store_name ?? ""),
         store_type: (order.store_type ?? "lifestyle") as StoreType,

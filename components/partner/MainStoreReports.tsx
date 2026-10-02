@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Store, ShoppingBag, Users, Coins, Search, ArrowUpDown, ChevronRight } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Store, ShoppingBag, Users, Coins, Search, ArrowUpDown, ChevronRight, X, Package, ExternalLink } from "lucide-react";
 import { EmptyState, PageHeader, Pagination, formatDate, peso, usePartner } from "./shared";
 import { getMainStoreReports, type MainStoreReports, type MainStoreOrder, type MainStoreChildStore } from "@/lib/api";
 
@@ -18,6 +18,8 @@ export default function MainStoreReportsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [offset, setOffset] = useState(0);
   const [pageSize, setPageSize] = useState(20);
+
+  const [selectedOrder, setSelectedOrder] = useState<MainStoreOrder | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -118,9 +120,9 @@ export default function MainStoreReportsPage() {
                     <th style={{ padding: "12px 8px" }}>Store Name</th>
                     <th style={{ padding: "12px 8px" }}>Type</th>
                     <th style={{ padding: "12px 8px" }}>Specialty & Location</th>
-                    <th style={{ padding: "12px 8px", textAlign: "right" }}>Paid Orders</th>
-                    <th style={{ padding: "12px 8px", textAlign: "right" }}>Gross Value</th>
-                    <th style={{ padding: "12px 8px", textAlign: "right" }}>Total Points</th>
+                    <th style={{ padding: "12px 8px", textAlign: "right" }}>Orders</th>
+                    <th style={{ padding: "12px 8px", textAlign: "right" }}>Sales Revenue</th>
+                    <th style={{ padding: "12px 8px", textAlign: "right" }}>E-Points</th>
                     <th style={{ padding: "12px 8px", textAlign: "center" }}>Referral QR</th>
                   </tr>
                 </thead>
@@ -223,12 +225,20 @@ export default function MainStoreReportsPage() {
                       <th style={{ padding: "12px 8px" }}>Date</th>
                       <th style={{ padding: "12px 8px" }}>Status</th>
                       <th style={{ padding: "12px 8px", textAlign: "right" }}>Total Amount</th>
+                      <th style={{ padding: "12px 8px", textAlign: "center" }}></th>
                     </tr>
                   </thead>
                   <tbody>
                     {orders.map((order) => (
-                      <tr key={order.order_code} style={{ borderBottom: "1px solid var(--rule, #e2e8f0)" }}>
-                        <td style={{ padding: "12px 8px", fontWeight: 600 }}>{order.order_code}</td>
+                      <tr
+                        key={order.order_code}
+                        onClick={() => setSelectedOrder(order)}
+                        style={{ borderBottom: "1px solid var(--rule, #e2e8f0)", cursor: "pointer" }}
+                        className="pp-tree-head"
+                      >
+                        <td style={{ padding: "12px 8px", fontWeight: 600 }}>
+                          <code>{order.order_code}</code>
+                        </td>
                         <td style={{ padding: "12px 8px" }}>
                           <div><strong>{order.store_name}</strong></div>
                           <span style={{
@@ -259,6 +269,19 @@ export default function MainStoreReportsPage() {
                           </span>
                         </td>
                         <td style={{ padding: "12px 8px", textAlign: "right", fontWeight: 700 }}>{peso(order.total_amount)}</td>
+                        <td style={{ padding: "12px 8px", textAlign: "center" }}>
+                          <button
+                            type="button"
+                            className="shop-secondary"
+                            style={{ padding: "4px 10px", fontSize: "12px" }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedOrder(order);
+                            }}
+                          >
+                            View
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -288,6 +311,177 @@ export default function MainStoreReportsPage() {
           )}
         </section>
       )}
+
+      {/* Detailed Order Modal */}
+      {selectedOrder ? (
+        <MainStoreOrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />
+      ) : null}
+    </div>
+  );
+}
+
+function MainStoreOrderDetailModal({ order, onClose }: { order: MainStoreOrder; onClose: () => void }) {
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+
+  const deliveryAddress = [order.address, order.barangay, order.city, order.province, order.zip].filter(Boolean).join(", ");
+  const items = Array.isArray(order.items) ? order.items : [];
+
+  return (
+    <div className="admin-modal-backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="admin-modal admin-shop-order-modal"
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: "680px" }}
+      >
+        <div className="admin-modal-head">
+          <div>
+            <p className="admin-wheel-kicker">Network Order Detail</p>
+            <h2 style={{ fontSize: "1.25rem", margin: 0 }}>{order.order_code}</h2>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close modal">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="admin-shop-order-detail" style={{ maxHeight: "70vh", overflowY: "auto", padding: "16px 20px" }}>
+          {/* Status & Store Banner */}
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "12px 16px",
+            background: "var(--bone-soft, #f8fafc)",
+            borderRadius: "8px",
+            marginBottom: "16px",
+            flexWrap: "wrap",
+            gap: "8px"
+          }}>
+            <div>
+              <span style={{ fontSize: "11px", color: "var(--ink-3)", textTransform: "uppercase", fontWeight: 700 }}>Attributed Store</span>
+              <div style={{ fontWeight: 700, color: "var(--ink)" }}>{order.store_name}</div>
+              <small style={{ color: "var(--ink-3)" }}>/{order.store_slug}</small>
+            </div>
+            <span style={{
+              fontSize: "12px",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              padding: "4px 10px",
+              borderRadius: "6px",
+              background: order.payment_status === "paid" ? "#dcfce7" : "#fee2e2",
+              color: order.payment_status === "paid" ? "#166534" : "#991b1b"
+            }}>
+              {order.payment_status}
+            </span>
+          </div>
+
+          <dl className="admin-tiktok-summary-grid">
+            <div>
+              <dt>Buyer Name</dt>
+              <dd><strong>{order.buyer_name || "Customer"}</strong></dd>
+            </div>
+            <div>
+              <dt>Email</dt>
+              <dd>{order.email ? <a href={`mailto:${order.email}`} style={{ color: "var(--ink)" }}>{order.email}</a> : "--"}</dd>
+            </div>
+            <div>
+              <dt>Mobile</dt>
+              <dd>{order.mobile ? <a href={`tel:${order.mobile}`} style={{ color: "var(--ink)" }}>{order.mobile}</a> : "--"}</dd>
+            </div>
+            <div>
+              <dt>Delivery Address</dt>
+              <dd>{deliveryAddress || "--"}</dd>
+            </div>
+            <div>
+              <dt>Shipping Region</dt>
+              <dd>{order.shipping_region || "--"}</dd>
+            </div>
+            <div>
+              <dt>Order Date</dt>
+              <dd>{formatDate(order.created_at)}</dd>
+            </div>
+            <div>
+              <dt>Payment Method</dt>
+              <dd>{order.payment_method || "Maya"}</dd>
+            </div>
+            <div>
+              <dt>Maya Reference</dt>
+              <dd><code>{order.maya_reference || "--"}</code></dd>
+            </div>
+            <div>
+              <dt>Paid At</dt>
+              <dd>{order.paid_at ? formatDate(order.paid_at) : (order.payment_status === "paid" ? formatDate(order.created_at) : "--")}</dd>
+            </div>
+            <div>
+              <dt>Order Status</dt>
+              <dd><span style={{ textTransform: "capitalize" }}>{order.status}</span></dd>
+            </div>
+            <div>
+              <dt>Subtotal</dt>
+              <dd>{peso(order.subtotal || order.total_amount)}</dd>
+            </div>
+            <div>
+              <dt>Shipping Fee</dt>
+              <dd>{peso(order.shipping_fee || 0)}</dd>
+            </div>
+            <div style={{ gridColumn: "1 / -1", borderTop: "1px solid var(--rule, #e2e8f0)", paddingTop: "8px" }}>
+              <dt style={{ fontSize: "14px", fontWeight: 700 }}>Total Paid</dt>
+              <dd style={{ fontSize: "18px", fontWeight: 800, color: "var(--gold-dark, #b45309)" }}>{peso(order.total_amount)}</dd>
+            </div>
+          </dl>
+
+          {/* Line Items Table */}
+          {items.length > 0 && (
+            <section className="admin-tiktok-subsection" style={{ marginTop: "20px" }}>
+              <h3 style={{ fontSize: "14px", fontWeight: 700, marginBottom: "8px" }}>Ordered Items</h3>
+              <div style={{ overflowX: "auto" }}>
+                <table className="admin-tiktok-table compact" style={{ width: "100%", fontSize: "13px" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left" }}>Item</th>
+                      <th style={{ textAlign: "center" }}>Caps</th>
+                      <th style={{ textAlign: "center" }}>Qty</th>
+                      <th style={{ textAlign: "right" }}>Price</th>
+                      <th style={{ textAlign: "right" }}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((item, idx) => (
+                      <tr key={item.id || idx}>
+                        <td><strong>{item.name}</strong></td>
+                        <td style={{ textAlign: "center" }}>{item.caps || "--"}</td>
+                        <td style={{ textAlign: "center" }}>{item.qty}</td>
+                        <td style={{ textAlign: "right" }}>{peso(item.price)}</td>
+                        <td style={{ textAlign: "right", fontWeight: 600 }}>{peso(item.price * item.qty)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+        </div>
+
+        <div className="admin-modal-actions" style={{ justifyContent: "flex-end", padding: "12px 20px" }}>
+          <button type="button" className="shop-secondary" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
