@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Search, X } from "lucide-react";
+import { ArrowUpDown, Search, X } from "lucide-react";
 import { EmptyState, Loading, PageHeader, Pagination, formatDate, peso, usePartner } from "./shared";
 import { getMainStoreReports, type MainStoreReports, type MainStoreOrder, type MainStoreChildStore } from "@/lib/api";
 
@@ -14,6 +14,9 @@ export default function MainStoreReportsPage() {
   const [reportsData, setReportsData] = useState<MainStoreReports | null>(null);
 
   const [search, setSearch] = useState("");
+  const [storeTypeFilter, setStoreTypeFilter] = useState<string>("");
+  const [storeSortBy, setStoreSortBy] = useState<"points" | "orders" | "revenue" | "name">("points");
+
   const [storeFilter, setStoreFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [offset, setOffset] = useState(0);
@@ -51,11 +54,25 @@ export default function MainStoreReportsPage() {
   const orders = reportsData?.orders ?? [];
   const totalOrders = reportsData?.total_orders ?? 0;
 
-  const filteredStores = stores.filter((s) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return s.full_name.toLowerCase().includes(q) || s.routing_slug.toLowerCase().includes(q) || (s.specialty && s.specialty.toLowerCase().includes(q));
-  });
+  const filteredStores = stores
+    .filter((s) => {
+      if (storeTypeFilter && s.store_type !== storeTypeFilter) return false;
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return (
+        s.full_name.toLowerCase().includes(q) ||
+        s.routing_slug.toLowerCase().includes(q) ||
+        (s.specialty && s.specialty.toLowerCase().includes(q)) ||
+        (s.practice_location && s.practice_location.toLowerCase().includes(q))
+      );
+    })
+    .sort((a, b) => {
+      if (storeSortBy === "points") return (b.points || 0) - (a.points || 0);
+      if (storeSortBy === "orders") return (b.orders_count || 0) - (a.orders_count || 0);
+      if (storeSortBy === "revenue") return (b.revenue || 0) - (a.revenue || 0);
+      if (storeSortBy === "name") return a.full_name.localeCompare(b.full_name);
+      return 0;
+    });
 
   return (
     <div className="pp-screen">
@@ -89,17 +106,72 @@ export default function MainStoreReportsPage() {
 
       {tab === "stores" ? (
         <>
-          {/* Universal External Filter Toolbar */}
+          {/* Universal External Filter Toolbar matching Referred Partners */}
           <div className="pp-partner-toolbar">
             <div className="pp-partner-search">
-              <Search size={16} aria-hidden="true" />
+              <Search size={16} className="pp-search-icon" aria-hidden="true" />
               <input
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search store by name or specialty…"
-                aria-label="Search stores"
+                placeholder="Search by doctor name, specialty, or clinic..."
+                aria-label="Search descendant stores"
               />
+              {search ? (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="pp-search-clear"
+                  aria-label="Clear search"
+                >
+                  <X size={14} />
+                </button>
+              ) : null}
+            </div>
+
+            <div className="pp-partner-actions">
+              <label className="pp-partner-sort">
+                <span>Type:</span>
+                <select
+                  value={storeTypeFilter}
+                  onChange={(e) => setStoreTypeFilter(e.target.value)}
+                  aria-label="Filter store type"
+                >
+                  <option value="">All types</option>
+                  <option value="lifestyle">Lifestyle</option>
+                  <option value="affiliate">Affiliate</option>
+                </select>
+              </label>
+
+              <label className="pp-partner-sort">
+                <ArrowUpDown size={14} aria-hidden="true" />
+                <span>Sort:</span>
+                <select
+                  value={storeSortBy}
+                  onChange={(e) => setStoreSortBy(e.target.value as typeof storeSortBy)}
+                  aria-label="Sort descendant stores"
+                >
+                  <option value="points">Most E-Points</option>
+                  <option value="orders">Most Orders</option>
+                  <option value="revenue">Highest Sales</option>
+                  <option value="name">Alphabetical</option>
+                </select>
+              </label>
+
+              {(search || storeTypeFilter || storeSortBy !== "points") ? (
+                <button
+                  type="button"
+                  className="shop-secondary pp-tree-quick-btn"
+                  onClick={() => {
+                    setSearch("");
+                    setStoreTypeFilter("");
+                    setStoreSortBy("points");
+                  }}
+                  aria-label="Reset filters"
+                >
+                  Reset
+                </button>
+              ) : null}
             </div>
           </div>
 
@@ -154,9 +226,9 @@ export default function MainStoreReportsPage() {
         </>
       ) : (
         <>
-          {/* Universal External Filter Toolbar */}
-          <div className="pp-partner-toolbar">
-            <div className="pp-partner-actions" style={{ flex: 1, justifyContent: "flex-start", gap: 10, flexWrap: "wrap" }}>
+          {/* Universal External Filter Toolbar on the Right */}
+          <div className="pp-partner-toolbar" style={{ justifyContent: "flex-end" }}>
+            <div className="pp-partner-actions">
               <label className="pp-partner-sort">
                 <span>Store:</span>
                 <select
@@ -167,10 +239,10 @@ export default function MainStoreReportsPage() {
                   }}
                   aria-label="Filter store"
                 >
-                  <option value="">All stores (direct + descendants)</option>
+                  <option value="">All stores</option>
                   {stores.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.full_name} ({s.store_type})
+                      {s.full_name}
                     </option>
                   ))}
                 </select>
@@ -189,7 +261,7 @@ export default function MainStoreReportsPage() {
                   <option value="">All statuses</option>
                   <option value="paid">Paid</option>
                   <option value="fulfilled">Fulfilled</option>
-                  <option value="pending">Pending payment</option>
+                  <option value="pending">Pending</option>
                   <option value="cancelled">Cancelled</option>
                 </select>
               </label>
