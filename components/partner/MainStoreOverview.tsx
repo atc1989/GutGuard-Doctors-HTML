@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Check, Copy, Store, Users, ShoppingBag, Coins, TrendingUp } from "lucide-react";
+import { ArrowRight, Check, Copy } from "lucide-react";
 import {
   CYCLE_TARGET,
   EmptyState,
@@ -18,7 +18,8 @@ import { getMainStoreDashboard, type MainStoreDashboard } from "@/lib/api";
 
 export default function MainStoreOverview() {
   const { dashboard } = usePartner();
-  const { copied, copy } = useCopy();
+  const { copy } = useCopy();
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [mainData, setMainData] = useState<MainStoreDashboard | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -44,10 +45,23 @@ export default function MainStoreOverview() {
     };
   }, []);
 
+  async function handleCopy(text: string, key: string) {
+    const success = await copy(text);
+    if (success) {
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 2000);
+    }
+  }
+
   const combinedPts = mainData?.combined_points ?? (dashboard.points.own_points + dashboard.points.passup_points);
   const cycleNumber = Math.floor(combinedPts / CYCLE_TARGET) + 1;
   const ptsInCycle = combinedPts % CYCLE_TARGET;
   const cyclePct = Math.min(100, (ptsInCycle / CYCLE_TARGET) * 100);
+
+  const ownPts = mainData?.own_points ?? dashboard.points.own_points;
+  const passupPts = mainData?.passup_points ?? dashboard.points.passup_points;
+  const lifestyleCount = mainData?.lifestyle_count ?? 0;
+  const totalOrders = mainData?.total_orders ?? 0;
 
   return (
     <div className="pp-screen">
@@ -58,10 +72,10 @@ export default function MainStoreOverview() {
       />
 
       {/* Main Store High-Level Stats */}
-      <section className="pp-stats" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }} aria-label="Main Store Summary">
+      <section className="pp-stats" aria-label="Main Store Summary">
         <StatTile
           label="Lifestyle Stores"
-          value={loading ? "--" : String(mainData?.lifestyle_count ?? 0)}
+          value={loading ? "--" : String(lifestyleCount)}
           note="active child lifestyle stores"
         />
         <StatTile
@@ -71,7 +85,7 @@ export default function MainStoreOverview() {
         />
         <StatTile
           label="Total Network Orders"
-          value={loading ? "--" : String(mainData?.total_orders ?? 0)}
+          value={loading ? "--" : String(totalOrders)}
           note="all descendant stores + own orders"
         />
         <StatTile
@@ -81,11 +95,15 @@ export default function MainStoreOverview() {
         />
       </section>
 
+      <p className="pp-perf">
+        Network summary: {lifestyleCount} active Lifestyle stores · {dashboard.clicks.last_30_days} retail clicks in the last 30 days · {combinedPts} lifetime pooled points
+      </p>
+
       <div className="pp-grid">
         {/* Left Column: Recent Orders Overview */}
         <section className="pp-card" aria-labelledby="pp-main-recent">
           <div className="pp-card-head">
-            <h2 id="pp-main-recent">Network Orders</h2>
+            <h2 id="pp-main-recent">Network orders</h2>
             <Link href="/partner/reports" className="pp-more">
               All reports & stores <ArrowRight aria-hidden="true" size={14} />
             </Link>
@@ -121,14 +139,11 @@ export default function MainStoreOverview() {
         <div className="pp-stack">
           <section className="pp-card" aria-labelledby="pp-main-epoints">
             <div className="pp-card-head">
-              <h2 id="pp-main-epoints">Main Store Combined Rebates</h2>
+              <h2 id="pp-main-epoints">Main Store rebates</h2>
               <Link href="/partner/e-points" className="pp-more">
-                Rebate details <ArrowRight aria-hidden="true" size={14} />
+                Details <ArrowRight aria-hidden="true" size={14} />
               </Link>
             </div>
-            <p style={{ fontSize: "13px", color: "var(--ink-3)", margin: "0 0 12px" }}>
-              Direct shop sales and pass-up points from directly referred partner stores are <strong>combined</strong> into one 1,500-point rebate track.
-            </p>
             <div className="pp-progress-labels">
               <strong>{ptsInCycle} / {CYCLE_TARGET} pts (Cycle {cycleNumber})</strong>
               <span>{Math.round(cyclePct)}%</span>
@@ -143,34 +158,57 @@ export default function MainStoreOverview() {
             >
               <div style={{ width: `${cyclePct}%`, background: "var(--gold)" }} />
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "12px", fontSize: "12px", color: "var(--ink-2)" }}>
-              <span>Own Shop Pts: <strong>{mainData?.own_points ?? dashboard.points.own_points}</strong></span>
-              <span>Referred Pass-Up: <strong>{mainData?.passup_points ?? dashboard.points.passup_points}</strong></span>
-              <span>Total Lifetime: <strong>{combinedPts} pts</strong></span>
+            <div className="pp-ms-rebate-grid">
+              <div className="pp-ms-rebate-stat">
+                <span className="pp-ms-rebate-label">Direct Shop</span>
+                <strong className="pp-ms-rebate-val">{ownPts} pts</strong>
+              </div>
+              <div className="pp-ms-rebate-stat">
+                <span className="pp-ms-rebate-label">Pass-Up</span>
+                <strong className="pp-ms-rebate-val">{passupPts} pts</strong>
+              </div>
+              <div className="pp-ms-rebate-stat">
+                <span className="pp-ms-rebate-label">Total Pooled</span>
+                <strong className="pp-ms-rebate-val is-gold">{combinedPts} pts</strong>
+              </div>
             </div>
           </section>
 
           <section className="pp-card" aria-labelledby="pp-main-quick-links">
             <div className="pp-card-head">
-              <h2 id="pp-main-quick-links">Main Store Share Links</h2>
+              <h2 id="pp-main-quick-links">Share & grow links</h2>
               <Link href="/partner/share" className="pp-more">
-                QR Codes <ArrowRight aria-hidden="true" size={14} />
+                QR codes <ArrowRight aria-hidden="true" size={14} />
               </Link>
             </div>
-            <div style={{ marginBottom: "16px" }}>
-              <p className="shop-kicker">1. Main shop link (direct retail)</p>
-              <p className="partner-link" style={{ fontSize: "13px" }}>{shopLink}</p>
-              <button type="button" className="shop-secondary pp-block-btn" onClick={() => copy(shopLink)}>
-                {copied ? <Check aria-hidden="true" size={14} /> : <Copy aria-hidden="true" size={14} />}
-                <span>Copy Main Shop Link</span>
+            <div className="pp-share-row">
+              <div className="pp-share-row-info">
+                <span className="shop-kicker" style={{ margin: 0, fontSize: "11px" }}>Retail shop link</span>
+                <span className="pp-share-row-url">{shopLink}</span>
+              </div>
+              <button
+                type="button"
+                className="shop-primary pp-share-row-btn"
+                onClick={() => handleCopy(shopLink, "shop")}
+                aria-label="Copy retail shop link"
+              >
+                {copiedKey === "shop" ? <Check aria-hidden="true" size={14} /> : <Copy aria-hidden="true" size={14} />}
+                <span>{copiedKey === "shop" ? "Copied" : "Copy"}</span>
               </button>
             </div>
-            <div>
-              <p className="shop-kicker">2. Partner registration link (invite stores)</p>
-              <p className="partner-link" style={{ fontSize: "13px" }}>{regLink}</p>
-              <button type="button" className="shop-secondary pp-block-btn" onClick={() => copy(regLink)}>
-                {copied ? <Check aria-hidden="true" size={14} /> : <Copy aria-hidden="true" size={14} />}
-                <span>Copy Registration Link</span>
+            <div className="pp-share-row" style={{ marginTop: 10 }}>
+              <div className="pp-share-row-info">
+                <span className="shop-kicker" style={{ margin: 0, fontSize: "11px" }}>Partner invite link</span>
+                <span className="pp-share-row-url">{regLink}</span>
+              </div>
+              <button
+                type="button"
+                className="shop-secondary pp-share-row-btn"
+                onClick={() => handleCopy(regLink, "referral")}
+                aria-label="Copy partner registration link"
+              >
+                {copiedKey === "referral" ? <Check aria-hidden="true" size={14} /> : <Copy aria-hidden="true" size={14} />}
+                <span>{copiedKey === "referral" ? "Copied" : "Copy"}</span>
               </button>
             </div>
           </section>
