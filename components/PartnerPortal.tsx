@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LoaderCircle } from "lucide-react";
-import { Logo } from "@/components/GutguardSite";
+import { Logo } from "@/components/GutguardLogo";
 import PartnerApplyForm from "@/components/PartnerApplyForm";
 import PartnerShell from "@/components/partner/PartnerShell";
 import { PartnerProvider } from "@/components/partner/shared";

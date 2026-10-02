@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { ArrowRightIcon, CheckIcon } from "@/components/Icons";
-import { Logo } from "@/components/GutguardSite";
+import { Logo } from "@/components/GutguardLogo";
 import { createShopOrder, sendShopOrderEmail, startMayaCheckout, type ShopOrderItem } from "@/lib/api";
 import { TIERS, TRIALS } from "@/lib/catalog";
 import {

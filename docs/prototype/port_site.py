@@ -27,7 +27,8 @@ rep('import { useState, useEffect, useRef, useContext, createContext } from "rea
     '"use client";\n'
     'import { useState, useEffect, useRef, useContext, createContext } from "react";\n'
     'import { ArrowRight, Play, Menu, X, Check, ShoppingBag, Lock, ChevronDown, ArrowLeft } from "lucide-react";\n'
-    'import { getPublicShopOrder, reconcileMayaPayment, sendShopOrderEmail, startMayaCheckout } from "@/lib/api";\n'
+    '/* the shop API (and the database client inside it) loads only when someone pays: not on every page */\n'
+    'const shopApi = () => import("@/lib/api");\n'
     'import { readReferralSlug } from "@/lib/referral";\n'
     'import CITIES from "@/lib/psgc_cities.json";')
 rep('import { ArrowRight, Play, Menu, X, Check, ShoppingBag, Lock, ChevronDown, ArrowLeft } from "lucide-react";\n\n', '\n')
@@ -210,10 +211,10 @@ rep('''  const tryPay = () => {''',
         }
         pend = { id: j.id, code: j.orderCode, sig };
         try { sessionStorage.setItem("gg-pending-order", JSON.stringify(pend)); } catch (e) {}
-        sendShopOrderEmail(j.id).catch(() => {});
+        shopApi().then((m) => m.sendShopOrderEmail(j.id)).catch(() => {});
       }
       try { sessionStorage.setItem("gg-order-summary", JSON.stringify({ code: pend.code, summary: summaryFor() })); } catch (e) {}
-      const co = await startMayaCheckout(pend.id);
+      const co = await (await shopApi()).startMayaCheckout(pend.id);
       window.location.assign(co.redirectUrl || co.orderUrl);
     } catch (err) {
       setPaying(false);
@@ -231,10 +232,10 @@ rep('''  const tryPay = () => {''',
     let saved = null; try { saved = JSON.parse(sessionStorage.getItem("gg-order-summary") || "null"); } catch (e) {}
     const summary = saved && saved.code === code ? saved.summary : null;
     if (params.p === "success") {
-      reconcileMayaPayment(code).catch(() => {});
+      shopApi().then((m) => m.reconcileMayaPayment(code)).catch(() => {});
       const done = (s) => { setOrder(s); setBasket([]); setPayFail(null); setTried(false); setStage("done"); try { sessionStorage.removeItem("gg-pending-order"); sessionStorage.removeItem("gg-order-summary"); } catch (e) {} };
       if (summary) done(summary);
-      else getPublicShopOrder(code).then((o) => { if (o) done({ lines: [], pts: 0, total: o.total_amount, pay: "maya", months: 3, isWatch: o.items.some((x) => x.id === "watch"), withOthers: false, daily: null, peak: o.items.some((x) => x.id === "peak"), newMember: true, name: o.first_name || "", province: o.province, doseGoal: "keep", credit: 0, ref: "", forOther: false, rcpName: "", becameGuardian: false }); }).catch(() => {});
+      else shopApi().then((m) => m.getPublicShopOrder(code)).then((o) => { if (o) done({ lines: [], pts: 0, total: o.total_amount, pay: "maya", months: 3, isWatch: o.items.some((x) => x.id === "watch"), withOthers: false, daily: null, peak: o.items.some((x) => x.id === "peak"), newMember: true, name: o.first_name || "", province: o.province, doseGoal: "keep", credit: 0, ref: "", forOther: false, rcpName: "", becameGuardian: false }); }).catch(() => {});
     } else if (params.p === "failure" || params.p === "cancel") {
       setPayFail(params.p === "cancel" ? "cancel" : "maya"); setStage("checkout");
     }
@@ -286,8 +287,66 @@ rep("--serif:'Fraunces',Georgia,serif;", "--serif:var(--font-fraunces),'Fraunces
 rep("--sans:'Inter Tight',system-ui,sans-serif;", "--sans:var(--font-inter-tight),'Inter Tight',system-ui,sans-serif;")
 rep("--mono:'IBM Plex Mono',ui-monospace,monospace;", "--mono:var(--font-plex-mono),'IBM Plex Mono',ui-monospace,monospace;")
 
-# ── 10. Two small CSS additions for the new fields ─────────────────────────────────────
-rep('const CSS = `\n', 'const CSS = `\n.vh{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;}\n.co-two{display:grid;grid-template-columns:1fr 1fr;gap:10px;}\n.co-zip input{max-width:140px;}\n')
+# ── 9e. Speed: what is already on screen shows at once. This small script is in the server HTML,
+#        so it runs as the page arrives, before the page code. The fade-in still runs for the rest. ──
+rep('''      <FooterOffer route={path} />''', '''      <FooterOffer route={path} />
+      <script dangerouslySetInnerHTML={{ __html: "document.querySelectorAll('.reveal').forEach(function(e){if(e.getBoundingClientRect().top<innerHeight)e.classList.add('in')})" }} />''')
 
-open(out, "w", encoding="utf-8").write(s)
-print("ported", len(s.splitlines()), "lines ->", out)
+# ── 10. Two small CSS additions for the new fields ─────────────────────────────────────
+rep('const CSS = `\n', 'const CSS = `\n/* speed: the first screen shows at once, without waiting for the page code (fade-in stays below it) */\nheader .reveal{opacity:1;transform:none;}\n.vh{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;}\n.co-two{display:grid;grid-template-columns:1fr 1fr;gap:10px;}\n.co-zip input{max-width:140px;}\n')
+
+# ── 11. Speed: the Shop is its own download (GutguardShop.jsx). Home, Science and the other
+#        pages do not load the Shop, the checkout, the city list or the shop API. ─────────────────
+import os, re
+a = s.index('\nconst ORDER_SHIP = 150;'); b = s.index('\nfunction Physicians()')
+shop_sec = s[a:b]
+core = s[:a] + s[b:]
+# shop-only module-level pieces move with it
+for piece in [
+    'import { readReferralSlug } from "@/lib/referral";\n',
+    'const shopApi = () => import("@/lib/api");\n',
+]:
+    assert core.count(piece) == 1, piece
+    core = core.replace(piece, '')
+    shop_sec = piece + shop_sec
+m = re.search(r'import CITIES from "@/lib/psgc_cities.json";[^\n]*\n', core); core = core.replace(m.group(0), ''); head_cities = m.group(0)
+m = re.search(r'/\* Barangays[^\n]*\n(let BRGY = null, BRGY_P = null;\n)(const loadBrgy = [^\n]*\n)', core)
+assert m, 'BRGY block'
+core = core.replace(m.group(0), ''); head_brgy = m.group(0)
+sec_names = set(re.findall(r'^(?:const|let|function|async function)\s+(\w+)', shop_sec, re.M))
+sec_names |= set(re.findall(r'^(?:const|let)\s+\w+\s*=\s*[^,;\n]{1,40},\s*(\w+)\s*=', shop_sec, re.M))
+for n in sec_names - {'Shop'}:
+    assert not re.search(r'\b' + n + r'\b', core), 'used outside the Shop: ' + n
+core_names = re.findall(r'^(?:export\s+)?(?:const|let|function)\s+(\w+)', core, re.M)
+core_names += re.findall(r'^(?:const|let)\s+\w+\s*=\s*[^,;\n]{1,40},\s*(\w+)\s*=', core, re.M)  # const A = 1, B = 2;
+needed = sorted({n for n in core_names if n not in ('GutguardSite',) and re.search(r'\b' + n + r'\b', shop_sec)})
+# core: lazy Shop, exports for the Shop module
+core = core.replace('import { useState, useEffect, useRef, useContext, createContext } from "react";',
+                    'import { useState, useEffect, useRef, useContext, createContext, lazy, Suspense } from "react";', 1)
+core = core.replace('const ROUTES = {', '/* the Shop downloads only when someone opens it */\nconst Shop = lazy(() => import("./GutguardShop.jsx"));\nconst ROUTES = {', 1)
+assert core.count('        <Page params={params} />') == 1
+core = core.replace('        <Page params={params} />', '        {Page === Shop ? <Suspense fallback={<div style={{ minHeight: "80vh" }} />}><Page params={params} /></Suspense> : <Page params={params} />}')
+core += '\n/* used by GutguardShop.jsx */\nexport { ' + ', '.join(n for n in needed if not re.search(r'^export\s+(?:const|let|function)\s+' + n + r'\b', core, re.M)) + ' };\n'
+shop = ('"use client";\n/* Generated with GutguardSite.jsx by docs/prototype/port_site.py. The Shop page, loaded on demand. */\n'
+        'import { useState, useEffect, useRef } from "react";\n'
+        + head_cities
+        + 'import { ' + ', '.join(needed) + ' } from "./GutguardSite.jsx";\n'
+        + head_brgy + shop_sec + '\n\nexport default Shop;\n')
+# ── 12. Speed: CSS as a real stylesheet (cached, not inside the JavaScript and the HTML), and the
+#        logo in its own tiny module, so pages that only need the logo do not load the whole site. ─
+a = core.index('const CSS = `'); b = core.index('`;', a)
+css_text = core[a + len('const CSS = `'):b]
+assert '${' not in css_text
+core = core[:a] + core[b + 2:]
+assert core.count('<style>{CSS}</style>') == 1
+core = core.replace('      <style>{CSS}</style>\n', '')
+m = re.search(r'const GG_LOGO = "[^"]*";\n(export function Logo\(.*?\n\}\n)', core, re.S)
+assert m, 'Logo block'
+logo_mod = '/* Generated by docs/prototype/port_site.py. The Gutguard logo, shared by the site, SiteNav and the partner pages. */\n' + m.group(0)
+core = core.replace(m.group(0), '')
+core = core.replace('"use client";\n', '"use client";\nimport "./GutguardSite.css";\nimport { Logo } from "./GutguardLogo.jsx";\nexport { Logo };\n', 1)
+open(os.path.join(os.path.dirname(out) or ".", "GutguardSite.css"), "w", encoding="utf-8").write("/* Generated by docs/prototype/port_site.py from the prototype. Change the prototype, not this file. */\n" + css_text)
+open(os.path.join(os.path.dirname(out) or ".", "GutguardLogo.jsx"), "w", encoding="utf-8").write(logo_mod)
+open(out, "w", encoding="utf-8").write(core)
+open(os.path.join(os.path.dirname(out) or ".", "GutguardShop.jsx"), "w", encoding="utf-8").write(shop)
+print("ported", len(core.splitlines()), "+", len(shop.splitlines()), "lines ->", out, "+ GutguardShop.jsx")

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
-import { Logo } from "@/components/GutguardSite";
+import { Logo } from "@/components/GutguardLogo";
 
 /**
  * The marketing masthead for pages that live outside GutguardSite's client router.
