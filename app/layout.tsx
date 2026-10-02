@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces } from "next/font/google";
+import { Fraunces, IBM_Plex_Mono, Inter_Tight } from "next/font/google";
 import "@/styles/globals.css";
 
 /**
@@ -12,6 +12,19 @@ const fraunces = Fraunces({
   subsets: ["latin"],
   style: ["normal", "italic"],
   variable: "--font-fraunces",
+  display: "swap",
+});
+
+/** The website's body and label faces (Addendum 05). Same families the prototype loads. */
+const interTight = Inter_Tight({
+  subsets: ["latin"],
+  variable: "--font-inter-tight",
+  display: "swap",
+});
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["500", "600"],
+  variable: "--font-plex-mono",
   display: "swap",
 });
 
@@ -57,7 +70,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={fraunces.variable}>
+    <html lang="en" className={`${fraunces.variable} ${interTight.variable} ${plexMono.variable}`}>
       <body>{children}</body>
     </html>
   );

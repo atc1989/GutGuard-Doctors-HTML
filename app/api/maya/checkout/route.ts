@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { recomputeSubtotal } from "@/lib/catalog";
+import { flatShippingFee, recomputeSubtotal } from "@/lib/catalog";
 import { createMayaCheckout, isMayaConfigured, toMayaAmount } from "@/lib/maya";
-import { isValidShippingFee } from "@/lib/shipping";
 import { getSupabaseAdmin, isSupabaseAdminConfigured } from "@/lib/supabase-admin";
 import type { ShopOrderItem } from "@/lib/api";
 
@@ -56,6 +55,9 @@ export async function POST(request: Request) {
 
   const order = data as OrderRow;
   const orderUrl = `${getSiteUrl(request)}/shop/order/${encodeURIComponent(order.order_code)}`;
+  // Return the buyer to the origin they paid from (gutguard.ph or shop.gutguard.ph), so the
+  // basket and order summary kept in that origin's browser storage are still there.
+  const shopUrl = `${getReturnOrigin(request)}/shop`;
 
   // Already settled - send them to the receipt instead of charging twice.
   if (order.payment_status === "paid") {
@@ -108,10 +110,12 @@ export async function POST(request: Request) {
         amount: { value: toMayaAmount(item.price), currency: "PHP" },
         totalAmount: { value: toMayaAmount(item.price * item.qty), currency: "PHP" },
       })),
+      // Back to the shop, which shows the prototype's Done screen (or its retry screen).
+      // The receipt page at /shop/order/<code> stays for email links.
       redirectUrl: {
-        success: `${orderUrl}?p=success`,
-        failure: `${orderUrl}?p=failure`,
-        cancel: `${orderUrl}?p=cancel`,
+        success: `${shopUrl}?order=${encodeURIComponent(order.order_code)}&p=success`,
+        failure: `${shopUrl}?order=${encodeURIComponent(order.order_code)}&p=failure`,
+        cancel: `${shopUrl}?order=${encodeURIComponent(order.order_code)}&p=cancel`,
       },
       requestReferenceNumber,
       metadata: {},
@@ -136,15 +140,16 @@ export async function POST(request: Request) {
 
 /**
  * The browser wrote subtotal/shipping/total into the row, so none of it is trusted here.
- * Line prices are re-derived from the server catalog and the shipping fee is bounded by
- * the published rate table before any amount is sent to Maya.
+ * Line prices are re-derived from the server catalog and the shipping fee must equal the
+ * flat fee for these items before any amount is sent to Maya.
  */
 function verifyAmounts(order: OrderRow) {
   const subtotal = recomputeSubtotal(order.items);
   if (subtotal === null) return null;
 
+  // Flat shipping (Addendum 05): the fee is derived from the items, never taken from the row.
   const shippingFee = Number(order.shipping_fee) || 0;
-  if (!isValidShippingFee(shippingFee)) return null;
+  if (shippingFee !== flatShippingFee(order.items)) return null;
 
   const total = subtotal + shippingFee;
   if (total <= 0) return null;
@@ -191,4 +196,13 @@ function getSiteUrl(request: Request) {
   const configured = process.env.NEXT_PUBLIC_SHOP_URL;
   if (configured) return configured.replace(/\/$/, "");
   return new URL(request.url).origin;
+}
+
+/** The request's own origin when it is one of ours, else the configured shop origin. */
+function getReturnOrigin(request: Request) {
+  const origin = new URL(request.url).origin;
+  const allowed = [process.env.NEXT_PUBLIC_SHOP_URL, process.env.NEXT_PUBLIC_MARKETING_URL]
+    .filter(Boolean)
+    .map((u) => String(u).replace(/\/$/, ""));
+  return allowed.includes(origin) || origin.startsWith("http://localhost") ? origin : getSiteUrl(request);
 }

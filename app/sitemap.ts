@@ -12,5 +12,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${marketingUrl}/physicians`, lastModified: now, changeFrequency: "monthly", priority: 0.7 },
     { url: `${marketingUrl}/physicians/register`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
     { url: `${marketingUrl}/shop`, lastModified: now, changeFrequency: "weekly", priority: 0.9 },
+    { url: `${marketingUrl}/about`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${marketingUrl}/legal`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
   ];
 }

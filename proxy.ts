@@ -7,6 +7,22 @@ let loginLimiter: Ratelimit | null = null;
 // Lazily initialised so a missing Upstash env (local dev, CI) doesn't crash the build.
 let ipLimiter: Ratelimit | null = null;
 let emailLimiter: Ratelimit | null = null;
+let buyerLimiter: Ratelimit | null = null;
+
+// 30 first-buyer checks per IP per 10 minutes. The check says whether a number has a
+// recent paid order, so it must not be usable to test numbers in bulk.
+function getBuyerLimiter(): Ratelimit | null {
+  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) return null;
+  if (!buyerLimiter) {
+    buyerLimiter = new Ratelimit({
+      redis: Redis.fromEnv(),
+      limiter: Ratelimit.slidingWindow(30, "10 m"),
+      prefix: "rl:shop:first-buyer",
+      analytics: false,
+    });
+  }
+  return buyerLimiter;
+}
 
 function getLimiters(): { ip: Ratelimit | null; em: Ratelimit | null } {
   if (
@@ -71,6 +87,15 @@ export async function proxy(req: NextRequest) {
         { status: 429, headers: { "Retry-After": String(Math.ceil((result.reset - Date.now()) / 1000)) } },
       );
     }
+    return NextResponse.next();
+  }
+
+  if (req.nextUrl.pathname === "/api/shop/first-buyer") {
+    const limiter = getBuyerLimiter();
+    if (!limiter) return NextResponse.next();
+    const fwd = req.headers.get("x-forwarded-for");
+    const result = await limiter.limit(fwd ? fwd.split(",")[0].trim() : "127.0.0.1");
+    if (!result.success) return NextResponse.json({ error: "Too many checks. Please wait a few minutes." }, { status: 429 });
     return NextResponse.next();
   }
 
