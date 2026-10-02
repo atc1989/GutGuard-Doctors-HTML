@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, ChevronRight, Copy, Package, Users, X } from "lucide-react";
+import { ChevronRight, X } from "lucide-react";
 import {
   CYCLE_TARGET,
   EmptyState,
@@ -11,64 +11,97 @@ import {
   StatTile,
   formatDate,
   peso,
-  useCopy,
   usePartner,
 } from "./shared";
 
 const MILESTONES = [
-  { pts: 300, rebate: 18000, label: "Initial movement milestone" },
-  { pts: 750, rebate: 70000, label: "Mid-level movement milestone" },
-  { pts: 1500, rebate: 150000, label: "Full cycle target milestone" },
+  { pts: 300, rebate: 18000, label: "Milestone 1" },
+  { pts: 750, rebate: 70000, label: "Milestone 2" },
+  { pts: 1500, rebate: 150000, label: "Milestone 3 (Full cycle)" },
 ];
 
 export default function MainStoreEPointsPage() {
   const { dashboard } = usePartner();
-  const { points, rebates, point_sources: sources = [] } = dashboard;
-  const { copied, copy } = useCopy();
+  const { points, rebates = [], point_sources: sources = [] } = dashboard;
 
-  const [tab, setTab] = useState<"rebates" | "log" | "breakdown">("rebates");
+  const [tab, setTab] = useState<"rebates" | "log">("rebates");
   const [pointsFilter, setPointsFilter] = useState<"all" | "direct" | "referred">("all");
   const [offset, setOffset] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [rebateOffset, setRebateOffset] = useState(0);
+  const [rebatePageSize, setRebatePageSize] = useState(10);
   const [selectedSource, setSelectedSource] = useState<typeof sources[number] | null>(null);
+  const [selectedRebate, setSelectedRebate] = useState<typeof rebates[number] | null>(null);
 
   useEffect(() => {
-    if (!selectedSource) return;
+    if (!selectedSource && !selectedRebate) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setSelectedSource(null);
+      if (e.key === "Escape") {
+        setSelectedSource(null);
+        setSelectedRebate(null);
+      }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [selectedSource]);
+  }, [selectedSource, selectedRebate]);
 
   const combinedPoints = points.own_points + points.passup_points;
   const cycleNumber = Math.floor(combinedPoints / CYCLE_TARGET) + 1;
   const pointsInCycle = combinedPoints % CYCLE_TARGET;
   const cyclePct = Math.min(100, Math.round((pointsInCycle / CYCLE_TARGET) * 100));
 
+  const nextMilestone = MILESTONES.find((m) => pointsInCycle < m.pts) || null;
+  const pointsToNext = nextMilestone ? nextMilestone.pts - pointsInCycle : 0;
+
   const directSources = sources.filter((s) => s.depth === 0);
   const referredSources = sources.filter((s) => s.depth === 1);
-  const activeSources = pointsFilter === "direct" ? directSources : pointsFilter === "referred" ? referredSources : sources;
+  const activeSources =
+    pointsFilter === "direct"
+      ? directSources
+      : pointsFilter === "referred"
+      ? referredSources
+      : sources;
   const visibleSources = activeSources.slice(offset, offset + pageSize);
+  const visibleRebates = rebates.slice(rebateOffset, rebateOffset + rebatePageSize);
 
   return (
     <div className="pp-screen">
       <PageHeader
-        kicker="Main Store combined rebates"
-        title="Combined E-Points & Cash Rebates"
-        lede="Your own direct Shop QR orders and pass-up points from directly referred partner stores are pooled into a single 1,500-point rebate cycle."
+        kicker="E-Points & rebates"
+        title="Points & Cash Rebates"
+        lede="Track points pooled from your direct Shop sales and downline store pass-ups toward 1,500-point cash rebate cycles."
       />
 
       {/* Top Overview Stats Bar */}
-      <section className="pp-stats" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }} aria-label="Main Store E-Points summary">
-        <StatTile label="Own Shop Points" value={`${points.own_points} pts`} note="earned from direct Shop QR retail sales" />
-        <StatTile label="Referred Pass-Up Points" value={`${points.passup_points} pts`} note="earned from direct child lifestyle stores" />
-        <StatTile label="Combined Lifetime Points" value={`${combinedPoints} pts`} note="all-time pooled rebate points" />
-        <StatTile label={`Cycle ${cycleNumber} Progress`} value={`${pointsInCycle} / ${CYCLE_TARGET} pts`} note={`${cyclePct}% towards cycle completion`} />
+      <section
+        className="pp-stats"
+        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}
+        aria-label="E-Points summary"
+      >
+        <StatTile
+          label="Direct shop points"
+          value={`${points.own_points} pts`}
+          note="Direct Shop QR retail sales"
+        />
+        <StatTile
+          label="Pass-up points"
+          value={`${points.passup_points} pts`}
+          note="Referred partner stores"
+        />
+        <StatTile
+          label="Cycle balance"
+          value={`${pointsInCycle} pts`}
+          note={`Target: ${CYCLE_TARGET} pts`}
+        />
+        <StatTile
+          label="Lifetime pooled"
+          value={`${combinedPoints} pts`}
+          note="All-time earned points"
+        />
       </section>
 
       {/* Main Tab Switcher */}
-      <div className="pp-seg" role="tablist" aria-label="Main Store Rebate view" style={{ marginTop: 20, marginBottom: 16 }}>
+      <div className="pp-seg" role="tablist" aria-label="E-Points view">
         <button
           type="button"
           role="tab"
@@ -76,102 +109,230 @@ export default function MainStoreEPointsPage() {
           className={tab === "rebates" ? "active" : ""}
           onClick={() => setTab("rebates")}
         >
-          Combined Rebate Track
+          Rebates
         </button>
         <button
           type="button"
           role="tab"
           aria-selected={tab === "log"}
           className={tab === "log" ? "active" : ""}
-          onClick={() => { setTab("log"); setOffset(0); }}
+          onClick={() => {
+            setTab("log");
+            setOffset(0);
+          }}
         >
-          Points & Orders Log
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "breakdown"}
-          className={tab === "breakdown" ? "active" : ""}
-          onClick={() => setTab("breakdown")}
-        >
-          Point Source Breakdown
+          Points Log
         </button>
       </div>
 
-      {/* TAB 1: COMBINED REBATES */}
+      {/* TAB 1: REBATES */}
       {tab === "rebates" && (
-        <section className="pp-card" aria-label="Combined Rebate Track" style={{ marginBottom: 24 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
-            <div>
-              <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--ink)", margin: 0 }}>
-                Main Store Single Combined Rebate Track
-              </h3>
-              <small style={{ color: "var(--ink-3)", fontSize: 13 }}>
-                Own Sales + Direct Referral Pass-Ups Pooled Together
-              </small>
+        <>
+          <section className="pp-card" aria-label="Combined Rebate Track" style={{ marginBottom: 24 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                marginBottom: 12,
+                flexWrap: "wrap",
+                gap: 8,
+              }}
+            >
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--ink)", margin: 0 }}>
+                  Combined rebate track · Cycle {cycleNumber}
+                </h3>
+                <small style={{ color: "var(--ink-3)", fontSize: 13 }}>
+                  Own direct sales and referral pass-up points pooled together
+                </small>
+              </div>
+              <span className="pp-tag pp-tag-blue">
+                Pooled track
+              </span>
             </div>
-            <span className="pp-tag pp-tag-blue">
-              Combined Track
-            </span>
-          </div>
 
-          <div className="pp-progress-labels" style={{ marginTop: 16 }}>
-            <strong>{pointsInCycle} / {CYCLE_TARGET} Combined E-Points (Cycle {cycleNumber})</strong>
-            <span>{cyclePct}%</span>
-          </div>
-          <div className="pp-progress" role="progressbar" aria-valuemin={0} aria-valuemax={CYCLE_TARGET} aria-valuenow={Math.min(pointsInCycle, CYCLE_TARGET)} aria-label="Combined rebate cycle progress">
-            <div style={{ width: `${cyclePct}%`, background: "var(--gold)" }} />
-          </div>
+            <div className="pp-progress-labels" style={{ marginTop: 16 }}>
+              <strong>
+                {pointsInCycle} / {CYCLE_TARGET} points
+              </strong>
+              <span>{cyclePct}%</span>
+            </div>
+            <div
+              className="pp-progress"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={CYCLE_TARGET}
+              aria-valuenow={Math.min(pointsInCycle, CYCLE_TARGET)}
+              aria-label="Combined rebate cycle progress"
+            >
+              <div style={{ width: `${cyclePct}%`, background: "var(--gold)" }} />
+            </div>
 
-          <div className="pp-milestones" style={{ marginTop: 24 }}>
-            {MILESTONES.map((m) => {
-              const unlocked = pointsInCycle >= m.pts;
-              return (
-                <article key={`combined-${m.pts}`} className={unlocked ? "pp-milestone unlocked" : "pp-milestone"}>
-                  <span>{unlocked ? "Unlocked" : `${m.pts} Combined Pts (${pointsInCycle} / ${m.pts} pts)`}</span>
-                  <strong>{peso(m.rebate)}</strong>
-                  <small style={{ color: "var(--ink-3)" }}>{m.label}</small>
-                </article>
-              );
-            })}
-          </div>
+            <div className="pp-milestones" style={{ marginTop: 20 }}>
+              {MILESTONES.map((m) => {
+                const unlocked = pointsInCycle >= m.pts;
+                return (
+                  <article
+                    key={`combined-${m.pts}`}
+                    className={unlocked ? "pp-milestone unlocked" : "pp-milestone"}
+                  >
+                    <span>{unlocked ? "Unlocked" : `${m.pts} pts`}</span>
+                    <strong>{peso(m.rebate)}</strong>
+                    <small>{m.label}</small>
+                  </article>
+                );
+              })}
+            </div>
 
-          <div style={{ marginTop: 24, padding: "16px", background: "var(--bone-soft)", border: "1px solid var(--rule-soft)", borderRadius: "var(--r-md)", fontSize: "13px", color: "var(--ink-2)", lineHeight: 1.5 }}>
-            <strong>How Main Store Rebates Work:</strong> When customers purchase through your Shop QR, you earn 1 point per ₱1,000 spent. When stores directly referred by your registration link make sales, you earn pass-up points. Both flow directly into this combined 1,500-point rebate tracker!
-          </div>
-        </section>
+            {nextMilestone ? (
+              <p
+                style={{
+                  margin: "16px 0 0",
+                  fontSize: 13,
+                  color: "var(--ink-3)",
+                  borderTop: "1px solid var(--rule-soft)",
+                  paddingTop: 12,
+                }}
+              >
+                Earn <strong>{pointsToNext} more {pointsToNext === 1 ? "point" : "points"}</strong> to unlock {nextMilestone.label} ({peso(nextMilestone.rebate)} cash rebate).
+              </p>
+            ) : (
+              <p
+                style={{
+                  margin: "16px 0 0",
+                  fontSize: 13,
+                  color: "var(--green, #107e3e)",
+                  fontWeight: 600,
+                  borderTop: "1px solid var(--rule-soft)",
+                  paddingTop: 12,
+                }}
+              >
+                All milestones in Cycle {cycleNumber} unlocked! Additional points roll into the next cycle.
+              </p>
+            )}
+          </section>
+
+          {/* Rebate History List */}
+          <h2 className="pp-h2">
+            {rebates.length
+              ? `${rebates.length} unlocked ${rebates.length === 1 ? "milestone" : "milestones"}`
+              : "Rebate history"}
+          </h2>
+          <section className="pp-card pp-card-flush" aria-label="Rebate history">
+            {rebates.length ? (
+              <>
+                <ul className="pp-log">
+                  {visibleRebates.map((rebate, index) => (
+                    <li
+                      key={index}
+                      className="pp-log-item-interactive"
+                      onClick={() => setSelectedRebate(rebate)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setSelectedRebate(rebate);
+                        }
+                      }}
+                      aria-label={`View details for ${peso(rebate.rebate_amount)} rebate`}
+                    >
+                      <div className="pp-log-lead">
+                        <div className="pp-log-title-row">
+                          <strong className="pp-log-title">{peso(rebate.rebate_amount)}</strong>
+                          <span
+                            className={
+                              rebate.status === "paid"
+                                ? "pp-tag pp-tag-green"
+                                : rebate.status === "processing"
+                                ? "pp-tag pp-tag-blue"
+                                : "pp-tag pp-tag-bone"
+                            }
+                          >
+                            {rebate.status === "paid"
+                              ? "Paid"
+                              : rebate.status === "processing"
+                              ? "Processing"
+                              : "Queued"}
+                          </span>
+                        </div>
+                        <span className="pp-log-date">{formatDate(rebate.created_at)}</span>
+                      </div>
+                      <div className="pp-log-trail">
+                        <span className="pp-log-pts">{rebate.milestone_pts} pts milestone</span>
+                        <ChevronRight size={16} className="pp-log-chevron" aria-hidden="true" />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <Pagination
+                  label="Rebate history pages"
+                  offset={rebateOffset}
+                  pageSize={rebatePageSize}
+                  total={rebates.length}
+                  shown={visibleRebates.length}
+                  noun="rebates"
+                  onOffset={setRebateOffset}
+                  onPageSize={(next) => {
+                    setRebatePageSize(next);
+                    setRebateOffset(0);
+                  }}
+                />
+              </>
+            ) : (
+              <EmptyState title="No rebate payouts yet.">
+                As your combined points reach 300, 750, and 1,500 points, your cash rebate payouts will appear here.
+              </EmptyState>
+            )}
+          </section>
+        </>
       )}
 
-      {/* TAB 2: POINTS & ORDERS LOG */}
+      {/* TAB 2: POINTS LOG */}
       {tab === "log" && (
         <>
-          <div className="pp-seg" style={{ marginTop: 0, marginBottom: 16 }} role="tablist" aria-label="Filter points origin">
+          <div
+            className="pp-seg"
+            style={{ marginTop: 0, marginBottom: 16 }}
+            role="tablist"
+            aria-label="Filter points origin"
+          >
             <button
               type="button"
               role="tab"
               aria-selected={pointsFilter === "all"}
               className={pointsFilter === "all" ? "active" : ""}
-              onClick={() => { setPointsFilter("all"); setOffset(0); }}
+              onClick={() => {
+                setPointsFilter("all");
+                setOffset(0);
+              }}
             >
-              All Activity
+              All activity
             </button>
             <button
               type="button"
               role="tab"
               aria-selected={pointsFilter === "direct"}
               className={pointsFilter === "direct" ? "active" : ""}
-              onClick={() => { setPointsFilter("direct"); setOffset(0); }}
+              onClick={() => {
+                setPointsFilter("direct");
+                setOffset(0);
+              }}
             >
-              My Direct Shop
+              Direct shop
             </button>
             <button
               type="button"
               role="tab"
               aria-selected={pointsFilter === "referred"}
               className={pointsFilter === "referred" ? "active" : ""}
-              onClick={() => { setPointsFilter("referred"); setOffset(0); }}
+              onClick={() => {
+                setPointsFilter("referred");
+                setOffset(0);
+              }}
             >
-              Downline Referrals
+              Downline pass-ups
             </button>
           </div>
 
@@ -181,7 +342,9 @@ export default function MainStoreEPointsPage() {
                 <ul className="pp-log">
                   {visibleSources.map((source, index) => {
                     const isPassup = source.depth === 1;
-                    const title = isPassup ? (source.source_partner || "Referred Partner") : `Order ${source.order_code}`;
+                    const title = isPassup
+                      ? source.source_partner || "Referred partner"
+                      : `Order ${source.order_code}`;
                     return (
                       <li
                         key={`${source.order_code}-${index}`}
@@ -201,7 +364,7 @@ export default function MainStoreEPointsPage() {
                           <div className="pp-log-title-row">
                             <strong className="pp-log-title">{title}</strong>
                             <span className={isPassup ? "pp-tag pp-tag-blue" : "pp-tag pp-tag-bone"}>
-                              {isPassup ? "Pass-Up" : "Direct Sale"}
+                              {isPassup ? "Pass-up" : "Direct sale"}
                             </span>
                           </div>
                           <span className="pp-log-date">{formatDate(source.created_at)}</span>
@@ -224,7 +387,10 @@ export default function MainStoreEPointsPage() {
                   shown={visibleSources.length}
                   noun="transactions"
                   onOffset={setOffset}
-                  onPageSize={(next) => { setPageSize(next); setOffset(0); }}
+                  onPageSize={(next) => {
+                    setPageSize(next);
+                    setOffset(0);
+                  }}
                 />
               </>
             ) : (
@@ -236,33 +402,14 @@ export default function MainStoreEPointsPage() {
         </>
       )}
 
-      {/* TAB 3: BREAKDOWN */}
-      {tab === "breakdown" && (
-        <section className="pp-card" aria-label="Point Source Breakdown">
-          <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 16px" }}>Point Contributions</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
-            <div style={{ padding: 16, borderRadius: "var(--r-md)", background: "var(--bone-soft)", border: "1px solid var(--rule-soft)" }}>
-              <div style={{ color: "var(--ink-3)", fontSize: 13, fontWeight: 600 }}>Direct Shop Sales (Depth 0)</div>
-              <div style={{ fontSize: 24, fontWeight: 700, color: "var(--ink)", margin: "4px 0" }}>{points.own_points} pts</div>
-              <small style={{ color: "var(--ink-3)" }}>Points generated directly from your Main Store retail link</small>
-            </div>
-            <div style={{ padding: 16, borderRadius: "var(--r-md)", background: "var(--bone-soft)", border: "1px solid var(--rule-soft)" }}>
-              <div style={{ color: "var(--ink-3)", fontSize: 13, fontWeight: 600 }}>Direct Referrals Pass-Up (Depth 1)</div>
-              <div style={{ fontSize: 24, fontWeight: 700, color: "var(--ink)", margin: "4px 0" }}>{points.passup_points} pts</div>
-              <small style={{ color: "var(--ink-3)" }}>Pass-up points generated by Lifestyle stores directly referred by you</small>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Detail Bottom Sheet / Modal */}
+      {/* Point Transaction Detail Modal */}
       {selectedSource ? (
         <div className="pp-sheet-wrap" role="dialog" aria-modal="true" aria-labelledby="pp-sheet-source-title">
           <div className="pp-sheet-backdrop" onClick={() => setSelectedSource(null)} aria-hidden="true" />
           <div className="pp-sheet">
             <div className="pp-sheet-grab" aria-hidden="true" />
             <div className="pp-sheet-head">
-              <h3 id="pp-sheet-source-title" className="pp-sheet-title">Point Transaction</h3>
+              <h3 id="pp-sheet-source-title" className="pp-sheet-title">Point transaction</h3>
               <button
                 type="button"
                 className="pp-sheet-close"
@@ -275,7 +422,7 @@ export default function MainStoreEPointsPage() {
             <div className="pp-sheet-body">
               <div className="pp-detail-hero">
                 <span className="pp-detail-kicker">
-                  {selectedSource.depth === 1 ? "Referred Partner Pass-Up" : "Direct Shop Order"}
+                  {selectedSource.depth === 1 ? "Referred partner pass-up" : "Direct shop order"}
                 </span>
                 <strong className="pp-detail-big-val">
                   +{selectedSource.points} {selectedSource.points === 1 ? "Point" : "Points"}
@@ -285,20 +432,20 @@ export default function MainStoreEPointsPage() {
 
               <dl className="pp-detail-grid">
                 <div>
-                  <dt>Order Code</dt>
+                  <dt>Order code</dt>
                   <dd>
                     <code>{selectedSource.order_code}</code>
                   </dd>
                 </div>
                 <div>
-                  <dt>Attribution Type</dt>
+                  <dt>Attribution</dt>
                   <dd>
-                    {selectedSource.depth === 1 ? "Referred Partner (Depth 1)" : "My Direct Shop (Depth 0)"}
+                    {selectedSource.depth === 1 ? "Referred partner" : "Direct shop"}
                   </dd>
                 </div>
                 {selectedSource.source_partner ? (
                   <div>
-                    <dt>Referring Doctor</dt>
+                    <dt>Referring doctor</dt>
                     <dd>{selectedSource.source_partner}</dd>
                   </div>
                 ) : null}
@@ -306,10 +453,70 @@ export default function MainStoreEPointsPage() {
             </div>
             <div className="pp-modal-footer">
               <Link href="/partner/reports" className="shop-secondary" onClick={() => setSelectedSource(null)}>
-                <span>View in Reports & Stores →</span>
+                <span>View in reports & stores →</span>
               </Link>
               <button type="button" className="shop-primary" onClick={() => setSelectedSource(null)}>
                 Done
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Rebate Milestone Detail Modal */}
+      {selectedRebate ? (
+        <div className="pp-sheet-wrap" role="dialog" aria-modal="true" aria-labelledby="pp-sheet-rebate-title">
+          <div className="pp-sheet-backdrop" onClick={() => setSelectedRebate(null)} aria-hidden="true" />
+          <div className="pp-sheet">
+            <div className="pp-sheet-grab" aria-hidden="true" />
+            <div className="pp-sheet-head">
+              <h3 id="pp-sheet-rebate-title" className="pp-sheet-title">Rebate payout</h3>
+              <button
+                type="button"
+                className="pp-sheet-close"
+                onClick={() => setSelectedRebate(null)}
+                aria-label="Close rebate details"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="pp-sheet-body">
+              <div className="pp-detail-hero">
+                <span className="pp-detail-kicker">Cycle {selectedRebate.cycle_number} milestone</span>
+                <strong className="pp-detail-big-val">{peso(selectedRebate.rebate_amount)}</strong>
+                <span className="pp-log-date">Unlocked {formatDate(selectedRebate.created_at)}</span>
+              </div>
+
+              <dl className="pp-detail-grid">
+                <div>
+                  <dt>Milestone requirement</dt>
+                  <dd>{selectedRebate.milestone_pts} E-Points</dd>
+                </div>
+                <div>
+                  <dt>Payout status</dt>
+                  <dd>
+                    <span
+                      className={
+                        selectedRebate.status === "paid"
+                          ? "pp-tag pp-tag-green"
+                          : selectedRebate.status === "processing"
+                          ? "pp-tag pp-tag-blue"
+                          : "pp-tag pp-tag-bone"
+                      }
+                    >
+                      {selectedRebate.status === "paid"
+                        ? "Paid"
+                        : selectedRebate.status === "processing"
+                        ? "Processing"
+                        : "Queued"}
+                    </span>
+                  </dd>
+                </div>
+              </dl>
+            </div>
+            <div className="pp-modal-footer">
+              <button type="button" className="shop-primary pp-block-btn" onClick={() => setSelectedRebate(null)}>
+                Close
               </button>
             </div>
           </div>

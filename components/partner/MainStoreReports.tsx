@@ -17,6 +17,7 @@ export default function MainStoreReportsPage() {
   const [storeTypeFilter, setStoreTypeFilter] = useState<string>("");
   const [storeSortBy, setStoreSortBy] = useState<"points" | "orders" | "revenue" | "name">("points");
 
+  const [orderSearch, setOrderSearch] = useState("");
   const [storeFilter, setStoreFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [offset, setOffset] = useState(0);
@@ -53,6 +54,16 @@ export default function MainStoreReportsPage() {
   const stores = reportsData?.stores ?? [];
   const orders = reportsData?.orders ?? [];
   const totalOrders = reportsData?.total_orders ?? 0;
+
+  const filteredOrders = orders.filter((o) => {
+    if (!orderSearch) return true;
+    const q = orderSearch.toLowerCase();
+    return (
+      o.order_code.toLowerCase().includes(q) ||
+      (o.buyer_name && o.buyer_name.toLowerCase().includes(q)) ||
+      (o.store_name && o.store_name.toLowerCase().includes(q))
+    );
+  });
 
   const filteredStores = stores
     .filter((s) => {
@@ -226,8 +237,29 @@ export default function MainStoreReportsPage() {
         </>
       ) : (
         <>
-          {/* Universal External Filter Toolbar on the Right */}
-          <div className="pp-partner-toolbar" style={{ justifyContent: "flex-end" }}>
+          {/* Universal External Filter Toolbar with Search on Left and Filters on Right */}
+          <div className="pp-partner-toolbar">
+            <div className="pp-partner-search">
+              <Search size={16} className="pp-search-icon" aria-hidden="true" />
+              <input
+                type="search"
+                value={orderSearch}
+                onChange={(e) => setOrderSearch(e.target.value)}
+                placeholder="Search by order code, buyer, or store..."
+                aria-label="Search network orders"
+              />
+              {orderSearch ? (
+                <button
+                  type="button"
+                  onClick={() => setOrderSearch("")}
+                  className="pp-search-clear"
+                  aria-label="Clear search"
+                >
+                  <X size={14} />
+                </button>
+              ) : null}
+            </div>
+
             <div className="pp-partner-actions">
               <label className="pp-partner-sort">
                 <span>Store:</span>
@@ -266,11 +298,12 @@ export default function MainStoreReportsPage() {
                 </select>
               </label>
 
-              {(storeFilter || statusFilter) ? (
+              {(orderSearch || storeFilter || statusFilter) ? (
                 <button
                   type="button"
                   className="shop-secondary pp-tree-quick-btn"
                   onClick={() => {
+                    setOrderSearch("");
                     setStoreFilter("");
                     setStatusFilter("");
                     setOffset(0);
@@ -286,7 +319,7 @@ export default function MainStoreReportsPage() {
           <section className="pp-card pp-card-flush" aria-label="Network Orders">
             {loading ? (
               <Loading>Loading network orders…</Loading>
-            ) : orders.length ? (
+            ) : filteredOrders.length ? (
               <>
                 <table className="pp-table">
                   <thead>
@@ -301,7 +334,7 @@ export default function MainStoreReportsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.map((order) => (
+                    {filteredOrders.map((order) => (
                       <tr
                         key={order.order_code}
                         onClick={() => setSelectedOrder(order)}
