@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Store, ShoppingBag, Users, Coins, Search, ArrowUpDown, ChevronRight, X, Package, ExternalLink } from "lucide-react";
-import { EmptyState, PageHeader, Pagination, formatDate, peso, usePartner } from "./shared";
+import { Search, X } from "lucide-react";
+import { EmptyState, Loading, PageHeader, Pagination, formatDate, peso, usePartner } from "./shared";
 import { getMainStoreReports, type MainStoreReports, type MainStoreOrder, type MainStoreChildStore } from "@/lib/api";
 
 type Tab = "stores" | "orders";
@@ -54,19 +54,19 @@ export default function MainStoreReportsPage() {
   const filteredStores = stores.filter((s) => {
     if (!search) return true;
     const q = search.toLowerCase();
-    return s.full_name.toLowerCase().includes(q) || s.routing_slug.toLowerCase().includes(q) || s.specialty.toLowerCase().includes(q);
+    return s.full_name.toLowerCase().includes(q) || s.routing_slug.toLowerCase().includes(q) || (s.specialty && s.specialty.toLowerCase().includes(q));
   });
 
   return (
     <div className="pp-screen">
       <PageHeader
-        kicker="Aggregated Reports"
+        kicker="Aggregated reports"
         title="Main Store Network Reports"
         lede="Inspect all descendant Lifestyle & Affiliate store performances and cross-store order attributions."
       />
 
-      {/* Tab Switcher */}
-      <div className="pp-seg" role="tablist" aria-label="Main Store report tabs">
+      {/* Universal Tab Navigation (Outside Card) */}
+      <div className="pp-seg" role="tablist" aria-label="Main Store report tabs" style={{ marginTop: 20, marginBottom: 16 }}>
         <button
           type="button"
           role="tab"
@@ -74,8 +74,7 @@ export default function MainStoreReportsPage() {
           className={tab === "stores" ? "active" : ""}
           onClick={() => setTab("stores")}
         >
-          <Store aria-hidden="true" size={16} />
-          <span>Store Directory ({stores.length})</span>
+          Store Directory
         </button>
         <button
           type="button"
@@ -84,81 +83,61 @@ export default function MainStoreReportsPage() {
           className={tab === "orders" ? "active" : ""}
           onClick={() => setTab("orders")}
         >
-          <ShoppingBag aria-hidden="true" size={16} />
-          <span>All Network Orders ({totalOrders})</span>
+          Network Orders
         </button>
       </div>
 
       {tab === "stores" ? (
-        <section className="pp-card" aria-label="Store Directory">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
-            <h2 style={{ fontSize: "1.125rem", fontWeight: 700, margin: 0 }}>
-              Descendant Stores ({filteredStores.length})
-            </h2>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", maxWidth: "320px" }}>
+        <>
+          {/* Universal External Filter Toolbar */}
+          <div className="pp-partner-toolbar">
+            <div className="pp-partner-search">
+              <Search size={16} aria-hidden="true" />
               <input
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search store by name or specialty…"
-                style={{
-                  width: "100%",
-                  padding: "8px 12px",
-                  borderRadius: "6px",
-                  border: "1px solid var(--rule, #e2e8f0)",
-                  fontSize: "14px",
-                }}
+                aria-label="Search stores"
               />
             </div>
           </div>
 
-          {filteredStores.length ? (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px", textAlign: "left" }}>
+          <section className="pp-card pp-card-flush" aria-label="Store Directory">
+            {filteredStores.length ? (
+              <table className="pp-table">
                 <thead>
-                  <tr style={{ borderBottom: "1px solid var(--rule, #e2e8f0)", color: "var(--ink-3, #64748b)" }}>
-                    <th style={{ padding: "12px 8px" }}>Store Name</th>
-                    <th style={{ padding: "12px 8px" }}>Type</th>
-                    <th style={{ padding: "12px 8px" }}>Specialty & Location</th>
-                    <th style={{ padding: "12px 8px", textAlign: "right" }}>Orders</th>
-                    <th style={{ padding: "12px 8px", textAlign: "right" }}>Sales Revenue</th>
-                    <th style={{ padding: "12px 8px", textAlign: "right" }}>E-Points</th>
-                    <th style={{ padding: "12px 8px", textAlign: "center" }}>Referral QR</th>
+                  <tr>
+                    <th>Store Name</th>
+                    <th>Type</th>
+                    <th>Specialty & Location</th>
+                    <th className="numeric">Orders</th>
+                    <th className="numeric">Sales Revenue</th>
+                    <th className="numeric">E-Points</th>
+                    <th style={{ textAlign: "center" }}>Referral QR</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredStores.map((store) => (
-                    <tr key={store.id} style={{ borderBottom: "1px solid var(--rule, #e2e8f0)" }}>
-                      <td style={{ padding: "12px 8px" }}>
+                    <tr key={store.id}>
+                      <td>
                         <strong>{store.full_name}</strong>
                         <div style={{ fontSize: "12px", color: "var(--ink-3)" }}>/{store.routing_slug}</div>
                       </td>
-                      <td style={{ padding: "12px 8px" }}>
-                        <span style={{
-                          fontSize: "11px",
-                          fontWeight: 700,
-                          textTransform: "uppercase",
-                          padding: "2px 8px",
-                          borderRadius: "4px",
-                          background: store.store_type === "lifestyle" ? "#dbeafe" : "#fef3c7",
-                          color: store.store_type === "lifestyle" ? "#1e40af" : "#92400e",
-                        }}>
-                          {store.store_type === "lifestyle" ? "🛍️ Lifestyle" : "🌱 Affiliate"}
+                      <td>
+                        <span className={store.store_type === "lifestyle" ? "pp-tag pp-tag-blue" : "pp-tag pp-tag-bone"}>
+                          {store.store_type === "lifestyle" ? "Lifestyle" : "Affiliate"}
                         </span>
                       </td>
-                      <td style={{ padding: "12px 8px" }}>
+                      <td>
                         <div>{store.specialty || "--"}</div>
                         <div style={{ fontSize: "12px", color: "var(--ink-3)" }}>{store.practice_location || "--"}</div>
                       </td>
-                      <td style={{ padding: "12px 8px", textAlign: "right" }}>{store.orders_count}</td>
-                      <td style={{ padding: "12px 8px", textAlign: "right", fontWeight: 600 }}>{peso(store.revenue)}</td>
-                      <td style={{ padding: "12px 8px", textAlign: "right", fontWeight: 600 }}>{store.points} pts</td>
-                      <td style={{ padding: "12px 8px", textAlign: "center" }}>
-                        <span style={{
-                          fontSize: "11px",
-                          fontWeight: 600,
-                          color: store.referral_qr_enabled ? "#16a34a" : "#94a3b8"
-                        }}>
+                      <td className="numeric">{store.orders_count}</td>
+                      <td className="numeric" style={{ fontWeight: 600 }}>{peso(store.revenue)}</td>
+                      <td className="numeric" style={{ fontWeight: 600 }}>{store.points} pts</td>
+                      <td style={{ textAlign: "center" }}>
+                        <span className={store.referral_qr_enabled ? "pp-tag pp-tag-blue" : "pp-tag pp-tag-bone"}>
                           {store.referral_qr_enabled ? "Active" : "Locked"}
                         </span>
                       </td>
@@ -166,66 +145,87 @@ export default function MainStoreReportsPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
-          ) : (
-            <EmptyState title="No descendant stores found.">
-              Partner stores registered under your Main Store link will appear here.
-            </EmptyState>
-          )}
-        </section>
+            ) : (
+              <EmptyState title="No descendant stores found.">
+                Partner stores registered under your Main Store link will appear here.
+              </EmptyState>
+            )}
+          </section>
+        </>
       ) : (
-        <section className="pp-card" aria-label="Network Orders">
-          {/* Order Filters */}
-          <div style={{ display: "flex", gap: "12px", marginBottom: "16px", flexWrap: "wrap" }}>
-            <select
-              value={storeFilter}
-              onChange={(e) => {
-                setStoreFilter(e.target.value);
-                setOffset(0);
-              }}
-              style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--rule, #e2e8f0)", fontSize: "14px" }}
-            >
-              <option value="">All Stores (Direct + Descendants)</option>
-              {stores.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.full_name} ({s.store_type})
-                </option>
-              ))}
-            </select>
+        <>
+          {/* Universal External Filter Toolbar */}
+          <div className="pp-partner-toolbar">
+            <div className="pp-partner-actions" style={{ flex: 1, justifyContent: "flex-start", gap: 10, flexWrap: "wrap" }}>
+              <label className="pp-partner-sort">
+                <span>Store:</span>
+                <select
+                  value={storeFilter}
+                  onChange={(e) => {
+                    setStoreFilter(e.target.value);
+                    setOffset(0);
+                  }}
+                  aria-label="Filter store"
+                >
+                  <option value="">All stores (direct + descendants)</option>
+                  {stores.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.full_name} ({s.store_type})
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-            <select
-              value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value);
-                setOffset(0);
-              }}
-              style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid var(--rule, #e2e8f0)", fontSize: "14px" }}
-            >
-              <option value="">All Statuses</option>
-              <option value="paid">Paid</option>
-              <option value="fulfilled">Fulfilled</option>
-              <option value="pending">Pending Payment</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
+              <label className="pp-partner-sort">
+                <span>Status:</span>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => {
+                    setStatusFilter(e.target.value);
+                    setOffset(0);
+                  }}
+                  aria-label="Filter status"
+                >
+                  <option value="">All statuses</option>
+                  <option value="paid">Paid</option>
+                  <option value="fulfilled">Fulfilled</option>
+                  <option value="pending">Pending payment</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </label>
+
+              {(storeFilter || statusFilter) ? (
+                <button
+                  type="button"
+                  className="shop-secondary pp-tree-quick-btn"
+                  onClick={() => {
+                    setStoreFilter("");
+                    setStatusFilter("");
+                    setOffset(0);
+                  }}
+                  aria-label="Reset filters"
+                >
+                  Reset
+                </button>
+              ) : null}
+            </div>
           </div>
 
-          {loading ? (
-            <div style={{ padding: "40px", textAlign: "center", color: "var(--ink-3)" }}>
-              Loading network orders…
-            </div>
-          ) : orders.length ? (
-            <>
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px", textAlign: "left" }}>
+          <section className="pp-card pp-card-flush" aria-label="Network Orders">
+            {loading ? (
+              <Loading>Loading network orders…</Loading>
+            ) : orders.length ? (
+              <>
+                <table className="pp-table">
                   <thead>
-                    <tr style={{ borderBottom: "1px solid var(--rule, #e2e8f0)", color: "var(--ink-3, #64748b)" }}>
-                      <th style={{ padding: "12px 8px" }}>Order Code</th>
-                      <th style={{ padding: "12px 8px" }}>Attributed Store</th>
-                      <th style={{ padding: "12px 8px" }}>Buyer</th>
-                      <th style={{ padding: "12px 8px" }}>Date</th>
-                      <th style={{ padding: "12px 8px" }}>Status</th>
-                      <th style={{ padding: "12px 8px", textAlign: "right" }}>Total Amount</th>
-                      <th style={{ padding: "12px 8px", textAlign: "center" }}></th>
+                    <tr>
+                      <th>Order Code</th>
+                      <th>Attributed Store</th>
+                      <th>Buyer</th>
+                      <th>Date</th>
+                      <th>Status</th>
+                      <th className="numeric">Total Amount</th>
+                      <th style={{ width: 80, textAlign: "right" }}></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -233,47 +233,29 @@ export default function MainStoreReportsPage() {
                       <tr
                         key={order.order_code}
                         onClick={() => setSelectedOrder(order)}
-                        style={{ borderBottom: "1px solid var(--rule, #e2e8f0)", cursor: "pointer" }}
-                        className="pp-tree-head"
+                        style={{ cursor: "pointer" }}
                       >
-                        <td style={{ padding: "12px 8px", fontWeight: 600 }}>
+                        <td style={{ fontWeight: 600 }}>
                           <code>{order.order_code}</code>
                         </td>
-                        <td style={{ padding: "12px 8px" }}>
+                        <td>
                           <div><strong>{order.store_name}</strong></div>
-                          <span style={{
-                            fontSize: "10px",
-                            fontWeight: 700,
-                            textTransform: "uppercase",
-                            padding: "1px 6px",
-                            borderRadius: "3px",
-                            background: order.store_type === "main" ? "#fef3c7" : "#e0e7ff",
-                            color: order.store_type === "main" ? "#92400e" : "#3730a3"
-                          }}>
+                          <span className={order.store_type === "main" ? "pp-tag pp-tag-bone" : "pp-tag pp-tag-blue"}>
                             {order.store_type === "main" ? "Main Store Direct" : order.store_type}
                           </span>
                         </td>
-                        <td style={{ padding: "12px 8px" }}>{order.buyer_name || "Customer"}</td>
-                        <td style={{ padding: "12px 8px", color: "var(--ink-3)" }}>{formatDate(order.created_at)}</td>
-                        <td style={{ padding: "12px 8px" }}>
-                          <span style={{
-                            fontSize: "11px",
-                            fontWeight: 700,
-                            textTransform: "uppercase",
-                            padding: "2px 8px",
-                            borderRadius: "4px",
-                            background: order.payment_status === "paid" ? "#dcfce7" : "#fee2e2",
-                            color: order.payment_status === "paid" ? "#166534" : "#991b1b"
-                          }}>
+                        <td>{order.buyer_name || "Customer"}</td>
+                        <td style={{ color: "var(--ink-3)" }} className="nowrap">{formatDate(order.created_at)}</td>
+                        <td>
+                          <span className={`partner-badge ${order.payment_status || "pending"}`}>
                             {order.payment_status}
                           </span>
                         </td>
-                        <td style={{ padding: "12px 8px", textAlign: "right", fontWeight: 700 }}>{peso(order.total_amount)}</td>
-                        <td style={{ padding: "12px 8px", textAlign: "center" }}>
+                        <td className="numeric"><b>{peso(order.total_amount)}</b></td>
+                        <td style={{ textAlign: "right" }}>
                           <button
                             type="button"
-                            className="shop-secondary"
-                            style={{ padding: "4px 10px", fontSize: "12px" }}
+                            className="shop-secondary pp-tree-inspect-btn"
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelectedOrder(order);
@@ -286,9 +268,7 @@ export default function MainStoreReportsPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
 
-              <div style={{ marginTop: "16px" }}>
                 <Pagination
                   label="Network orders pagination"
                   offset={offset}
@@ -302,36 +282,37 @@ export default function MainStoreReportsPage() {
                     setOffset(0);
                   }}
                 />
-              </div>
-            </>
-          ) : (
-            <EmptyState title="No matching network orders found.">
-              Try adjusting your store or status filter.
-            </EmptyState>
-          )}
-        </section>
+              </>
+            ) : (
+              <EmptyState title="No matching network orders found.">
+                Try adjusting your store or status filter.
+              </EmptyState>
+            )}
+          </section>
+        </>
       )}
 
-      {/* Detailed Order Modal */}
+      {/* Detailed Order Drawer matching Design System */}
       {selectedOrder ? (
-        <MainStoreOrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />
+        <MainStoreOrderDrawer order={selectedOrder} onClose={() => setSelectedOrder(null)} />
       ) : null}
     </div>
   );
 }
 
-function MainStoreOrderDetailModal({ order, onClose }: { order: MainStoreOrder; onClose: () => void }) {
-  const modalRef = useRef<HTMLDivElement>(null);
+function MainStoreOrderDrawer({ order, onClose }: { order: MainStoreOrder; onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", handleKeyDown);
+    const opener = document.activeElement as HTMLElement | null;
+    ref.current?.focus();
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
     return () => {
-      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
+      opener?.focus?.();
     };
   }, [onClose]);
 
@@ -339,146 +320,107 @@ function MainStoreOrderDetailModal({ order, onClose }: { order: MainStoreOrder; 
   const items = Array.isArray(order.items) ? order.items : [];
 
   return (
-    <div className="admin-modal-backdrop" role="presentation" onClick={onClose}>
-      <div
-        className="admin-modal admin-shop-order-modal"
-        ref={modalRef}
-        role="dialog"
-        aria-modal="true"
-        onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: "680px" }}
-      >
-        <div className="admin-modal-head">
+    <div className="pp-drawer-backdrop" onClick={onClose}>
+      <div className="pp-drawer" ref={ref} role="dialog" aria-modal="true" aria-labelledby="pp-drawer-title" tabIndex={-1} onClick={(event) => event.stopPropagation()}>
+        <div className="pp-drawer-head">
           <div>
-            <p className="admin-wheel-kicker">Network Order Detail</p>
-            <h2 style={{ fontSize: "1.25rem", margin: 0 }}>{order.order_code}</h2>
+            <p className="shop-kicker">{order.order_code}</p>
+            <h2 id="pp-drawer-title">{order.buyer_name || "Customer"}</h2>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close modal">
-            <X size={18} />
+          <button type="button" className="pp-sheet-close" aria-label="Close order details" onClick={onClose}>
+            <X size={18} aria-hidden="true" />
           </button>
         </div>
-
-        <div className="admin-shop-order-detail" style={{ maxHeight: "70vh", overflowY: "auto", padding: "16px 20px" }}>
-          {/* Status & Store Banner */}
-          <div style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "12px 16px",
-            background: "var(--bone-soft, #f8fafc)",
-            borderRadius: "8px",
-            marginBottom: "16px",
-            flexWrap: "wrap",
-            gap: "8px"
-          }}>
-            <div>
-              <span style={{ fontSize: "11px", color: "var(--ink-3)", textTransform: "uppercase", fontWeight: 700 }}>Attributed Store</span>
-              <div style={{ fontWeight: 700, color: "var(--ink)" }}>{order.store_name}</div>
-              <small style={{ color: "var(--ink-3)" }}>/{order.store_slug}</small>
-            </div>
-            <span style={{
-              fontSize: "12px",
-              fontWeight: 700,
-              textTransform: "uppercase",
-              padding: "4px 10px",
-              borderRadius: "6px",
-              background: order.payment_status === "paid" ? "#dcfce7" : "#fee2e2",
-              color: order.payment_status === "paid" ? "#166534" : "#991b1b"
-            }}>
-              {order.payment_status}
-            </span>
+        <dl className="pp-dl">
+          <div>
+            <dt>Status</dt>
+            <dd>
+              <span className={`partner-badge ${order.payment_status || "pending"}`}>
+                {order.payment_status}
+              </span>
+            </dd>
           </div>
+          <div>
+            <dt>Total</dt>
+            <dd><b>{peso(order.total_amount)}</b></dd>
+          </div>
+          <div>
+            <dt>Date</dt>
+            <dd>{formatDate(order.created_at)}</dd>
+          </div>
+          <div>
+            <dt>Attributed store</dt>
+            <dd>
+              <strong>{order.store_name}</strong>
+              <div style={{ fontSize: "12px", color: "var(--ink-3)" }}>/{order.store_slug}</div>
+            </dd>
+          </div>
+          <div>
+            <dt>Store type</dt>
+            <dd>
+              <span className={order.store_type === "main" ? "pp-tag pp-tag-bone" : "pp-tag pp-tag-blue"}>
+                {order.store_type === "main" ? "Main Store Direct" : "Child Lifestyle Store"}
+              </span>
+            </dd>
+          </div>
+          <div>
+            <dt>Mobile</dt>
+            <dd>{order.mobile ? <a href={`tel:${order.mobile}`}>{order.mobile}</a> : "--"}</dd>
+          </div>
+          <div>
+            <dt>Email</dt>
+            <dd>{order.email ? <a href={`mailto:${order.email}`}>{order.email}</a> : "--"}</dd>
+          </div>
+          <div>
+            <dt>Delivery address</dt>
+            <dd>{deliveryAddress || "--"}</dd>
+          </div>
+          {order.shipping_region ? (
+            <div>
+              <dt>Region</dt>
+              <dd>{order.shipping_region}</dd>
+            </div>
+          ) : null}
+          {order.payment_method ? (
+            <div>
+              <dt>Payment method</dt>
+              <dd>{order.payment_method}</dd>
+            </div>
+          ) : null}
+        </dl>
 
-          <dl className="admin-tiktok-summary-grid">
-            <div>
-              <dt>Buyer Name</dt>
-              <dd><strong>{order.buyer_name || "Customer"}</strong></dd>
-            </div>
-            <div>
-              <dt>Email</dt>
-              <dd>{order.email ? <a href={`mailto:${order.email}`} style={{ color: "var(--ink)" }}>{order.email}</a> : "--"}</dd>
-            </div>
-            <div>
-              <dt>Mobile</dt>
-              <dd>{order.mobile ? <a href={`tel:${order.mobile}`} style={{ color: "var(--ink)" }}>{order.mobile}</a> : "--"}</dd>
-            </div>
-            <div>
-              <dt>Delivery Address</dt>
-              <dd>{deliveryAddress || "--"}</dd>
-            </div>
-            <div>
-              <dt>Shipping Region</dt>
-              <dd>{order.shipping_region || "--"}</dd>
-            </div>
-            <div>
-              <dt>Order Date</dt>
-              <dd>{formatDate(order.created_at)}</dd>
-            </div>
-            <div>
-              <dt>Payment Method</dt>
-              <dd>{order.payment_method || "Maya"}</dd>
-            </div>
-            <div>
-              <dt>Maya Reference</dt>
-              <dd><code>{order.maya_reference || "--"}</code></dd>
-            </div>
-            <div>
-              <dt>Paid At</dt>
-              <dd>{order.paid_at ? formatDate(order.paid_at) : (order.payment_status === "paid" ? formatDate(order.created_at) : "--")}</dd>
-            </div>
-            <div>
-              <dt>Order Status</dt>
-              <dd><span style={{ textTransform: "capitalize" }}>{order.status}</span></dd>
-            </div>
-            <div>
-              <dt>Subtotal</dt>
-              <dd>{peso(order.subtotal || order.total_amount)}</dd>
-            </div>
-            <div>
-              <dt>Shipping Fee</dt>
-              <dd>{peso(order.shipping_fee || 0)}</dd>
-            </div>
-            <div style={{ gridColumn: "1 / -1", borderTop: "1px solid var(--rule, #e2e8f0)", paddingTop: "8px" }}>
-              <dt style={{ fontSize: "14px", fontWeight: 700 }}>Total Paid</dt>
-              <dd style={{ fontSize: "18px", fontWeight: 800, color: "var(--gold-dark, #b45309)" }}>{peso(order.total_amount)}</dd>
-            </div>
-          </dl>
+        {items.length > 0 && (
+          <div style={{ marginTop: "12px", borderTop: "1px solid var(--rule-soft)", paddingTop: "14px" }}>
+            <h3 style={{ fontSize: "13px", fontWeight: 700, margin: "0 0 10px", textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--ink-3)" }}>
+              Ordered Items
+            </h3>
+            <table className="pp-table" style={{ fontSize: "13px" }}>
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th style={{ textAlign: "center" }}>Qty</th>
+                  <th className="numeric">Price</th>
+                  <th className="numeric">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item, idx) => (
+                  <tr key={item.id || idx}>
+                    <td><strong>{item.name}</strong></td>
+                    <td style={{ textAlign: "center" }}>{item.qty}</td>
+                    <td className="numeric">{peso(item.price)}</td>
+                    <td className="numeric" style={{ fontWeight: 600 }}>{peso(item.price * item.qty)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-          {/* Line Items Table */}
-          {items.length > 0 && (
-            <section className="admin-tiktok-subsection" style={{ marginTop: "20px" }}>
-              <h3 style={{ fontSize: "14px", fontWeight: 700, marginBottom: "8px" }}>Ordered Items</h3>
-              <div style={{ overflowX: "auto" }}>
-                <table className="admin-tiktok-table compact" style={{ width: "100%", fontSize: "13px" }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: "left" }}>Item</th>
-                      <th style={{ textAlign: "center" }}>Caps</th>
-                      <th style={{ textAlign: "center" }}>Qty</th>
-                      <th style={{ textAlign: "right" }}>Price</th>
-                      <th style={{ textAlign: "right" }}>Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((item, idx) => (
-                      <tr key={item.id || idx}>
-                        <td><strong>{item.name}</strong></td>
-                        <td style={{ textAlign: "center" }}>{item.caps || "--"}</td>
-                        <td style={{ textAlign: "center" }}>{item.qty}</td>
-                        <td style={{ textAlign: "right" }}>{peso(item.price)}</td>
-                        <td style={{ textAlign: "right", fontWeight: 600 }}>{peso(item.price * item.qty)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          )}
-        </div>
-
-        <div className="admin-modal-actions" style={{ justifyContent: "flex-end", padding: "12px 20px" }}>
-          <button type="button" className="shop-secondary" onClick={onClose}>
-            Close
+        <p className="shop-note" style={{ margin: "14px 0 0" }}>Buyer contact details are confidential. Use them only to follow up on this order.</p>
+        <div className="pp-sheet-footer" style={{ marginTop: "auto", padding: "16px 0 0", background: "transparent" }}>
+          <button type="button" className="shop-secondary pp-sheet-btn-secondary" style={{ width: "100%" }} onClick={onClose}>
+            Done
           </button>
         </div>
       </div>
