@@ -152,8 +152,8 @@ export default function EPointsPage() {
                       <div className="pp-log-lead">
                         <div className="pp-log-title-row">
                           <strong className="pp-log-title">Cycle {rebate.cycle_number} Milestone</strong>
-                          <span className={rebate.status === "paid" ? "pp-tag pp-tag-success" : "pp-tag pp-tag-warning"}>
-                            {rebate.status === "paid" ? "Paid Out" : "Awaiting Payout"}
+                          <span className={rebate.status === "paid" ? "partner-badge paid" : "partner-badge pending"}>
+                            {rebate.status === "paid" ? "paid" : "processing"}
                           </span>
                         </div>
                         <span className="pp-log-date">{formatDate(rebate.created_at)} · {rebate.milestone_pts} pts</span>
@@ -365,9 +365,9 @@ function PointTransactionDrawer({
       >
         <div className="pp-drawer-head">
           <div>
-            <p className="shop-kicker">{isPassup ? "Referred partner pass-up" : "Direct shop commission"}</p>
+            <p className="shop-kicker">{source.order_code}</p>
             <h2 id="pp-drawer-title">
-              +{source.points} {source.points === 1 ? "point" : "points"}
+              +{source.points} {source.points === 1 ? "Point" : "Points"}
             </h2>
           </div>
           <button type="button" className="pp-sheet-close" aria-label="Close transaction details" onClick={onClose}>
@@ -376,6 +376,12 @@ function PointTransactionDrawer({
         </div>
 
         <dl className="pp-dl">
+          <div>
+            <dt>Points earned</dt>
+            <dd>
+              <b>+{source.points} {source.points === 1 ? "pt" : "pts"}</b>
+            </dd>
+          </div>
           <div>
             <dt>Order code</dt>
             <dd>
@@ -408,9 +414,17 @@ function PointTransactionDrawer({
             <dd>{formatDate(source.created_at)}</dd>
           </div>
           <div>
-            <dt>Source</dt>
+            <dt>Attributed store</dt>
             <dd>
-              {isPassup ? (source.source_partner || "Referred Partner") : "Direct Customer"}
+              <strong>{isPassup ? (source.source_partner || "Referred Partner") : "Direct Shop"}</strong>
+            </dd>
+          </div>
+          <div>
+            <dt>Store type</dt>
+            <dd>
+              <span className={isPassup ? "pp-tag pp-tag-blue" : "pp-tag pp-tag-bone"}>
+                {isPassup ? "Child Lifestyle Store" : "Direct Shop"}
+              </span>
             </dd>
           </div>
           <div>
@@ -421,27 +435,19 @@ function PointTransactionDrawer({
               </span>
             </dd>
           </div>
-          {source.source_partner ? (
-            <div>
-              <dt>Partner</dt>
-              <dd>
-                <strong>{source.source_partner}</strong>
-              </dd>
-            </div>
-          ) : null}
         </dl>
 
-        <p className="shop-note" style={{ margin: "8px 0 0" }}>
+        <p className="shop-note" style={{ margin: "14px 0 0" }}>
           {isPassup
             ? "Pass-up points earned from referred partner orders count toward Track B group targets."
             : "Commission points earned directly from customer orders count toward Track A direct targets."}
         </p>
 
-        <div style={{ marginTop: "auto", paddingTop: 16 }}>
+        <div className="pp-sheet-footer" style={{ marginTop: "auto", padding: "16px 0 0", background: "transparent" }}>
           <button
             type="button"
-            className="shop-secondary"
-            style={{ width: "100%", justifyContent: "center" }}
+            className="shop-secondary pp-sheet-btn-secondary"
+            style={{ width: "100%" }}
             onClick={onClose}
           >
             Done
@@ -505,29 +511,17 @@ function RebateMilestoneDrawer({
 
         <dl className="pp-dl">
           <div>
-            <dt>Target</dt>
+            <dt>Status</dt>
             <dd>
-              <strong>{rebate.milestone_pts} Points reached</strong>
+              <span className={`partner-badge ${rebate.status === "paid" ? "paid" : "pending"}`}>
+                {rebate.status === "paid" ? "paid" : "processing"}
+              </span>
             </dd>
           </div>
           <div>
-            <dt>Status</dt>
+            <dt>Requirement</dt>
             <dd>
-              <span
-                className={
-                  rebate.status === "paid"
-                    ? "pp-tag pp-tag-green"
-                    : rebate.status === "processing"
-                    ? "pp-tag pp-tag-blue"
-                    : "pp-tag pp-tag-bone"
-                }
-              >
-                {rebate.status === "paid"
-                  ? "Paid out"
-                  : rebate.status === "processing"
-                  ? "Processing"
-                  : "Queued"}
-              </span>
+              <b>{rebate.milestone_pts} Points reached</b>
             </dd>
           </div>
           <div>
@@ -540,15 +534,15 @@ function RebateMilestoneDrawer({
           </div>
         </dl>
 
-        <p className="shop-note" style={{ margin: "8px 0 0" }}>
+        <p className="shop-note" style={{ margin: "14px 0 0" }}>
           Cash rebates are audited and disbursed directly to your registered bank account by administration upon cycle validation.
         </p>
 
-        <div style={{ marginTop: "auto", paddingTop: 16 }}>
+        <div className="pp-sheet-footer" style={{ marginTop: "auto", padding: "16px 0 0", background: "transparent" }}>
           <button
             type="button"
-            className="shop-secondary"
-            style={{ width: "100%", justifyContent: "center" }}
+            className="shop-secondary pp-sheet-btn-secondary"
+            style={{ width: "100%" }}
             onClick={onClose}
           >
             Done
