@@ -3,13 +3,29 @@
 -- 2. The 5-Night Watch first-buyer rule, checked on the server.
 -- 3. Orders are created by the server only (POST /api/shop/order), never straight from the browser.
 -- Applied to both shop schemas: `doctors` (production) and `sandbox` (sandbox.gutguard.ph).
+--
+-- Two optional settings, for a safe rollout (Addendum 05, Part B). Put them on the first lines
+-- of the same SQL editor run:
+--   set addendum05.schemas = 'sandbox';  -- only this schema (default: doctors,sandbox)
+--   set addendum05.step = 'prepare';     -- add columns and functions, but keep create_shop_order
+--                                        -- open to the browser, so the old live shop keeps working
+-- Run once more without addendum05.step after the new website is live, to close create_shop_order.
+-- Running the file twice is safe.
 
 do $$
 declare
   s text;
   fn regprocedure;
+  schemas text[] := string_to_array(replace(coalesce(nullif(current_setting('addendum05.schemas', true), ''), 'doctors,sandbox'), ' ', ''), ',');
+  step text := coalesce(nullif(current_setting('addendum05.step', true), ''), 'all');
 begin
-  foreach s in array array['doctors', 'sandbox'] loop
+  if step not in ('all', 'prepare') then
+    raise exception 'addendum05.step must be all or prepare, not %', step;
+  end if;
+  if not schemas <@ array['doctors', 'sandbox'] then
+    raise exception 'addendum05.schemas must list doctors and/or sandbox, not %', schemas;
+  end if;
+  foreach s in array schemas loop
     if to_regclass(format('%I.shop_orders', s)) is null then
       continue;
     end if;
@@ -105,12 +121,19 @@ begin
 
   end loop;
 
+  if step = 'prepare' then
+    raise notice 'prepare: create_shop_order left as it was. Run again without addendum05.step after the new site is live.';
+    return;
+  end if;
+
   -- Orders now come only from POST /api/shop/order (service role), which applies the Watch
   -- rule and builds every price. The browser can no longer call create_shop_order directly.
+  -- (`public` holds an older copy; it is closed together with `doctors`.)
   for fn in
     select p.oid::regprocedure
     from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
-    where ns.nspname in ('public', 'doctors', 'sandbox') and p.proname = 'create_shop_order'
+    where (ns.nspname = any(schemas) or (ns.nspname = 'public' and 'doctors' = any(schemas)))
+      and p.proname = 'create_shop_order'
   loop
     execute format('revoke execute on function %s from public, anon, authenticated', fn);
     execute format('grant execute on function %s to service_role', fn);
