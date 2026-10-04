@@ -34,9 +34,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
   // existing cookie intact. A typo'd link must not wipe out a real prior referral.
   if (error || !matched) return response;
 
+  const domain = sharedCookieDomain(request);
   response.cookies.set(REFERRAL_COOKIE, matched, {
     maxAge: REFERRAL_MAX_AGE_SECONDS,
     path: "/",
+    domain,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     // Not httpOnly on purpose: the checkout form reads this in the browser to attach it
@@ -47,6 +49,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   response.cookies.set(REFERRAL_SHOP_NAME_COOKIE, getReferralShopName(matched, request), {
     maxAge: REFERRAL_MAX_AGE_SECONDS,
     path: "/",
+    domain,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     httpOnly: false,
@@ -65,4 +68,15 @@ function getReferralShopName(slug: string, request: NextRequest) {
   if (slug === "ginhawa") return "Ginhawa";
 
   return "";
+}
+
+/**
+ * Addendum 05-A: gutguard.ph/shop and shop.gutguard.ph are one Shop. A referral remembered on one
+ * address must be there on the other, so on these production hosts the cookie is shared by the
+ * parent domain. Every other host (sandbox, previews, localhost) keeps its own cookie, as before.
+ */
+const SHARED_SHOP_HOSTS = ["gutguard.ph", "www.gutguard.ph", "shop.gutguard.ph"];
+function sharedCookieDomain(request: NextRequest) {
+  const host = (request.headers.get("x-forwarded-host") || request.headers.get("host") || "").split(":")[0].toLowerCase();
+  return SHARED_SHOP_HOSTS.includes(host) ? ".gutguard.ph" : undefined;
 }
