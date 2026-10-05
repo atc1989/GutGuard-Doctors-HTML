@@ -2,9 +2,28 @@
 
 import { useEffect, useRef, useState } from "react";
 import { QRCodeCanvas, QRCodeSVG } from "qrcode.react";
-import { Check, Copy, Download, Lock, Printer, X } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Download,
+  ExternalLink,
+  FileText,
+  Lock,
+  MessageSquare,
+  Printer,
+  QrCode,
+  Share2,
+  X,
+} from "lucide-react";
 import { Logo } from "@/components/GutguardSite";
-import { PageHeader, getPartnerQrLink, useCopy, usePartner, type PartnerQrMode } from "./shared";
+import {
+  PageHeader,
+  StatTile,
+  getPartnerQrLink,
+  useCopy,
+  usePartner,
+  type PartnerQrMode,
+} from "./shared";
 
 // Rendered large and scaled down by CSS so the download and the print sheet are both sharp.
 const QR_RENDER_PX = 1024;
@@ -12,6 +31,7 @@ const QR_RENDER_PX = 1024;
 export default function SharePage() {
   const { dashboard } = usePartner();
   const { copied, copy } = useCopy();
+  const { copied: msgCopied, copy: copyMsg } = useCopy();
   const qrRef = useRef<HTMLDivElement>(null);
   const linkRef = useRef<HTMLParagraphElement>(null);
   const posterDialogRef = useRef<HTMLDivElement>(null);
@@ -23,33 +43,57 @@ export default function SharePage() {
   const isAffiliate = dashboard.partner.store_type === "affiliate";
   const isReferralLocked = isAffiliate && !dashboard.partner.referral_qr_enabled;
 
-  const MODES: Array<{ mode: PartnerQrMode; label: string; description: string; hint: string; locked?: boolean }> = [
+  const MODES: Array<{
+    mode: PartnerQrMode;
+    label: string;
+    linkTitle: string;
+    description: string;
+    tag: string;
+    tagClass: string;
+    hint: string;
+    locked?: boolean;
+    presetMessage: string;
+  }> = [
     {
       mode: "shop",
       label: isMainStore ? "Main Shop QR" : "Shop QR",
+      linkTitle: isMainStore ? "Main shop link" : "Direct shop link",
       description: isMainStore
-        ? "Send retail customers directly to your Main Store shop link."
-        : "Send customers to your GutGuard shop and attribute their orders to you.",
-      hint: "Display this QR code at your clinic reception or share the direct link with patients.",
+        ? "Send retail customers directly to your Main Store shop link. All completed orders will be tracked directly to your store."
+        : "Send customers directly to your verified GutGuard shop. Orders placed through this link attribute commission points to your account.",
+      tag: isMainStore ? "Main Store direct" : "Commission attributed",
+      tagClass: "pp-tag-blue",
+      hint: "Display this QR code at your clinic reception or share the direct link with patients during consultations.",
+      presetMessage: `Hi! You can order your prescribed GutGuard synbiotics online through my verified clinic link: ${getPartnerQrLink(dashboard.partner, "shop")}`,
     },
     {
       mode: "referral",
       label: isMainStore ? "Partner Registration QR" : isReferralLocked ? "Referral QR (Locked)" : "Referral QR",
+      linkTitle: isMainStore ? "Partner registration link" : "Doctor referral link",
       description: isMainStore
-        ? "Invite new partner stores to register under your Main Store umbrella."
+        ? "Invite new physician partners and clinics to register under your Main Store umbrella network."
         : isReferralLocked
-        ? "Referral QR is currently locked for Affiliate stores. Unlock by getting your first Shop QR sale!"
-        : "Invite another partner. Their registration and future attributed orders will be connected to you.",
+        ? "Referral QR is currently locked for Affiliate stores. Unlock by completing your first paid Shop order!"
+        : "Invite fellow physicians to join the GutGuard partner network. Their registrations and future attributed orders will connect to your network.",
+      tag: isMainStore ? "Umbrella network" : isReferralLocked ? "Locked" : "Downline network",
+      tagClass: isReferralLocked ? "pp-tag-bone" : "pp-tag-blue",
       hint: isMainStore
         ? "Stores registering via this link will be automatically nested under your Main Store umbrella."
         : "Partners registering via this link will be attributed to your downline network.",
       locked: isReferralLocked,
+      presetMessage: isMainStore
+        ? `Hello Doctor! Join our GutGuard physician network and register your clinic store under our umbrella: ${getPartnerQrLink(dashboard.partner, "referral")}`
+        : `Hello Doctor! Register your verified physician account on GutGuard to prescribe and earn partner points: ${getPartnerQrLink(dashboard.partner, "referral")}`,
     },
     {
       mode: "profile",
       label: "Profile QR",
-      description: "Send visitors directly to your TikTok profile.",
-      hint: "Direct visitors to your verified TikTok profile.",
+      linkTitle: "TikTok profile link",
+      description: "Send visitors directly to your verified TikTok profile and physician educational content.",
+      tag: "Public profile",
+      tagClass: "pp-tag-bone",
+      hint: "Direct visitors to your verified TikTok profile and educational videos.",
+      presetMessage: `Check out my verified GutGuard doctor profile and gut health educational content: ${getPartnerQrLink(dashboard.partner, "profile")}`,
     },
   ];
 
@@ -115,7 +159,31 @@ export default function SharePage() {
     <>
       <PageHeader kicker="Share & grow" title="Your QR codes" />
 
-      {/* Universal Tab Navigation (Outside Card) */}
+      {/* Top Summary Metrics Strip */}
+      <section className="pp-stats" aria-label="Sharing performance summary">
+        <StatTile
+          label="30-day link clicks"
+          value={dashboard.clicks.last_30_days.toLocaleString()}
+          note="Traffic from your shared links"
+        />
+        <StatTile
+          label="All-time link clicks"
+          value={dashboard.clicks.total.toLocaleString()}
+          note="Total visits & QR scans"
+        />
+        <StatTile
+          label="Attributed orders"
+          value={dashboard.totals.orders.toLocaleString()}
+          note="Orders placed through your links"
+        />
+        <StatTile
+          label="Attribution mode"
+          value={isMainStore ? "Main Store Direct" : isAffiliate ? "Affiliate Store" : "Lifestyle Store"}
+          note="Active commission attribution"
+        />
+      </section>
+
+      {/* Universal Tab Navigation */}
       <div className="pp-seg" role="tablist" aria-label="QR code mode">
         {MODES.map((item) => (
           <button
@@ -134,67 +202,203 @@ export default function SharePage() {
         ))}
       </div>
 
-      <section className="pp-card pp-share">
-        <div className="pp-share-controls">
+      {/* Balanced Dual-Card Layout */}
+      <div className="pp-grid">
+        {/* Card 1: Direct Link & Digital Sharing */}
+        <article className="pp-card" style={{ display: "grid", gap: "16px", alignContent: "start" }}>
+          <div className="pp-card-head">
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+              <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "var(--ink)" }}>{active.linkTitle}</h2>
+              <span className={`pp-tag ${active.tagClass}`}>{active.tag}</span>
+            </div>
+          </div>
+
           {qrMode === "referral" && isReferralLocked ? (
             <div
               style={{
                 background: "var(--bone-soft)",
                 border: "1px solid var(--rule-soft)",
                 borderRadius: "var(--r-md)",
-                padding: "16px",
-                color: "var(--ink)",
+                padding: "20px",
+                display: "grid",
+                gap: "12px",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 700, marginBottom: "6px" }}>
-                <Lock size={18} />
-                <span>Referral QR is Locked for Affiliate Stores</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 700, color: "var(--ink)" }}>
+                <Lock size={18} color="var(--ink-2)" />
+                <span>Referral Program Locked for Affiliate Stores</span>
               </div>
               <p style={{ margin: 0, fontSize: "13px", lineHeight: 1.5, color: "var(--ink-2)" }}>
                 New partner accounts start in Affiliate mode with partner recruitment disabled. As soon as a customer completes a paid purchase through your <strong>Shop QR</strong>, your account will automatically promote to a <strong>Lifestyle Store</strong> and activate this Referral QR!
               </p>
+              <button
+                type="button"
+                className="shop-secondary"
+                onClick={() => setQrMode("shop")}
+                style={{
+                  marginTop: "4px",
+                  justifySelf: "start",
+                  textTransform: "none",
+                  letterSpacing: "normal",
+                  fontWeight: 600,
+                  fontSize: "13px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "8px 14px",
+                  borderRadius: "var(--r-sm)",
+                }}
+              >
+                Switch to Shop QR
+              </button>
             </div>
           ) : (
             <>
-              <div>
-                <h2 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 4px", color: "var(--ink)" }}>{active.label}</h2>
-                <p className="partner-qr-description" role="tabpanel">{active.description}</p>
-              </div>
+              <p style={{ margin: 0, fontSize: "13px", color: "var(--ink-2)", lineHeight: 1.5 }} role="tabpanel">
+                {active.description}
+              </p>
 
-              <div className="partner-link-row" style={{ marginTop: 6 }}>
-                <p className="partner-link" ref={linkRef}>{link}</p>
+              {/* Integrated Link Input Group */}
+              <div className="partner-link-row" style={{ display: "flex", gap: "8px", alignItems: "stretch" }}>
+                <p
+                  className="partner-link"
+                  ref={linkRef}
+                  style={{
+                    margin: 0,
+                    fontFamily: "var(--mono, monospace)",
+                    fontSize: "12px",
+                    display: "flex",
+                    alignItems: "center",
+                    wordBreak: "break-all",
+                  }}
+                >
+                  {link}
+                </p>
                 <button
                   type="button"
                   className="shop-primary"
                   onClick={copyLink}
-                  style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                  style={{
+                    textTransform: "none",
+                    letterSpacing: "normal",
+                    fontWeight: 600,
+                    fontSize: "13px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                    borderRadius: "var(--r-sm)",
+                  }}
                   aria-label="Copy link to clipboard"
                 >
                   {copied ? <Check size={14} /> : <Copy size={14} />}
-                  <span>{copied ? "Copied" : "Copy"}</span>
+                  <span>{copied ? "Copied" : "Copy link"}</span>
                 </button>
+                <a
+                  href={link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shop-secondary"
+                  style={{
+                    textTransform: "none",
+                    letterSpacing: "normal",
+                    fontWeight: 600,
+                    fontSize: "13px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "0 12px",
+                    textDecoration: "none",
+                    color: "var(--ink)",
+                    flexShrink: 0,
+                    borderRadius: "var(--r-sm)",
+                  }}
+                  title="Open link in new tab"
+                  aria-label="Open link in new tab"
+                >
+                  <ExternalLink size={14} />
+                </a>
               </div>
               <span className="visually-hidden" aria-live="polite">{copied ? "Link copied" : ""}</span>
 
+              {/* Quick Prescription / Share Recommendation Template */}
               <div
                 style={{
-                  marginTop: 6,
-                  padding: "12px 14px",
                   background: "var(--bone-soft)",
                   border: "1px solid var(--rule-soft)",
                   borderRadius: "var(--r-md)",
-                  fontSize: "13px",
-                  color: "var(--ink-2)",
-                  lineHeight: 1.5,
+                  padding: "14px 16px",
+                  display: "grid",
+                  gap: "8px",
                 }}
               >
-                {active.hint}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--ink-3)" }}>
+                    {qrMode === "referral" ? "Physician Invitation Template" : qrMode === "profile" ? "Profile Share Template" : "Patient Prescription Template"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => copyMsg(active.presetMessage)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      padding: "2px 6px",
+                      borderRadius: "var(--r-sm)",
+                      color: "var(--blue)",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 5,
+                    }}
+                    title="Copy message template"
+                  >
+                    {msgCopied ? <Check size={12} /> : <Copy size={12} />}
+                    <span>{msgCopied ? "Copied" : "Copy text"}</span>
+                  </button>
+                </div>
+                <p style={{ margin: 0, fontSize: "12px", color: "var(--ink-2)", lineHeight: 1.5, fontStyle: "italic" }}>
+                  &ldquo;{active.presetMessage}&rdquo;
+                </p>
+              </div>
+
+              {/* Recommended Touchpoints */}
+              <div style={{ display: "grid", gap: "8px" }}>
+                <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--ink-3)" }}>
+                  Recommended Touchpoints
+                </span>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "8px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--ink-2)", background: "var(--bone-soft)", border: "1px solid var(--rule-soft)", borderRadius: "var(--r-sm)", padding: "8px 10px" }}>
+                    <MessageSquare size={14} color="var(--blue)" style={{ flexShrink: 0 }} />
+                    <span>Viber & WhatsApp</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--ink-2)", background: "var(--bone-soft)", border: "1px solid var(--rule-soft)", borderRadius: "var(--r-sm)", padding: "8px 10px" }}>
+                    <FileText size={14} color="var(--blue)" style={{ flexShrink: 0 }} />
+                    <span>Prescription notes</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--ink-2)", background: "var(--bone-soft)", border: "1px solid var(--rule-soft)", borderRadius: "var(--r-sm)", padding: "8px 10px" }}>
+                    <QrCode size={14} color="var(--blue)" style={{ flexShrink: 0 }} />
+                    <span>Clinic reception desk</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--ink-2)", background: "var(--bone-soft)", border: "1px solid var(--rule-soft)", borderRadius: "var(--r-sm)", padding: "8px 10px" }}>
+                    <Share2 size={14} color="var(--blue)" style={{ flexShrink: 0 }} />
+                    <span>Social media bio</span>
+                  </div>
+                </div>
               </div>
             </>
           )}
-        </div>
+        </article>
 
-        <div className="pp-share-qr">
+        {/* Card 2: Scannable QR & Print Assets */}
+        <article className="pp-card" style={{ display: "grid", gap: "16px", alignContent: "start" }}>
+          <div className="pp-card-head">
+            <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: "var(--ink)" }}>Scannable QR code</h2>
+            <span className="pp-tag pp-tag-bone">1024px PNG</span>
+          </div>
+
           {qrMode === "referral" && isReferralLocked ? (
             <div
               style={{
@@ -209,27 +413,72 @@ export default function SharePage() {
                 textAlign: "center",
                 minHeight: "260px",
                 width: "100%",
-                maxWidth: 280,
               }}
             >
-              <Lock size={40} color="var(--ink-3)" style={{ marginBottom: "12px" }} />
-              <strong style={{ color: "var(--ink-2)" }}>Referral QR Inactive</strong>
-              <p style={{ margin: "8px 0 0", fontSize: "13px", color: "var(--ink-3)", maxWidth: "260px" }}>
+              <Lock size={36} color="var(--ink-3)" style={{ marginBottom: "12px" }} />
+              <strong style={{ color: "var(--ink-2)", fontSize: "14px" }}>Referral QR Inactive</strong>
+              <p style={{ margin: "8px 0 0", fontSize: "12px", color: "var(--ink-3)", maxWidth: "240px", lineHeight: 1.4 }}>
                 Make your 1st paid shop sale to automatically unlock!
               </p>
             </div>
           ) : (
             <>
-              <div className="partner-qr" ref={qrRef}>
-                <QRCodeSVG key={qrMode} value={link} size={QR_RENDER_PX} level="M" marginSize={2} style={{ width: "100%", height: "auto" }} />
-                <QRCodeCanvas className="partner-qr-download-canvas" value={link} size={QR_RENDER_PX} level="M" marginSize={4} />
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  background: "var(--bone-soft)",
+                  border: "1px solid var(--rule-soft)",
+                  borderRadius: "var(--r-md)",
+                  padding: "20px 16px 14px",
+                }}
+              >
+                <div
+                  ref={qrRef}
+                  style={{
+                    width: "min(100%, 220px)",
+                    aspectRatio: "1",
+                    background: "#ffffff",
+                    padding: "12px",
+                    borderRadius: "var(--r-sm)",
+                    border: "1px solid var(--rule-soft)",
+                    boxShadow: "0 2px 8px rgba(15, 15, 24, 0.04)",
+                  }}
+                >
+                  <QRCodeSVG
+                    key={qrMode}
+                    value={link}
+                    size={QR_RENDER_PX}
+                    level="M"
+                    marginSize={2}
+                    style={{ width: "100%", height: "100%", display: "block" }}
+                  />
+                  <QRCodeCanvas className="partner-qr-download-canvas" value={link} size={QR_RENDER_PX} level="M" marginSize={4} />
+                </div>
+                <p style={{ margin: "10px 0 0", fontSize: "11px", color: "var(--ink-3)", textAlign: "center" }}>
+                  Point phone camera at screen to test destination
+                </p>
               </div>
-              <div className="partner-qr-actions" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, width: "100%", maxWidth: 280 }}>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, width: "100%" }}>
                 <button
                   type="button"
                   className="shop-secondary"
                   onClick={downloadQr}
-                  style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 38, padding: "8px 10px" }}
+                  style={{
+                    textTransform: "none",
+                    letterSpacing: "normal",
+                    fontWeight: 600,
+                    fontSize: "13px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    minHeight: 38,
+                    padding: "8px 12px",
+                    borderRadius: "var(--r-sm)",
+                  }}
                 >
                   <Download size={14} />
                   <span>Download PNG</span>
@@ -239,16 +488,46 @@ export default function SharePage() {
                   type="button"
                   className="shop-secondary"
                   onClick={() => setPosterOpen(true)}
-                  style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 38, padding: "8px 10px" }}
+                  style={{
+                    textTransform: "none",
+                    letterSpacing: "normal",
+                    fontWeight: 600,
+                    fontSize: "13px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    minHeight: 38,
+                    padding: "8px 12px",
+                    borderRadius: "var(--r-sm)",
+                  }}
                 >
                   <Printer size={14} />
                   <span>Preview poster</span>
                 </button>
               </div>
+
+              <div
+                style={{
+                  padding: "10px 12px",
+                  background: "var(--bone-soft)",
+                  border: "1px solid var(--rule-soft)",
+                  borderRadius: "var(--r-sm)",
+                  fontSize: "12px",
+                  color: "var(--ink-2)",
+                  lineHeight: 1.4,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                }}
+              >
+                <Printer size={14} color="var(--ink-3)" style={{ flexShrink: 0 }} />
+                <span>Print-ready A4 clinic counter sign with your name and doctor details.</span>
+              </div>
             </>
           )}
-        </div>
-      </section>
+        </article>
+      </div>
 
       {posterOpen ? (
         <div className="partner-poster-modal" role="dialog" aria-modal="true" aria-labelledby="poster-title">
@@ -264,8 +543,20 @@ export default function SharePage() {
               <span>{dashboard.partner.full_name}</span><small>{link}</small>
             </div>
             <div className="partner-poster-actions">
-              <button type="button" className="shop-secondary" onClick={() => { setPosterOpen(false); requestAnimationFrame(() => posterTriggerRef.current?.focus()); }}>Close</button>
-              <button type="button" className="shop-primary" style={{ display: "inline-flex", alignItems: "center", gap: 6 }} onClick={() => window.print()}>
+              <button
+                type="button"
+                className="shop-secondary"
+                style={{ textTransform: "none", letterSpacing: "normal", fontWeight: 600, fontSize: "13px" }}
+                onClick={() => { setPosterOpen(false); requestAnimationFrame(() => posterTriggerRef.current?.focus()); }}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                className="shop-primary"
+                style={{ textTransform: "none", letterSpacing: "normal", fontWeight: 600, fontSize: "13px", display: "inline-flex", alignItems: "center", gap: 6 }}
+                onClick={() => window.print()}
+              >
                 <Printer size={14} />
                 <span>Print poster</span>
               </button>
