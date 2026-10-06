@@ -178,7 +178,7 @@ export default function SharePage() {
         />
         <StatTile
           label="Attribution mode"
-          value={isMainStore ? "Main Store Direct" : isAffiliate ? "Affiliate Store" : "Lifestyle Store"}
+          value={isMainStore ? "Main Store" : isAffiliate ? "Affiliate" : "Lifestyle"}
           note="Active commission attribution"
         />
       </section>
@@ -259,80 +259,39 @@ export default function SharePage() {
               </p>
 
               {/* Integrated Link Input Group */}
-              <div className="partner-link-row" style={{ display: "flex", gap: "8px", alignItems: "stretch" }}>
-                <p
-                  className="partner-link"
-                  ref={linkRef}
-                  style={{
-                    margin: 0,
-                    fontFamily: "var(--mono, monospace)",
-                    fontSize: "12px",
-                    display: "flex",
-                    alignItems: "center",
-                    wordBreak: "break-all",
-                  }}
-                >
-                  {link}
-                </p>
-                <button
-                  type="button"
-                  className="shop-primary"
-                  onClick={copyLink}
-                  style={{
-                    textTransform: "none",
-                    letterSpacing: "normal",
-                    fontWeight: 600,
-                    fontSize: "13px",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    whiteSpace: "nowrap",
-                    flexShrink: 0,
-                    borderRadius: "var(--r-sm)",
-                  }}
-                  aria-label="Copy link to clipboard"
-                >
-                  {copied ? <Check size={14} /> : <Copy size={14} />}
-                  <span>{copied ? "Copied" : "Copy link"}</span>
-                </button>
-                <a
-                  href={link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="shop-secondary"
-                  style={{
-                    textTransform: "none",
-                    letterSpacing: "normal",
-                    fontWeight: 600,
-                    fontSize: "13px",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: "0 12px",
-                    textDecoration: "none",
-                    color: "var(--ink)",
-                    flexShrink: 0,
-                    borderRadius: "var(--r-sm)",
-                  }}
-                  title="Open link in new tab"
-                  aria-label="Open link in new tab"
-                >
-                  <ExternalLink size={14} />
-                </a>
+              <div className="pp-share-link-group">
+                <div className="pp-share-url-container">
+                  <p className="pp-share-url-text" ref={linkRef}>
+                    {link}
+                  </p>
+                </div>
+                <div className="pp-share-actions-row pp-share-inline-actions">
+                  <button
+                    type="button"
+                    className="shop-primary"
+                    onClick={copyLink}
+                    aria-label="Copy link to clipboard"
+                  >
+                    {copied ? <Check size={14} /> : <Copy size={14} />}
+                    <span>{copied ? "Copied" : "Copy link"}</span>
+                  </button>
+                  <a
+                    href={link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shop-secondary"
+                    title="Open link in new tab"
+                    aria-label="Open link in new tab"
+                  >
+                    <ExternalLink size={14} />
+                    <span>Open link</span>
+                  </a>
+                </div>
               </div>
               <span className="visually-hidden" aria-live="polite">{copied ? "Link copied" : ""}</span>
 
               {/* Quick Prescription / Share Recommendation Template */}
-              <div
-                style={{
-                  background: "var(--bone-soft)",
-                  border: "1px solid var(--rule-soft)",
-                  borderRadius: "var(--r-md)",
-                  padding: "14px 16px",
-                  display: "grid",
-                  gap: "8px",
-                }}
-              >
+              <div className="pp-share-template-box">
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--ink-3)" }}>
                     {qrMode === "referral" ? "Physician Invitation Template" : qrMode === "profile" ? "Profile Share Template" : "Patient Prescription Template"}
@@ -359,7 +318,7 @@ export default function SharePage() {
                     <span>{msgCopied ? "Copied" : "Copy text"}</span>
                   </button>
                 </div>
-                <p style={{ margin: 0, fontSize: "12px", color: "var(--ink-2)", lineHeight: 1.5, fontStyle: "italic" }}>
+                <p>
                   &ldquo;{active.presetMessage}&rdquo;
                 </p>
               </div>
@@ -369,20 +328,20 @@ export default function SharePage() {
                 <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--ink-3)" }}>
                   Recommended Touchpoints
                 </span>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "8px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--ink-2)", background: "var(--bone-soft)", border: "1px solid var(--rule-soft)", borderRadius: "var(--r-sm)", padding: "8px 10px" }}>
+                <div className="pp-share-touchpoints-grid">
+                  <div className="pp-share-touchpoint">
                     <MessageSquare size={14} color="var(--blue)" style={{ flexShrink: 0 }} />
                     <span>Viber & WhatsApp</span>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--ink-2)", background: "var(--bone-soft)", border: "1px solid var(--rule-soft)", borderRadius: "var(--r-sm)", padding: "8px 10px" }}>
+                  <div className="pp-share-touchpoint">
                     <FileText size={14} color="var(--blue)" style={{ flexShrink: 0 }} />
                     <span>Prescription notes</span>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--ink-2)", background: "var(--bone-soft)", border: "1px solid var(--rule-soft)", borderRadius: "var(--r-sm)", padding: "8px 10px" }}>
+                  <div className="pp-share-touchpoint">
                     <QrCode size={14} color="var(--blue)" style={{ flexShrink: 0 }} />
                     <span>Clinic reception desk</span>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--ink-2)", background: "var(--bone-soft)", border: "1px solid var(--rule-soft)", borderRadius: "var(--r-sm)", padding: "8px 10px" }}>
+                  <div className="pp-share-touchpoint">
                     <Share2 size={14} color="var(--blue)" style={{ flexShrink: 0 }} />
                     <span>Social media bio</span>
                   </div>
@@ -461,24 +420,11 @@ export default function SharePage() {
                 </p>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, width: "100%" }}>
+              <div className="pp-share-actions-row">
                 <button
                   type="button"
                   className="shop-secondary"
                   onClick={downloadQr}
-                  style={{
-                    textTransform: "none",
-                    letterSpacing: "normal",
-                    fontWeight: 600,
-                    fontSize: "13px",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 6,
-                    minHeight: 38,
-                    padding: "8px 12px",
-                    borderRadius: "var(--r-sm)",
-                  }}
                 >
                   <Download size={14} />
                   <span>Download PNG</span>
@@ -488,19 +434,6 @@ export default function SharePage() {
                   type="button"
                   className="shop-secondary"
                   onClick={() => setPosterOpen(true)}
-                  style={{
-                    textTransform: "none",
-                    letterSpacing: "normal",
-                    fontWeight: 600,
-                    fontSize: "13px",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 6,
-                    minHeight: 38,
-                    padding: "8px 12px",
-                    borderRadius: "var(--r-sm)",
-                  }}
                 >
                   <Printer size={14} />
                   <span>Preview poster</span>
