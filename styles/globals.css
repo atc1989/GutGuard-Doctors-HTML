@@ -6595,7 +6595,7 @@
   .pp-seg button {
     flex: 1 1 0;
     min-width: 0;
-    padding: 0 8px;
+    padding: 0 6px;
     font-size: 12px;
     white-space: nowrap;
     text-align: center;
@@ -7617,6 +7617,10 @@
 .pp-dl dt { color: var(--ink-3); font-size: 11px; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; padding-top: 2px; }
 .pp-dl dd { overflow-wrap: anywhere; }
 .pp-dl a { color: var(--blue); }
+.pp-drawer .pp-table { display: table !important; width: 100%; border-collapse: collapse; }
+.pp-drawer .pp-table th, .pp-drawer .pp-table td { padding: 8px 6px; font-size: 12px; }
+.pp-drawer .pp-table th:first-child, .pp-drawer .pp-table td:first-child { padding-left: 0; }
+.pp-drawer .pp-table th:last-child, .pp-drawer .pp-table td:last-child { padding-right: 0; }
 
 /* Responsive: content-width (container) queries */
 @container (max-width: 860px) {
@@ -7625,6 +7629,7 @@
 }
 @container (max-width: 700px) {
   .pp-table { display: none; }
+  .pp-drawer .pp-table { display: table !important; }
   .pp-order-cards { display: block; }
   .pp-toolbar { padding: 14px 16px; }
   .pp-filter-toggle { display: inline-flex; }

@@ -72,9 +72,9 @@ export default function OrdersPage() {
   const total = page?.orders_page.total ?? 0;
   const activeFilters = [status, from, to, sort === "oldest" ? "x" : ""].filter(Boolean).length;
   const scopeLabels: Array<[PartnerOrderScope, string]> = [
-    ["all", "All Orders"],
-    ["direct", "Direct Orders"],
-    ["referred", "Referred Orders"],
+    ["all", "All orders"],
+    ["direct", "Direct"],
+    ["referred", "Referred"],
   ];
 
   return (
