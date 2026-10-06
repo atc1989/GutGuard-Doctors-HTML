@@ -141,7 +141,7 @@ export default function MainStoreReportsPage() {
 
             <div className="pp-partner-actions">
               <label className="pp-partner-sort">
-                <span>Type:</span>
+                <span>Type</span>
                 <select
                   value={storeTypeFilter}
                   onChange={(e) => setStoreTypeFilter(e.target.value)}
@@ -154,8 +154,10 @@ export default function MainStoreReportsPage() {
               </label>
 
               <label className="pp-partner-sort">
-                <ArrowUpDown size={14} aria-hidden="true" />
-                <span>Sort:</span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <ArrowUpDown size={12} aria-hidden="true" />
+                  <span>Sort</span>
+                </span>
                 <select
                   value={storeSortBy}
                   onChange={(e) => setStoreSortBy(e.target.value as typeof storeSortBy)}
@@ -171,7 +173,7 @@ export default function MainStoreReportsPage() {
               {(search || storeTypeFilter || storeSortBy !== "points") ? (
                 <button
                   type="button"
-                  className="shop-secondary pp-tree-quick-btn"
+                  className="shop-secondary pp-tree-quick-btn pp-filter-reset-btn"
                   onClick={() => {
                     setSearch("");
                     setStoreTypeFilter("");
@@ -261,7 +263,7 @@ export default function MainStoreReportsPage() {
 
             <div className="pp-partner-actions">
               <label className="pp-partner-sort">
-                <span>Store:</span>
+                <span>Store</span>
                 <select
                   value={storeFilter}
                   onChange={(e) => {
@@ -280,7 +282,7 @@ export default function MainStoreReportsPage() {
               </label>
 
               <label className="pp-partner-sort">
-                <span>Status:</span>
+                <span>Status</span>
                 <select
                   value={statusFilter}
                   onChange={(e) => {
@@ -300,7 +302,7 @@ export default function MainStoreReportsPage() {
               {(orderSearch || storeFilter || statusFilter) ? (
                 <button
                   type="button"
-                  className="shop-secondary pp-tree-quick-btn"
+                  className="shop-secondary pp-tree-quick-btn pp-filter-reset-btn"
                   onClick={() => {
                     setOrderSearch("");
                     setStoreFilter("");

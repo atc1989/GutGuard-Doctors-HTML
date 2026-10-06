@@ -299,7 +299,7 @@ export default function MainStoreEPointsPage() {
                 setOffset(0);
               }}
             >
-              Downline pass-ups
+              Pass-ups
             </button>
           </div>
 

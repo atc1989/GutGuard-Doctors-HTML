@@ -191,8 +191,10 @@ export default function PartnersPage() {
 
         <div className="pp-partner-actions">
           <label className="pp-partner-sort">
-            <ArrowUpDown size={14} aria-hidden="true" />
-            <span>Sort:</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <ArrowUpDown size={12} aria-hidden="true" />
+              <span>Sort</span>
+            </span>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as typeof sortBy)}

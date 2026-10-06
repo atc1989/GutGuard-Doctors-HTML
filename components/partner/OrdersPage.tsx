@@ -99,9 +99,9 @@ export default function OrdersPage() {
 
       {/* Universal Filter Toolbar (Outside Card) */}
       <div className="pp-partner-toolbar">
-        <div className="pp-partner-actions" style={{ flex: 1, justifyContent: "flex-start", gap: 10, flexWrap: "wrap" }}>
+        <div className="pp-partner-actions">
           <label className="pp-partner-sort">
-            <span>Status:</span>
+            <span>Status</span>
             <select
               value={status}
               onChange={(event) => update({ status: event.target.value })}
@@ -117,7 +117,22 @@ export default function OrdersPage() {
           </label>
 
           <label className="pp-partner-sort">
-            <span>From:</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <ArrowUpDown size={12} aria-hidden="true" />
+              <span>Sort</span>
+            </span>
+            <select
+              value={sort}
+              onChange={(event) => update({ sort: event.target.value as "newest" | "oldest" })}
+              aria-label="Sort orders"
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+            </select>
+          </label>
+
+          <label className="pp-partner-sort">
+            <span>From</span>
             <input
               type="date"
               value={from}
@@ -129,7 +144,7 @@ export default function OrdersPage() {
           </label>
 
           <label className="pp-partner-sort">
-            <span>To:</span>
+            <span>To</span>
             <input
               type="date"
               value={to}
@@ -139,26 +154,11 @@ export default function OrdersPage() {
               aria-label="Filter to date"
             />
           </label>
-        </div>
-
-        <div className="pp-partner-actions">
-          <label className="pp-partner-sort">
-            <ArrowUpDown size={14} aria-hidden="true" />
-            <span>Sort:</span>
-            <select
-              value={sort}
-              onChange={(event) => update({ sort: event.target.value as "newest" | "oldest" })}
-              aria-label="Sort orders"
-            >
-              <option value="newest">Newest first</option>
-              <option value="oldest">Oldest first</option>
-            </select>
-          </label>
 
           {activeFilters ? (
             <button
               type="button"
-              className="shop-secondary pp-tree-quick-btn"
+              className="shop-secondary pp-tree-quick-btn pp-filter-reset-btn"
               onClick={() => update({ status: "", from: "", to: "", sort: "newest" })}
               aria-label="Clear active filters"
             >
