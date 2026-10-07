@@ -1,4 +1,4 @@
--- Addendum 05: run after 20261002000000_prototype_shop.sql. Change `doctors` to `sandbox` to check the mirror.
+-- Addendum 05: run after 20261007000000_prototype_shop.sql. Change `doctors` to `sandbox` to check the mirror.
 -- After the final run (step all) every row must say ok = true.
 -- After a `prepare` run, the last row says false on purpose (the browser can still create orders).
 with s as (select 'doctors'::text as name)

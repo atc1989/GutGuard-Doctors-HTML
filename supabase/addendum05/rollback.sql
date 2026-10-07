@@ -1,4 +1,4 @@
--- Addendum 05 rollback for 20261002000000_prototype_shop.sql, both shop schemas.
+-- Addendum 05 rollback for 20261007000000_prototype_shop.sql, both shop schemas.
 -- Use it together with the app rollback (Vercel: promote the previous Production deployment),
 -- because the old shop creates orders from the browser and needs create_shop_order open again.
 -- The three new shop_orders columns are kept: they are harmless to the old code and keep who

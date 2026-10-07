@@ -11,7 +11,7 @@ import {
   Printer,
   X,
 } from "lucide-react";
-import { Logo } from "@/components/GutguardSite";
+import { Logo } from "@/components/GutguardLogo";
 import {
   PageHeader,
   StatTile,

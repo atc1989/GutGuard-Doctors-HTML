@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Check, ChevronDown, Coins, Copy, LayoutDashboard, LogOut, Package, QrCode, Users } from "lucide-react";
-import { Logo } from "@/components/GutguardSite";
+import { Logo } from "@/components/GutguardLogo";
 import { getPartnerQrLink, useCopy, usePartner } from "./shared";
 
 const LIFESTYLE_NAV = [

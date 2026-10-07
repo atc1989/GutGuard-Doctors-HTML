@@ -1,6 +1,6 @@
 # Addendum 05 database scripts
 
-For `supabase/migrations/20261002000000_prototype_shop.sql`. Full steps: Addendum 05, Part B.
+For `supabase/migrations/20261007000000_prototype_shop.sql`. Full steps: Addendum 05, Part B.
 
 - `check.sql`: run after each step. Change `doctors` to `sandbox` on line 3 to check the mirror.
 - `rollback.sql`: undo, together with promoting the previous Vercel Production deployment.
