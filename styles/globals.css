@@ -7633,6 +7633,7 @@
 .pp-share-actions-row a,
 .pp-share-actions-row .shop-primary,
 .pp-share-actions-row .shop-secondary {
+  margin: 0 !important;
   width: 100%;
   min-height: 38px;
   height: 38px;
@@ -7655,44 +7656,37 @@
   background: var(--bone-soft);
   border: 1px solid var(--rule-soft);
   border-radius: var(--r-md);
-  padding: 14px 16px;
+  padding: 10px 12px;
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .pp-share-template-box p {
   margin: 0;
   font-size: 12px;
   color: var(--ink-2);
-  line-height: 1.5;
+  line-height: 1.45;
   font-style: italic;
   overflow-wrap: anywhere;
 }
 
-.pp-share-touchpoints-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  width: 100%;
-}
-
-.pp-share-touchpoint {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--ink-2);
-  background: var(--bone-soft);
-  border: 1px solid var(--rule-soft);
+.pp-share-copy-msg-btn {
+  background: none;
+  border: none;
+  padding: 2px 6px;
   border-radius: var(--r-sm);
-  padding: 8px 10px;
-  min-width: 0;
+  color: var(--blue);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-transform: none;
+  letter-spacing: normal;
 }
-
-.pp-share-touchpoint span {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.pp-share-copy-msg-btn:hover {
+  text-decoration: underline;
 }
 
 @media (min-width: 680px) {
@@ -7721,12 +7715,7 @@
     width: auto;
     flex-shrink: 0;
     min-width: 90px;
-  }
-}
-
-@media (max-width: 360px) {
-  .pp-share-touchpoints-grid {
-    grid-template-columns: 1fr;
+    margin: 0 !important;
   }
 }
 
