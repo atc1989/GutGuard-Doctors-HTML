@@ -73,6 +73,11 @@ function normalizeAdminDoctorRegistration(doctor: AdminDoctorRegistration): Admi
     routing_slug: routingSlug,
     redirect_url:
       (doctor.redirect_url ?? "").trim() || (tiktokUsername ? `https://www.tiktok.com/@${tiktokUsername}` : ""),
+    where_did_you_find_us: doctor.where_did_you_find_us ?? "",
+    referred_by_partner_id: doctor.referred_by_partner_id ?? null,
+    referrer_name: doctor.referrer_name ?? null,
+    referrer_prefix: doctor.referrer_prefix ?? null,
+    referrer_slug: doctor.referrer_slug ?? null,
   };
 }
 

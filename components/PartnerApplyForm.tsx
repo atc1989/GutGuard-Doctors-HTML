@@ -27,6 +27,7 @@ const INITIAL_VALUES: FormValues = {
   specialty: "",
   otherSpecialty: "",
   location: "",
+  whereDidYouFindUs: "",
 };
 
 export default function PartnerApplyForm({
@@ -87,6 +88,7 @@ export default function PartnerApplyForm({
         specialty:
           values.specialty === "Other" ? values.otherSpecialty.trim() : values.specialty.trim(),
         location: values.location.trim(),
+        whereDidYouFindUs: values.whereDidYouFindUs.trim(),
         referrerSlug: invitedBy?.slug,
       });
       await onRegistered(email, doctor.id);
@@ -229,16 +231,30 @@ export default function PartnerApplyForm({
 
       <ApplyField
         id="location"
-        label=" Full Clinic Address"
-        error="Please enter your practice location."
+        label="Complete Clinic Address"
+        error="Please enter your complete clinic address."
         value={values.location}
         hasError={errors.location}
         onValueChange={handleValueChange}
         onFieldBlur={handleFieldBlur}
         type="text"
-        placeholder="City or province"
-        autoComplete="address-level2"
+        placeholder="Complete Address"
+        autoComplete="street-address"
         required
+      />
+
+      <ApplyField
+        id="whereDidYouFindUs"
+        label="Where did you find us?"
+        optional
+        error="Please enter where you found us, or leave this blank."
+        value={values.whereDidYouFindUs}
+        hasError={errors.whereDidYouFindUs}
+        onValueChange={handleValueChange}
+        onFieldBlur={handleFieldBlur}
+        type="text"
+        placeholder="e.g. Colleague, social media, event"
+        autoComplete="off"
       />
 
       {submitError ? (

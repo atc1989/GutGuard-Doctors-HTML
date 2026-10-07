@@ -34,10 +34,11 @@ const INITIAL_VALUES: FormValues = {
   specialty: "",
   otherSpecialty: "",
   location: "",
+  whereDidYouFindUs: "",
 };
 
-// Email is only used to deliver the proposal; specialty helps tailor it. Neither blocks registration.
-const OPTIONAL_FIELDS: FieldName[] = ["email", "specialty"];
+// Email is only used to deliver the proposal; specialty helps tailor it; where did you find us is optional. None block registration.
+const OPTIONAL_FIELDS: FieldName[] = ["email", "specialty", "whereDidYouFindUs"];
 
 export default function RegistrationSection({
   active,
@@ -86,6 +87,7 @@ export default function RegistrationSection({
           ? values.otherSpecialty.trim()
           : values.specialty.trim(),
       location: values.location.trim(),
+      whereDidYouFindUs: values.whereDidYouFindUs.trim(),
       referrerSlug: invitedBy?.slug,
     };
   }
@@ -245,16 +247,28 @@ export default function RegistrationSection({
         ) : null}
         <InputField
           id="location"
-          label="Full Clinic Address"
-          error="Please enter your city address."
+          label="Complete Clinic Address"
+          error="Please enter your complete clinic address."
           value={values.location}
           hasError={errors.location}
           onValueChange={handleValueChange}
           onFieldBlur={handleFieldBlur}
           type="text"
-          placeholder="City or province"
+          placeholder="Complete Address"
           required
-          autoComplete="address-level2"
+          autoComplete="street-address"
+        />
+        <InputField
+          id="whereDidYouFindUs"
+          label="Where did you find us?"
+          error="Please enter where you found us."
+          value={values.whereDidYouFindUs}
+          hasError={errors.whereDidYouFindUs}
+          onValueChange={handleValueChange}
+          onFieldBlur={handleFieldBlur}
+          type="text"
+          placeholder="e.g. Colleague, social media, event"
+          autoComplete="off"
         />
 
         <ActionButton

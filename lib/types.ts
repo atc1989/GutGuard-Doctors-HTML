@@ -12,6 +12,7 @@ export type Registration = {
   tiktokUsername: string;
   specialty: string;
   location: string;
+  whereDidYouFindUs?: string;
   registeredAt: number;
   referrerSlug?: string;
 };

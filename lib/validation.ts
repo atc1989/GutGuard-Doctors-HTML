@@ -6,7 +6,8 @@ export type FieldName =
   | "tiktokUsername"
   | "specialty"
   | "otherSpecialty"
-  | "location";
+  | "location"
+  | "whereDidYouFindUs";
 
 export type FormValues = Record<FieldName, string>;
 export type FieldErrors = Partial<Record<FieldName, boolean>>;
@@ -28,8 +29,9 @@ export function formatPrefixedName(prefix?: string | null, fullName?: string | n
 export function validateField(name: FieldName, value: string | undefined, optionalFields: FieldName[] = []) {
   const trimmed = (value ?? "").trim();
 
-  // TikTok is optional everywhere. Empty is valid; a value must still be a handle.
+  // TikTok and Where did you find us are optional everywhere. Empty is valid; a value must still be a handle for TikTok.
   if (name === "tiktokUsername" && !trimmed) return true;
+  if (name === "whereDidYouFindUs" && !trimmed) return true;
   if (optionalFields.includes(name) && !trimmed) return true;
   if (!trimmed) return false;
   if (name === "email") return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);

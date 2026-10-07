@@ -48,6 +48,11 @@ export type AdminDoctorRegistration = {
   redirect_url: string;
   specialty: string;
   practice_location: string;
+  where_did_you_find_us?: string;
+  referred_by_partner_id?: string | null;
+  referrer_name?: string | null;
+  referrer_prefix?: string | null;
+  referrer_slug?: string | null;
   created_at: string;
   prize_label?: string | null;
   prize_claimed_at?: string | null;
@@ -469,7 +474,7 @@ type RegistrationEmailTestResponse = {
 
 export async function registerDoctor(payload: RegistrationPayload) {
   if (isSupabaseConfigured && supabase) {
-    const { data, error } = await supabase.rpc("register_doctor", {
+    let { data, error } = await supabase.rpc("register_doctor", {
       p_full_name: payload.fullName,
       p_name_prefix: payload.namePrefix,
       p_email: payload.email,
@@ -478,7 +483,28 @@ export async function registerDoctor(payload: RegistrationPayload) {
       p_specialty: payload.specialty,
       p_practice_location: payload.location,
       p_referrer_slug: payload.referrerSlug || null,
+      p_where_did_you_find_us: payload.whereDidYouFindUs || "",
     });
+
+    if (
+      error &&
+      (error.message?.includes("Could not find the function") ||
+        error.code === "PGRST202" ||
+        error.message?.includes("does not exist"))
+    ) {
+      const fallback = await supabase.rpc("register_doctor", {
+        p_full_name: payload.fullName,
+        p_name_prefix: payload.namePrefix,
+        p_email: payload.email,
+        p_mobile: payload.mobile,
+        p_tiktok_username: payload.tiktokUsername,
+        p_specialty: payload.specialty,
+        p_practice_location: payload.location,
+        p_referrer_slug: payload.referrerSlug || null,
+      });
+      data = fallback.data;
+      error = fallback.error;
+    }
 
     if (error) throw new Error(`Registration failed: ${error.message}`);
 
@@ -1490,6 +1516,11 @@ function normalizeAdminDoctorRegistration(doctor: AdminDoctorRegistration): Admi
     routing_slug: routingSlug,
     redirect_url:
       (doctor.redirect_url ?? "").trim() || (tiktokUsername ? `https://www.tiktok.com/@${tiktokUsername}` : ""),
+    where_did_you_find_us: doctor.where_did_you_find_us ?? "",
+    referred_by_partner_id: doctor.referred_by_partner_id ?? null,
+    referrer_name: doctor.referrer_name ?? null,
+    referrer_prefix: doctor.referrer_prefix ?? null,
+    referrer_slug: doctor.referrer_slug ?? null,
   };
 }
 
