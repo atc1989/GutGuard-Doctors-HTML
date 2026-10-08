@@ -9,8 +9,24 @@ type Tab = "stores" | "orders";
 
 export default function MainStoreReportsPage() {
   const { dashboard } = usePartner();
+  // get_main_store_reports refuses non-main accounts; say so instead of an empty report.
+  if (dashboard.partner.store_type !== "main") {
+    return (
+      <>
+        <PageHeader kicker="Reports" title="Main Store reports" />
+        <EmptyState title="Reports are available to Main Store accounts.">
+          Orders from your own links and your referred partners are on the Orders page.
+        </EmptyState>
+      </>
+    );
+  }
+  return <MainStoreReportsView />;
+}
+
+function MainStoreReportsView() {
   const [tab, setTab] = useState<Tab>("stores");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [reportsData, setReportsData] = useState<MainStoreReports | null>(null);
 
   const [search, setSearch] = useState("");
@@ -21,13 +37,14 @@ export default function MainStoreReportsPage() {
   const [storeFilter, setStoreFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [offset, setOffset] = useState(0);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(25);
 
   const [selectedOrder, setSelectedOrder] = useState<MainStoreOrder | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setLoadError("");
 
     getMainStoreReports({
       storeId: storeFilter || undefined,
@@ -43,7 +60,10 @@ export default function MainStoreReportsPage() {
       })
       .catch((err) => {
         console.error("Failed to load reports:", err);
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoadError(err instanceof Error && err.message ? err.message : "Reports could not be loaded.");
+          setLoading(false);
+        }
       });
 
     return () => {
@@ -267,6 +287,10 @@ export default function MainStoreReportsPage() {
                   ))}
                 </ul>
               </>
+            ) : loading ? (
+              <Loading>Loading stores…</Loading>
+            ) : loadError ? (
+              <EmptyState title="Reports could not be loaded.">{loadError}</EmptyState>
             ) : (
               <EmptyState title="No descendant stores found.">
                 Partner stores registered under your Main Store link will appear here.
@@ -441,25 +465,31 @@ export default function MainStoreReportsPage() {
                   ))}
                 </ul>
 
-                <Pagination
-                  label="Network orders pagination"
-                  offset={offset}
-                  pageSize={pageSize}
-                  total={totalOrders}
-                  shown={orders.length}
-                  noun="orders"
-                  onOffset={setOffset}
-                  onPageSize={(size) => {
-                    setPageSize(size);
-                    setOffset(0);
-                  }}
-                />
               </>
+            ) : loadError ? (
+              <EmptyState title="Reports could not be loaded.">{loadError}</EmptyState>
             ) : (
               <EmptyState title="No matching network orders found.">
-                Try adjusting your store or status filter.
+                {orderSearch ? "Search covers this page only - try the next page or clear the search." : "Try adjusting your store or status filter."}
               </EmptyState>
             )}
+            {/* Outside the results branch: search filters the current page, so a search with no
+                hits here must still let the partner page on. */}
+            {!loading && totalOrders > 0 ? (
+              <Pagination
+                label="Network orders pagination"
+                offset={offset}
+                pageSize={pageSize}
+                total={totalOrders}
+                shown={orders.length}
+                noun="orders"
+                onOffset={setOffset}
+                onPageSize={(size) => {
+                  setPageSize(size);
+                  setOffset(0);
+                }}
+              />
+            ) : null}
           </section>
         </>
       )}

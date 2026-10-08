@@ -11,3 +11,13 @@ export function adminErrorMessage(error: unknown, fallback: string): string {
   }
   return fallback;
 }
+
+/** HTTP status for an admin route failure: caller mistakes are 4xx, everything else 500. */
+export function adminErrorStatus(error: unknown): number {
+  if (error instanceof SyntaxError) return 400; // malformed JSON body
+  const code = error && typeof error === "object" ? (error as { code?: unknown }).code : undefined;
+  if (code === "22023" || code === "23514" || code === "22P02") return 400;
+  if (code === "P0002") return 404;
+  if (code === "42501" || code === "28000") return 403;
+  return 500;
+}

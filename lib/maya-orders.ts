@@ -86,11 +86,15 @@ export async function applyPaymentToOrder(
 
   if (!wasPaid && next.paymentStatus === "paid") {
     try {
-      await supabase.functions.invoke("send-shop-order-email", {
+      // invoke() reports HTTP failures in `error` rather than throwing - log them, or a
+      // rejected call (e.g. service-role key mismatch, 403) disappears without a trace.
+      const { error: emailError } = await supabase.functions.invoke("send-shop-order-email", {
         body: { orderId: order.id, kind: "paid", schema: SHOP_SCHEMA },
       });
-    } catch {
+      if (emailError) console.error("Paid receipt email failed", order.id, emailError.message);
+    } catch (emailError) {
       // Best-effort receipt notification
+      console.error("Paid receipt email failed", order.id, emailError);
     }
   }
 

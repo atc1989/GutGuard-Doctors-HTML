@@ -1,4 +1,4 @@
-import { adminErrorMessage } from "@/lib/admin-error";
+import { adminErrorMessage, adminErrorStatus } from "@/lib/admin-error";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
 import { serverAdminToggleReferralQr } from "@/lib/admin-server-api";
 import { NextRequest, NextResponse } from "next/server";
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       { error: adminErrorMessage(error, "Failed to toggle Referral QR.") },
-      { status: 500 },
+      { status: adminErrorStatus(error) },
     );
   }
 }

@@ -435,14 +435,17 @@ export default function SharePage() {
         </div>
       ) : null}
 
-      {/* Screen-hidden, print-only. Kept in the DOM so window.print() needs no new page. */}
-      <div className="partner-print" aria-hidden="true">
-        <PosterLogo />
-        <strong>{posterTitle(qrMode)}</strong>
-        <QRCodeSVG value={link} size={QR_RENDER_PX} level="M" marginSize={4} />
-        <span>{dashboard.partner.full_name}</span>
-        <small>{link}</small>
-      </div>
+      {/* Screen-hidden, print-only. Kept in the DOM so window.print() needs no new page.
+          Not rendered for a locked Referral QR, or Ctrl+P would print a working invite. */}
+      {qrMode === "referral" && isReferralLocked ? null : (
+        <div className="partner-print" aria-hidden="true">
+          <PosterLogo />
+          <strong>{posterTitle(qrMode)}</strong>
+          <QRCodeSVG value={link} size={QR_RENDER_PX} level="M" marginSize={4} />
+          <span>{dashboard.partner.full_name}</span>
+          <small>{link}</small>
+        </div>
+      )}
     </>
   );
 }

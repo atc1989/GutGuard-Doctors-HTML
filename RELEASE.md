@@ -18,6 +18,10 @@ is done** — it would re-run every file, including the store-hierarchy backfill
 | `MAYA_API_BASE` | `https://pg.paymaya.com` with the **live** keys (sandbox base = test cards mark real orders paid) |
 | `NEXT_PUBLIC_SHOP_DB_SCHEMA` | `doctors` |
 | `NEXT_PUBLIC_SITE_URL` | `https://partners.gutguard.ph` (QR codes are printed from it) |
+| `SUPABASE_SERVICE_ROLE_KEY` | the same key the edge functions see as `SUPABASE_SERVICE_ROLE_KEY` (the legacy service_role JWT, not an `sb_secret_` key) — the redeployed functions compare it byte-for-byte, and paid receipts / admin actions fail otherwise |
+
+Maya's webhook URL must use the custom domain: `proxy.ts` answers every `*.vercel.app`
+request with a 308 redirect.
 
 Take a database backup (Supabase → Database → Backups).
 

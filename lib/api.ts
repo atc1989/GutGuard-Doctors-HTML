@@ -1075,11 +1075,6 @@ export async function verifyPartnerOtp(email: string, token: string): Promise<vo
   });
 
   if (error) throw error;
-
-  // supabaseShop is a second createClient (see lib/supabase.ts) and was built before this
-  // session existed, so it is still anonymous in this tab until it is handed the session.
-  // Without this the first dashboard read fails and only starts working after a reload.
-  if (data.session) await supabaseShop.auth.setSession(data.session);
 }
 
 export async function signOutPartner(): Promise<void> {
@@ -1091,11 +1086,9 @@ export async function signOutPartner(): Promise<void> {
 export async function hasPartnerSession(): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase || !supabaseShop) return false;
 
+  // supabaseShop reads this same session per request (see lib/supabase.ts), so nothing to copy.
   const { data } = await supabase.auth.getSession();
-  if (!data.session) return false;
-
-  await supabaseShop.auth.setSession(data.session);
-  return true;
+  return Boolean(data.session);
 }
 
 export async function getPartnerAuthEmail(): Promise<string> {
