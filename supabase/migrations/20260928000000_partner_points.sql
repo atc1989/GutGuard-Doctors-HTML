@@ -1,4 +1,4 @@
-`-- Migration: E-Points Referral Pass-Up (1-Level, Cycles)
+-- Migration: E-Points Referral Pass-Up (1-Level, Cycles)
 
 -- 1. Create tables in PUBLIC schema
 CREATE TABLE IF NOT EXISTS public.partner_points (
