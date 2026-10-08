@@ -146,13 +146,13 @@ export default function MainStoreEPointsPage() {
 
             <div className="pp-milestones">
               {MILESTONES.map((m) => {
-                const unlocked = pointsInCycle >= m.pts;
+                const reached = pointsInCycle >= m.pts;
                 return (
                   <article
                     key={`combined-${m.pts}`}
-                    className={unlocked ? "pp-milestone unlocked" : "pp-milestone"}
+                    className={reached ? "pp-milestone unlocked" : "pp-milestone"}
                   >
-                    <span>{unlocked ? "Unlocked" : `${m.pts} pts`}</span>
+                    <span>{reached ? "Milestone reached" : `${m.pts} pts`}</span>
                     <strong>{peso(m.rebate)}</strong>
                     <small>{m.label}</small>
                   </article>
@@ -169,7 +169,7 @@ export default function MainStoreEPointsPage() {
                   borderTop: "1px solid var(--rule-soft)",
                 }}
               >
-                Earn <strong>{pointsToNext} more {pointsToNext === 1 ? "point" : "points"}</strong> to unlock {nextMilestone.label} ({peso(nextMilestone.rebate)} cash rebate).
+                Earn <strong>{pointsToNext} more {pointsToNext === 1 ? "point" : "points"}</strong> to reach {nextMilestone.label} ({peso(nextMilestone.rebate)} cash rebate).
               </p>
             ) : (
               <p
@@ -182,7 +182,7 @@ export default function MainStoreEPointsPage() {
                   fontWeight: 600,
                 }}
               >
-                All milestones in Cycle {cycleNumber} unlocked! Additional points roll into the next cycle.
+                All milestones in Cycle {cycleNumber} reached. Additional points roll into the next cycle.
               </p>
             )}
           </section>

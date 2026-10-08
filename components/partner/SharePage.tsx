@@ -24,6 +24,10 @@ import {
 // Rendered large and scaled down by CSS so the download and the print sheet are both sharp.
 const QR_RENDER_PX = 1024;
 
+function PosterLogo() {
+  return <div className="partner-poster-logo"><Logo h={44} /></div>;
+}
+
 export default function SharePage() {
   const { dashboard } = usePartner();
   const { copied, copy } = useCopy();
@@ -97,10 +101,6 @@ export default function SharePage() {
     if (mode === "shop") return isMainStore ? "Scan to order from Main Store" : "Scan to order GutGuard";
     if (mode === "referral") return isMainStore ? "Scan to register as a partner" : "Scan to become a GutGuard partner";
     return "Scan to visit my TikTok profile";
-  }
-
-  function PosterLogo() {
-    return <div className="partner-poster-logo"><Logo h={44} /></div>;
   }
 
   const link = getPartnerQrLink(dashboard.partner, qrMode);

@@ -186,6 +186,7 @@ BEGIN
           'points', pp.points,
           'depth', pp.depth,
           'source_partner', coalesce(seller.full_name, 'Direct Customer'),
+          'source_partner_slug', seller.routing_slug,
           'created_at', pp.created_at
         ) ORDER BY pp.created_at DESC
       ), '[]'::jsonb)
@@ -406,6 +407,7 @@ BEGIN
           'points', pp.points,
           'depth', pp.depth,
           'source_partner', coalesce(seller.full_name, 'Direct Customer'),
+          'source_partner_slug', seller.routing_slug,
           'created_at', pp.created_at
         ) ORDER BY pp.created_at DESC
       ), '[]'::jsonb)
