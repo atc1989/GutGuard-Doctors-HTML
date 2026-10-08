@@ -4,6 +4,7 @@ import {
   supabaseAdmin as supabase,
   supabaseAdminShop as supabaseShop,
 } from "@/lib/supabase-admin";
+import { PARTNER_SLUG_PATTERN, RESERVED_PARTNER_SLUGS } from "@/lib/referral";
 import type { AdminTestimonial, TestimonialStatus } from "@/lib/testimonials";
 import type { Prize, WheelPrize, WheelPrizeInput } from "@/lib/types";
 import type {
@@ -15,8 +16,12 @@ import type {
   RegistrationEmailSettings,
   SequenceProgress,
   SequenceStep,
+  SequenceAttachment,
   ShopOrder,
   ShopOrderAdminUpdate,
+  ShopOrderItem,
+  ShopOrderStatus,
+  ShopPaymentStatus,
   SmsBlastResponse,
   SmsSendHistory,
   TikTokAdminAction,
@@ -100,8 +105,8 @@ function normalizeShopOrder(row: unknown): ShopOrder {
   return {
     id: String(order.id ?? ""),
     order_code: String(order.order_code ?? ""),
-    status: (order.status ?? "pending_payment") as any,
-    payment_status: (order.payment_status ?? "pending") as any,
+    status: (order.status ?? "pending_payment") as ShopOrderStatus,
+    payment_status: (order.payment_status ?? "pending") as ShopPaymentStatus,
     payment_method: String(order.payment_method ?? "maya"),
     maya_reference: typeof order.maya_reference === "string" ? order.maya_reference : null,
     maya_checkout_id: typeof order.maya_checkout_id === "string" ? order.maya_checkout_id : null,
@@ -130,7 +135,7 @@ function normalizeShopOrder(row: unknown): ShopOrder {
     shipping_weight_grams: Number(order.shipping_weight_grams ?? 0),
     total_amount: totalAmount,
     subtotal,
-    items: Array.isArray(order.items) ? (order.items as any[]) : [],
+    items: Array.isArray(order.items) ? (order.items as ShopOrderItem[]) : [],
     admin_notes: typeof order.admin_notes === "string" ? order.admin_notes : null,
     created_at: String(order.created_at ?? ""),
     updated_at: String(order.updated_at ?? ""),
@@ -243,19 +248,24 @@ export async function serverUpdateDoctorRegistration(
 
   if (error) throw error;
 
-  if (doctor.routing_slug) {
-    const cleanSlug = doctor.routing_slug.trim().toLowerCase();
-    if (cleanSlug) {
-      const schema = process.env.NEXT_PUBLIC_SHOP_DB_SCHEMA || "doctors";
-      await supabase
-        .schema(schema as any)
-        .from("doctor_registrations")
-        .update({ routing_slug: cleanSlug })
-        .eq("id", doctor.id);
-    }
-  }
+  const updated = normalizeAdminDoctorRegistration((Array.isArray(data) ? data[0] : data) as AdminDoctorRegistration);
+  const cleanSlug = doctor.routing_slug?.trim().toLowerCase();
+  if (!cleanSlug || cleanSlug === updated.routing_slug) return updated;
 
-  return normalizeAdminDoctorRegistration((Array.isArray(data) ? data[0] : data) as AdminDoctorRegistration);
+  // The slug is the partner's public link (gutguard.ph/<slug>), so it must be routable there.
+  if (!PARTNER_SLUG_PATTERN.test(cleanSlug) || RESERVED_PARTNER_SLUGS.has(cleanSlug)) {
+    throw new Error("Routing slug must use lowercase letters, numbers and single hyphens, and cannot be a site path.");
+  }
+  // Partners live in `doctors` on every deployment (sandbox mirrors only the shop), so this
+  // goes through the doctors client rather than NEXT_PUBLIC_SHOP_DB_SCHEMA.
+  const { error: slugError } = await supabase
+    .from("doctor_registrations")
+    .update({ routing_slug: cleanSlug })
+    .eq("id", doctor.id);
+  if (slugError) {
+    throw slugError.code === "23505" ? new Error(`The routing slug "${cleanSlug}" is already taken.`) : slugError;
+  }
+  return { ...updated, routing_slug: cleanSlug };
 }
 
 export async function serverAdminUpgradeToMainStore(
@@ -444,7 +454,7 @@ export async function serverGetSequenceSteps(adminPassword: string): Promise<Seq
 
 export async function serverUpsertSequenceStep(
   adminPassword: string,
-  step: { id?: string; stepNumber: number; subject: string; htmlBody: string; attachments?: any[] },
+  step: { id?: string; stepNumber: number; subject: string; htmlBody: string; attachments?: SequenceAttachment[] },
 ): Promise<SequenceStep> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
   const { data, error } = await supabase.functions.invoke("manage-sequence", {

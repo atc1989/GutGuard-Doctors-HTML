@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { PARTNER_SLUG_PATTERN, RESERVED_PARTNER_SLUGS } from "@/lib/referral";
 import { supabase } from "@/lib/supabase";
 
-const RESERVED = new Set(["admin", "api", "beehive", "dr", "partner", "physicians", "r", "science", "shop", "system"]);
 const COOKIE = "gg_partner_ref";
 const MAX_AGE = 30 * 24 * 60 * 60;
 
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ slu
   const { slug: rawSlug } = await context.params;
   const slug = rawSlug.trim().toLowerCase();
   const destination = new URL("/physicians/register", request.url);
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || RESERVED.has(slug)) {
+  if (!PARTNER_SLUG_PATTERN.test(slug) || RESERVED_PARTNER_SLUGS.has(slug)) {
     return invalidInvitation(destination);
   }
 

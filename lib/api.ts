@@ -1290,7 +1290,7 @@ export async function getMainStoreReports(query: {
         province: String(order.province ?? ""),
         barangay: String(order.barangay ?? ""),
         zip: String(order.zip ?? ""),
-        items: Array.isArray(order.items) ? (order.items as any[]) : [],
+        items: Array.isArray(order.items) ? (order.items as ShopOrderItem[]) : [],
         store_id: String(order.store_id ?? ""),
         store_name: String(order.store_name ?? ""),
         store_type: (order.store_type ?? "lifestyle") as StoreType,

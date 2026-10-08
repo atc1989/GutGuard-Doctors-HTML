@@ -1,4 +1,9 @@
 export const REFERRAL_COOKIE = "gg_ref";
+
+/** Shape of a partner routing slug, as served by app/[slug]/route.ts. */
+export const PARTNER_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/** Top-level paths a partner slug must not shadow. */
+export const RESERVED_PARTNER_SLUGS = new Set(["admin", "api", "beehive", "dr", "partner", "physicians", "r", "science", "shop", "system", "testimonials"]);
 export const REFERRAL_SHOP_NAME_COOKIE = "gg_ref_shop";
 
 /** Last-click attribution with a 30-day window: each /r/<slug> visit overwrites the cookie. */

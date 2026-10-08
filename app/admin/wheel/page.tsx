@@ -112,6 +112,8 @@ type RegistrationEmailSettings = {
 };
 
 type WheelApi = {
+  checkAdminSession?: () => Promise<boolean>;
+  adminLogin?: (password: string) => Promise<boolean>;
   getWheelPrizes?: (adminPassword: string) => Promise<AdminWheelPrize[]>;
   saveWheelPrize?: (adminPassword: string, prize: AdminWheelPrize) => Promise<AdminWheelPrize>;
   createWheelPrize?: (
@@ -609,8 +611,8 @@ export default function AdminWheelPage() {
 
   useEffect(() => {
     loadWheelApi().then((api) => {
-      if ((api as any).checkAdminSession) {
-        (api as any).checkAdminSession().then((authenticated: boolean) => {
+      if (api.checkAdminSession) {
+        api.checkAdminSession().then((authenticated: boolean) => {
           if (authenticated) {
             setIsUnlocked(true);
             loadAdminData().catch(() => setIsUnlocked(false));
@@ -658,8 +660,8 @@ export default function AdminWheelPage() {
     try {
       if (password) {
         const api = await loadWheelApi();
-        if ((api as any).adminLogin) {
-          await (api as any).adminLogin(password);
+        if (api.adminLogin) {
+          await api.adminLogin(password);
           setPassword("");
         }
       }
