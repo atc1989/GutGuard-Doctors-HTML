@@ -1,3 +1,4 @@
+import { adminErrorMessage } from "@/lib/admin-error";
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
 import { serverGetDoctorRegistrations, serverUpdateDoctorRegistration } from "@/lib/admin-server-api";
@@ -13,7 +14,7 @@ export async function GET() {
     return NextResponse.json({ doctors });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to load doctor registrations." },
+      { error: adminErrorMessage(error, "Failed to load doctor registrations.") },
       { status: 500 },
     );
   }
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ doctor: updated });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update doctor registration." },
+      { error: adminErrorMessage(error, "Failed to update doctor registration.") },
       { status: 500 },
     );
   }

@@ -1,18 +1,17 @@
 # Current Task State
 
 ## 🎯 Goal
-- [x] Registration clinic fields & "Where did you find us"
-- [x] Admin doctors tab: registration origin (referrer vs direct) & attribution
+- [x] Registration "Where did you find us" + admin origin (direct vs referred) — from main
+- [x] 3-tier store hierarchy (Main -> Lifestyle -> Affiliate) with breakaway upgrade — from sandbox
+- [ ] Release sandbox to main: see `RELEASE.md` for DB steps that must run before deploy
 
 ## ⛔ Constraints & Rules
 - Follow `.antigravity/rules.md` | Under 20 lines
+- Prod DB = Supabase "GutGuard Life Style"; `doctors` = prod schema, `sandbox` = QA mirror (shares partners)
 
-## 🛠️ Decisions & Progress
-- Added Origin badges (Direct vs Referred by Dr. [Name]) & "Where found" field
-- Added origin filter pills (All/Direct/Referred), metric counters, and smart search
+## 🛠️ Decisions & Architecture
+- Registrations start as Affiliate (Referral QR off); 1st paid sale auto-promotes to Lifestyle.
+- Admin upgrades Lifestyle -> Main Store (breakaway). Main Store has combined 1,500-pt rebate track.
 
 ## 📌 Pending Actions / Next Steps
-- [x] All checks passing (tsc + tests)
-
----
-*Note: Maintain this file under 20 lines. Keep active goals, key decisions, and next steps here so old context can be cleared.*
+- [ ] Apply `20261007`/`20261008` migrations, then deploy; run test-data cleanup after review

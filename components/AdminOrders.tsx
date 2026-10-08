@@ -22,7 +22,7 @@ const ORDER_STATUSES: ShopOrderStatus[] = [
 const PAYMENT_STATUSES: ShopPaymentStatus[] = ["pending", "review", "paid", "failed", "refunded"];
 
 /** Only what the referral column needs, so this does not depend on the admin doctor type. */
-type PartnerLike = { id: string; full_name: string; email: string };
+type PartnerLike = { id: string; full_name: string; email: string; store_type?: "affiliate" | "lifestyle" | "main" };
 
 export default function AdminOrders({ password, partners }: { password: string; partners: PartnerLike[] }) {
   const [orders, setOrders] = useState<ShopOrder[]>([]);
@@ -40,6 +40,10 @@ export default function AdminOrders({ password, partners }: { password: string; 
   );
   const partnerEmails = useMemo(
     () => new Map(partners.map((partner) => [partner.id, partner.email])),
+    [partners],
+  );
+  const partnerStoreTypes = useMemo(
+    () => new Map(partners.map((partner) => [partner.id, partner.store_type || "lifestyle"])),
     [partners],
   );
 
@@ -205,7 +209,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                     {formatStatus(order.status)}
                     <span>{formatStatus(order.payment_status)}</span>
                   </td>
-                  <td>{referralSource(order, partnerNames)}</td>
+                  <td>{referralSource(order, partnerNames, partnerStoreTypes)}</td>
                   <td>{formatPeso(order.total_amount)}</td>
                   <td>{formatAdminDate(order.created_at)}</td>
                   <td>
@@ -259,7 +263,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                   ["Paid via", selectedOrder.maya_fund_source ?? "--"],
                   ["Paid at", selectedOrder.paid_at ? formatAdminDate(selectedOrder.paid_at) : "--"],
                   ["Payment attempts", String(selectedOrder.payment_attempts ?? 0)],
-                  ["Came from", referralSource(selectedOrder, partnerNames)],
+                  ["Came from", referralSource(selectedOrder, partnerNames, partnerStoreTypes)],
                   ["Referral link", selectedOrder.referral_slug ?? "--"],
                 ]}
               />
@@ -392,16 +396,18 @@ function formatStatus(value: string) {
     .join(" ");
 }
 
-/**
- * Who the order came from: the partner whose shop link the customer used, or Direct.
- * A slug with no doctor id was recorded but not credited - almost always a self-referral -
- * so say so, because nobody should pay a commission on it.
- */
-function referralSource(order: ShopOrder, partnerNames: Map<string, string>) {
+function referralSource(
+  order: ShopOrder,
+  partnerNames: Map<string, string>,
+  partnerStoreTypes?: Map<string, "affiliate" | "lifestyle" | "main">,
+) {
   if (!order.referral_slug) return "Direct";
 
   const name = (order.referral_doctor_id ? partnerNames.get(order.referral_doctor_id) : "") || order.referral_slug;
-  return order.referral_doctor_id ? name : `${name} (not credited - self-referral)`;
+  const storeType = order.referral_doctor_id && partnerStoreTypes ? partnerStoreTypes.get(order.referral_doctor_id) : undefined;
+  const typeBadge = storeType === "main" ? " [🏢 Main]" : storeType === "affiliate" ? " [🌱 Affiliate]" : storeType === "lifestyle" ? " [🛍️ Lifestyle]" : "";
+
+  return order.referral_doctor_id ? `${name}${typeBadge}` : `${name} (not credited - self-referral)`;
 }
 
 function formatDeliveryAddress(order: ShopOrder) {

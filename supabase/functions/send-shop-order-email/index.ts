@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.106.2";
+import { serveWithCors } from "../_shared/cors.ts";
 
 const PROD_SITE_URL = (Deno.env.get("SHOP_SITE_URL") ?? "https://gutguard.ph").replace(/\/$/, "");
 const SANDBOX_SITE_URL = (Deno.env.get("SHOP_SANDBOX_SITE_URL") ?? PROD_SITE_URL).replace(/\/$/, "");
@@ -37,12 +38,16 @@ type ShopOrder = {
   created_at: string | null;
 };
 
-Deno.serve(async (req) => {
+serveWithCors(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
   try {
+    const isServiceRole = req.headers.get("Authorization") === `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`;
     const { orderId, kind = "saved", schema } = (await req.json()) as RequestPayload;
+    // The browser may only ask for the order-received email. The paid receipt is sent by the
+    // Maya webhook route with the service role.
+    if (kind !== "saved" && !isServiceRole) return jsonResponse({ error: "Forbidden" }, 403);
     const dbSchema = schema === "sandbox" || schema === "doctors" || schema === "public" ? schema : "doctors";
     if (!orderId) return jsonResponse({ error: "Missing orderId" }, 400);
 
@@ -72,6 +77,17 @@ Deno.serve(async (req) => {
       kind === "paid"
         ? `Payment confirmed for GutGuard order ${order.order_code}`
         : `We received your GutGuard order ${order.order_code}`;
+
+    // Send each kind once per order, so a leaked order id cannot be used to mail-bomb the buyer.
+    const { data: alreadySent } = await supabase
+      .schema(dbSchema)
+      .from("shop_order_email_sends")
+      .select("order_id")
+      .eq("order_id", orderId)
+      .eq("subject", subject)
+      .eq("status", "sent")
+      .limit(1);
+    if (alreadySent?.length) return jsonResponse({ sent: false, duplicate: true });
 
     if (!isValidEmail(email)) {
       await recordSendAttempt(supabase, {

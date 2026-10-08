@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { getPartnerReferralEmailSettings, savePartnerReferralEmailSettings, sendPartnerReferralEmailTest, type RegistrationEmailSettings } from "@/lib/api";
+import { adminLogin, getPartnerReferralEmailSettings, savePartnerReferralEmailSettings, sendPartnerReferralEmailTest, type RegistrationEmailSettings } from "@/lib/api";
 
 const empty: RegistrationEmailSettings = { enabled: true, subject: "", replyTo: "", bodyText: "", html: "", attachments: [], updatedAt: "", fromLabel: "" };
 const TOKENS = ["{{partner_name}}", "{{new_partner_name}}", "{{new_partner_specialty}}", "{{new_partner_location}}", "{{registered_at}}", "{{dashboard_url}}"];
@@ -14,7 +14,7 @@ export default function ReferralEmailAdminPage() {
   const [message, setMessage] = useState("");
   const [testEmail, setTestEmail] = useState("");
 
-  async function unlock(event: FormEvent) { event.preventDefault(); setBusy(true); setMessage(""); try { setSettings(await getPartnerReferralEmailSettings(password)); setUnlocked(true); } catch { setMessage("Unable to load settings. Check the admin password."); } finally { setBusy(false); } }
+  async function unlock(event: FormEvent) { event.preventDefault(); setBusy(true); setMessage(""); try { await adminLogin(password); setSettings(await getPartnerReferralEmailSettings(password)); setUnlocked(true); } catch { setMessage("Unable to load settings. Check the admin password."); } finally { setBusy(false); } }
   async function save() { setBusy(true); setMessage(""); try { setSettings(await savePartnerReferralEmailSettings(password, settings)); setMessage("Referral notification template saved."); } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to save settings."); } finally { setBusy(false); } }
   async function sendTest() { setBusy(true); setMessage(""); try { const saved = await savePartnerReferralEmailSettings(password, settings); setSettings(saved); await sendPartnerReferralEmailTest(password, testEmail); setMessage(`Test sent to ${testEmail}.`); } catch (error) { setMessage(error instanceof Error ? error.message : "Unable to send test."); } finally { setBusy(false); } }
 

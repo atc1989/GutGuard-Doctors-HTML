@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
+let loginLimiter: Ratelimit | null = null;
+
 // Lazily initialised so a missing Upstash env (local dev, CI) doesn't crash the build.
 let ipLimiter: Ratelimit | null = null;
 let emailLimiter: Ratelimit | null = null;
@@ -35,6 +37,19 @@ function getLimiters(): { ip: Ratelimit | null; em: Ratelimit | null } {
   return { ip: ipLimiter, em: emailLimiter };
 }
 
+// 8 admin login attempts per IP per 15 minutes. The admin password also unlocks partner
+// impersonation, so unthrottled guessing is the highest-value target on the site.
+function getLoginLimiter(): Ratelimit | null {
+  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) return null;
+  loginLimiter ??= new Ratelimit({
+    redis: Redis.fromEnv(),
+    limiter: Ratelimit.slidingWindow(8, "15 m"),
+    prefix: "rl:admin-login:ip",
+    analytics: false,
+  });
+  return loginLimiter;
+}
+
 export async function proxy(req: NextRequest) {
   // 1. Canonical Host Redirect: Redirect any *.vercel.app request to custom domain
   const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "").toLowerCase();
@@ -42,6 +57,21 @@ export async function proxy(req: NextRequest) {
     const targetOrigin = (process.env.NEXT_PUBLIC_SITE_URL || "https://partners.gutguard.ph").replace(/\/$/, "");
     const targetUrl = new URL(req.nextUrl.pathname + req.nextUrl.search, targetOrigin);
     return NextResponse.redirect(targetUrl, 308);
+  }
+
+  if (req.nextUrl.pathname === "/api/admin/login" && req.method === "POST") {
+    const limiter = getLoginLimiter();
+    // ponytail: fails open without Redis (local dev); production must set the UPSTASH_* vars.
+    if (!limiter) return NextResponse.next();
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "127.0.0.1";
+    const result = await limiter.limit(clientIp);
+    if (!result.success) {
+      return NextResponse.json(
+        { error: "Too many login attempts. Try again in a few minutes." },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((result.reset - Date.now()) / 1000)) } },
+      );
+    }
+    return NextResponse.next();
   }
 
   // Only gate the OTP proxy route; everything else passes through.

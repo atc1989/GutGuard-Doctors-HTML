@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.106.2";
+import { serveWithCors } from "../_shared/cors.ts";
 
 const BUCKET = "registration-email-assets";
 
@@ -34,7 +35,7 @@ type AttachmentRecord = {
   path: string;
 };
 
-Deno.serve(async (req) => {
+serveWithCors(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -73,6 +74,15 @@ Deno.serve(async (req) => {
     }
 
     const doctor = registration as DoctorRegistration;
+
+    // Once per registration: the id is the only input, so repeats must not re-mail the doctor.
+    const { data: alreadySent } = await supabase
+      .from("registration_email_sends")
+      .select("registration_id")
+      .eq("registration_id", registrationId)
+      .eq("status", "sent")
+      .limit(1);
+    if (alreadySent?.length) return jsonResponse({ sent: false, duplicate: true });
     const email = (doctor.email ?? "").trim().toLowerCase();
     if (!isValidEmail(email)) {
       await recordSendAttempt(supabase, {

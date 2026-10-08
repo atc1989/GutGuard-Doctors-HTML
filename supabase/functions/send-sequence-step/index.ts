@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.106.2";
+import { serveWithCors } from "../_shared/cors.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -43,12 +44,18 @@ type Enrollment = {
   status: string;
 };
 
-Deno.serve(async (req) => {
+serveWithCors(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
   try {
-    const { doctorId, stepNumber, onlyIfUnenrolled } = (await req.json()) as SendSequenceStepRequest;
+    const isServiceRole = req.headers.get("Authorization") === `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`;
+    const body = (await req.json()) as SendSequenceStepRequest;
+    const { doctorId } = body;
+    // Browser callers can only enroll a new doctor at step 1. Any other step, or a resend,
+    // comes from the admin server route with the service role.
+    const stepNumber = isServiceRole ? body.stepNumber : 1;
+    const onlyIfUnenrolled = isServiceRole ? body.onlyIfUnenrolled : true;
     if (!doctorId) return jsonResponse({ error: "Missing doctorId" }, 400);
 
     const resendApiKey = Deno.env.get("RESEND_API_KEY");

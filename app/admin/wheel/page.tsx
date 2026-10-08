@@ -8,6 +8,7 @@ import { DownloadIcon } from "@/components/Icons";
 import { NAME_PREFIXES } from "@/lib/constants";
 import { partnerLinkKey } from "@/lib/referral";
 import { formatPrefixedName } from "@/lib/validation";
+import { adminUpgradeToMainStore, adminToggleReferralQr, adminPromotePartner } from "@/lib/api";
 
 type AdminWheelPrize = {
   id?: string;
@@ -38,6 +39,11 @@ type AdminDoctorRegistration = {
   referrer_name?: string | null;
   referrer_prefix?: string | null;
   referrer_slug?: string | null;
+  store_type?: "affiliate" | "lifestyle" | "main";
+  referral_qr_enabled?: boolean;
+  main_store_id?: string | null;
+  promoted_at?: string | null;
+  promoted_by?: string | null;
   created_at: string;
   prize_label?: string | null;
   prize_claimed_at?: string | null;
@@ -314,6 +320,12 @@ export default function AdminWheelPage() {
   const [doctors, setDoctors] = useState<AdminDoctorRegistration[]>([]);
   const [doctorSearch, setDoctorSearch] = useState("");
   const [doctorOriginFilter, setDoctorOriginFilter] = useState<"all" | "direct" | "referred">("all");
+  const [doctorStoreTypeFilter, setDoctorStoreTypeFilter] = useState<string>("all");
+  const [upgradingDoctor, setUpgradingDoctor] = useState<AdminDoctorRegistration | null>(null);
+  const [upgradeNote, setUpgradeNote] = useState("");
+  const [isUpgrading, setIsUpgrading] = useState(false);
+  const [togglingQrDoctorId, setTogglingQrDoctorId] = useState<string | null>(null);
+  const [promotingDoctorId, setPromotingDoctorId] = useState<string | null>(null);
   const [doctorPage, setDoctorPage] = useState(1);
   const [doctorPageSize, setDoctorPageSize] = useState(10);
   const [doctorQrModes, setDoctorQrModes] = useState<Record<string, DoctorQrMode>>({});
@@ -398,18 +410,17 @@ export default function AdminWheelPage() {
     return { total, direct, referred };
   }, [doctors]);
   const filteredDoctors = useMemo(() => {
-    let list = doctors;
-    if (doctorOriginFilter === "direct") {
-      list = list.filter((doctor) => !doctor.referred_by_partner_id && !doctor.referrer_name);
-    } else if (doctorOriginFilter === "referred") {
-      list = list.filter((doctor) => Boolean(doctor.referred_by_partner_id || doctor.referrer_name));
-    }
-
     const query = doctorSearch.trim().toLowerCase();
-    if (!query) return list;
 
-    return list.filter((doctor) => {
+    return doctors.filter((doctor) => {
       const isReferred = Boolean(doctor.referred_by_partner_id || doctor.referrer_name);
+      if (doctorOriginFilter === "direct" && isReferred) return false;
+      if (doctorOriginFilter === "referred" && !isReferred) return false;
+      if (doctorStoreTypeFilter !== "all" && (doctor.store_type || "affiliate") !== doctorStoreTypeFilter) {
+        return false;
+      }
+      if (!query) return true;
+
       return [
         doctor.full_name,
         doctor.name_prefix,
@@ -426,12 +437,13 @@ export default function AdminWheelPage() {
         doctor.referrer_slug ?? "",
         isReferred ? "referred" : "direct",
         doctor.prize_label ?? "",
+        doctor.store_type ?? "",
       ]
         .join(" ")
         .toLowerCase()
         .includes(query);
     });
-  }, [doctorSearch, doctors, doctorOriginFilter]);
+  }, [doctorSearch, doctorOriginFilter, doctorStoreTypeFilter, doctors]);
   const totalDoctorPages = Math.max(1, Math.ceil(filteredDoctors.length / doctorPageSize));
   const visibleDoctors = filteredDoctors.slice(
     (doctorPage - 1) * doctorPageSize,
@@ -1163,6 +1175,62 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
     }
   }
 
+  async function handleToggleQr(doctor: AdminDoctorRegistration) {
+    const nextState = !doctor.referral_qr_enabled;
+    setTogglingQrDoctorId(doctor.id);
+    setError(null);
+    setNotice(null);
+    try {
+      await adminToggleReferralQr(doctor.id, nextState);
+      setDoctors((current) =>
+        current.map((d) => (d.id === doctor.id ? { ...d, referral_qr_enabled: nextState } : d)),
+      );
+      setNotice(`Referral QR ${nextState ? "enabled" : "disabled"} for ${doctor.full_name}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to toggle Referral QR.");
+    } finally {
+      setTogglingQrDoctorId(null);
+    }
+  }
+
+  async function handlePromote(doctor: AdminDoctorRegistration) {
+    if (!window.confirm(`Are you sure you want to promote ${doctor.full_name} from Affiliate to Lifestyle Store?`)) return;
+    setPromotingDoctorId(doctor.id);
+    setError(null);
+    setNotice(null);
+    try {
+      await adminPromotePartner(doctor.id, "Admin manual promotion");
+      setDoctors((current) =>
+        current.map((d) => (d.id === doctor.id ? { ...d, store_type: "lifestyle", referral_qr_enabled: true } : d)),
+      );
+      setNotice(`Promoted ${doctor.full_name} to Lifestyle Store!`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to promote partner.");
+    } finally {
+      setPromotingDoctorId(null);
+    }
+  }
+
+  async function handleConfirmUpgradeToMain() {
+    if (!upgradingDoctor) return;
+    setIsUpgrading(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await adminUpgradeToMainStore(upgradingDoctor.id, upgradeNote);
+      setDoctors((current) =>
+        current.map((d) => (d.id === upgradingDoctor.id ? { ...d, store_type: "main", main_store_id: null, referral_qr_enabled: true } : d)),
+      );
+      setNotice(`Upgraded ${upgradingDoctor.full_name} to Main Store! Transferred ${res.descendants_moved} descendant stores.`);
+      setUpgradingDoctor(null);
+      setUpgradeNote("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to upgrade store to Main Store.");
+    } finally {
+      setIsUpgrading(false);
+    }
+  }
+
   function downloadDoctorQr(doctor: AdminDoctorRegistration, qrUrl: string, mode: DoctorQrMode) {
     setError(null);
     setNotice(null);
@@ -1767,6 +1835,23 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                   Referred ({doctorMetrics.referred})
                 </button>
               </div>
+              <label htmlFor="doctor-store-filter">
+                Store Type
+                <select
+                  id="doctor-store-filter"
+                  value={doctorStoreTypeFilter}
+                  onChange={(event) => {
+                    setDoctorStoreTypeFilter(event.target.value);
+                    setDoctorPage(1);
+                  }}
+                  style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
+                >
+                  <option value="all">All Store Types</option>
+                  <option value="main">🏢 Main Stores</option>
+                  <option value="lifestyle">🛍️ Lifestyle Stores</option>
+                  <option value="affiliate">🌱 Affiliate Stores</option>
+                </select>
+              </label>
               <label htmlFor="doctor-search">
                 Search
                 <input
@@ -1797,6 +1882,28 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                     <div className="admin-doctor-primary">
                       <strong>{formatPrefixedName(doctor.name_prefix, doctor.full_name) || "Unnamed doctor"}</strong>
                       <span>@{doctor.tiktok_username || "no-handle"}</span>
+
+                      <div style={{ margin: "4px 0 8px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                        <span style={{
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
+                          padding: "2px 8px",
+                          borderRadius: "4px",
+                          background: doctor.store_type === "main" ? "#fef3c7" : doctor.store_type === "affiliate" ? "#ecfdf5" : "#eff6ff",
+                          color: doctor.store_type === "main" ? "#92400e" : doctor.store_type === "affiliate" ? "#065f46" : "#1e40af",
+                          border: `1px solid ${doctor.store_type === "main" ? "#fde047" : doctor.store_type === "affiliate" ? "#a7f3d0" : "#bfdbfe"}`
+                        }}>
+                          {doctor.store_type === "main" ? "🏢 Main Store" : doctor.store_type === "affiliate" ? "🌱 Affiliate Store" : "🛍️ Lifestyle Store"}
+                        </span>
+                        {doctor.store_type === "affiliate" && (
+                          <span style={{ fontSize: "11px", color: doctor.referral_qr_enabled ? "#16a34a" : "#64748b" }}>
+                            Referral QR: <strong>{doctor.referral_qr_enabled ? "Active" : "Locked"}</strong>
+                          </span>
+                        )}
+                      </div>
+
                       <div
                         className="admin-doctor-qr-toggle"
                         role="group"
@@ -1937,6 +2044,37 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                       >
                         {impersonatingId === doctor.id ? "Opening…" : "Log in as"}
                       </button>
+
+                      {(!doctor.store_type || doctor.store_type === "lifestyle") && (
+                        <button
+                          type="button"
+                          style={{ background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}
+                          onClick={() => setUpgradingDoctor(doctor)}
+                          title="Upgrade this Lifestyle Store to an independent Main Store"
+                        >
+                          ⬆ Upgrade to Main
+                        </button>
+                      )}
+
+                      {doctor.store_type === "affiliate" && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleQr(doctor)}
+                            disabled={togglingQrDoctorId === doctor.id}
+                          >
+                            {togglingQrDoctorId === doctor.id ? "Updating…" : doctor.referral_qr_enabled ? "Disable QR" : "Enable QR"}
+                          </button>
+                          <button
+                            type="button"
+                            style={{ background: "#f0fdf4", color: "#166534", border: "1px solid #bbf7d0" }}
+                            onClick={() => handlePromote(doctor)}
+                            disabled={promotingDoctorId === doctor.id}
+                          >
+                            {promotingDoctorId === doctor.id ? "Promoting…" : "Promote to Lifestyle"}
+                          </button>
+                        </>
+                      )}
                     </div>
                   </article>
                 );
@@ -1947,6 +2085,55 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
               </div>
             )}
           </div>
+
+          {upgradingDoctor && (
+            <div className="admin-wheel-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="upgrade-main-title" style={{
+              position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
+              background: "rgba(0, 0, 0, 0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999
+            }}>
+              <div style={{ background: "#ffffff", padding: "24px", borderRadius: "12px", maxWidth: "480px", width: "90%", boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#b45309", marginBottom: "8px" }}>
+                  <span style={{ fontSize: "20px" }}>⚠️</span>
+                  <h3 id="upgrade-main-title" style={{ margin: 0, fontSize: "18px", fontWeight: 700 }}>
+                    Upgrade to Main Store (Breakaway)
+                  </h3>
+                </div>
+                <p style={{ fontSize: "14px", lineHeight: 1.5, color: "#334155", margin: "8px 0" }}>
+                  You are about to upgrade <strong>{upgradingDoctor.full_name}</strong> to an independent <strong>Main Store</strong>.
+                </p>
+                <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "8px", padding: "12px", fontSize: "13px", color: "#92400e", marginBottom: "16px" }}>
+                  <p style={{ margin: "0 0 6px", fontWeight: 700 }}>Breakaway Impact:</p>
+                  <ul style={{ margin: 0, paddingLeft: "18px" }}>
+                    <li>Severs the referral link to their former upline Main Store.</li>
+                    <li>All downstream descendant stores in their referral tree transfer under this new Main Store.</li>
+                    <li>Former upline Main Store completely loses visibility to this subtree.</li>
+                  </ul>
+                </div>
+                <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "4px" }}>
+                  Admin Note (Optional)
+                  <textarea
+                    value={upgradeNote}
+                    onChange={(e) => setUpgradeNote(e.target.value)}
+                    placeholder="Reason for upgrading to Main Store..."
+                    style={{ width: "100%", height: "60px", padding: "8px", marginTop: "4px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px", boxSizing: "border-box" }}
+                  />
+                </label>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "16px" }}>
+                  <button type="button" onClick={() => setUpgradingDoctor(null)} disabled={isUpgrading} style={{ padding: "8px 16px", borderRadius: "6px", border: "1px solid #cbd5e1", background: "#f8fafc" }}>
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    style={{ background: "#d97706", color: "#ffffff", fontWeight: 700, border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer" }}
+                    onClick={handleConfirmUpgradeToMain}
+                    disabled={isUpgrading}
+                  >
+                    {isUpgrading ? "Upgrading…" : "Confirm Upgrade & Breakaway"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="admin-pagination">
             <p>

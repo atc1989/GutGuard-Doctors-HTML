@@ -1,3 +1,4 @@
+import { adminErrorMessage } from "@/lib/admin-error";
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
 import { serverAdminListTestimonials, serverAdminReviewTestimonial } from "@/lib/admin-server-api";
@@ -17,7 +18,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ stories });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to load testimonials." },
+      { error: adminErrorMessage(error, "Failed to load testimonials.") },
       { status: 500 },
     );
   }
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ story: saved });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to review testimonial." },
+      { error: adminErrorMessage(error, "Failed to review testimonial.") },
       { status: 500 },
     );
   }

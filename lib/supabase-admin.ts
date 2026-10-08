@@ -19,8 +19,8 @@ export function getSupabaseAdmin() {
 }
 
 /**
- * Service-role clients for the /api/admin routes. The admin_* RPCs are revoked from anon,
- * so only these can reach them. Server-only, same warning as above.
+ * Service-role clients for the /api/admin routes. The admin_* RPCs and edge functions are
+ * revoked from anon, so only these can reach them. Server-only, same warning as above.
  */
 export const supabaseAdmin = isSupabaseAdminConfigured
   ? createClient(url!, serviceRoleKey!, { auth: { persistSession: false }, db: { schema: "doctors" } })
