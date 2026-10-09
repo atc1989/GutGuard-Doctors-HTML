@@ -1,6 +1,10 @@
+import { adminErrorMessage } from "@/lib/admin-error";
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
 import { serverAdminListTestimonials, serverAdminReviewTestimonial } from "@/lib/admin-server-api";
+import type { TestimonialStatus } from "@/lib/testimonials";
+
+const STATUSES: TestimonialStatus[] = ["pending", "approved", "rejected"];
 
 export async function GET(req: NextRequest) {
   const adminPassword = await getAdminPasswordFromSession();
@@ -12,12 +16,12 @@ export async function GET(req: NextRequest) {
   try {
     const stories = await serverAdminListTestimonials(
       adminPassword,
-      status ? (status as any) : undefined,
+      STATUSES.find((value) => value === status),
     );
     return NextResponse.json({ stories });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to load testimonials." },
+      { error: adminErrorMessage(error, "Failed to load testimonials.") },
       { status: 500 },
     );
   }
@@ -35,7 +39,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ story: saved });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to review testimonial." },
+      { error: adminErrorMessage(error, "Failed to review testimonial.") },
       { status: 500 },
     );
   }

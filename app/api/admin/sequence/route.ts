@@ -1,3 +1,4 @@
+import { adminErrorMessage } from "@/lib/admin-error";
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
 import {
@@ -5,6 +6,7 @@ import {
   serverGetSequenceProgress,
   serverGetSequenceSteps,
   serverReorderSequenceSteps,
+  serverResendSequenceStep,
   serverUpsertSequenceStep,
 } from "@/lib/admin-server-api";
 
@@ -25,7 +27,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ steps });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to load sequence." },
+      { error: adminErrorMessage(error, "Failed to load sequence.") },
       { status: 500 },
     );
   }
@@ -51,10 +53,14 @@ export async function POST(req: NextRequest) {
       await serverReorderSequenceSteps(adminPassword, body.stepIds);
       return NextResponse.json({ success: true });
     }
+    if (body.action === "resend") {
+      await serverResendSequenceStep(String(body.doctorId), Number(body.stepNumber));
+      return NextResponse.json({ success: true });
+    }
     return NextResponse.json({ error: "Invalid action." }, { status: 400 });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Sequence operation failed." },
+      { error: adminErrorMessage(error, "Sequence operation failed.") },
       { status: 500 },
     );
   }

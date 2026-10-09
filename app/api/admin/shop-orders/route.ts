@@ -1,3 +1,4 @@
+import { adminErrorMessage } from "@/lib/admin-error";
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
 import {
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ orders });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to load shop orders." },
+      { error: adminErrorMessage(error, "Failed to load shop orders.") },
       { status: 500 },
     );
   }
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ order: saved });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to update shop order." },
+      { error: adminErrorMessage(error, "Failed to update shop order.") },
       { status: 500 },
     );
   }

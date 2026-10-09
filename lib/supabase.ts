@@ -21,10 +21,15 @@ export const supabase = isSupabaseConfigured
  * Shop client, scoped to SHOP_SCHEMA. Deliberately separate from `supabase` above:
  * scoping the default client would send the doctor and wheel RPCs to the sandbox
  * schema too, where they do not exist.
+ *
+ * It borrows the partner's session from `supabase` on every request instead of holding a
+ * copy: a copied session refreshes on its own and replays a refresh token the main client
+ * already rotated, and GoTrue then revokes the whole session (partners logged out ~1h in).
+ * No session -> null -> the anon key, so guest shop calls are unchanged.
  */
 export const supabaseShop = isSupabaseConfigured
   ? createClient(supabaseUrl!, supabaseAnonKey!, {
       db: { schema: SHOP_SCHEMA },
-      auth: { persistSession: false, autoRefreshToken: false, storageKey: "gg-shop" },
+      accessToken: async () => (await supabase!.auth.getSession()).data.session?.access_token ?? null,
     })
   : null;

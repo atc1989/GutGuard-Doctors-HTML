@@ -37,6 +37,8 @@ export type AdminWheelPrize = {
   claim_count?: number;
 };
 
+export type StoreType = "affiliate" | "lifestyle" | "main";
+
 export type AdminDoctorRegistration = {
   id: string;
   full_name: string;
@@ -53,6 +55,11 @@ export type AdminDoctorRegistration = {
   referrer_name?: string | null;
   referrer_prefix?: string | null;
   referrer_slug?: string | null;
+  store_type?: StoreType;
+  referral_qr_enabled?: boolean;
+  main_store_id?: string | null;
+  promoted_at?: string | null;
+  promoted_by?: string | null;
   created_at: string;
   prize_label?: string | null;
   prize_claimed_at?: string | null;
@@ -268,6 +275,8 @@ export type ReferredPartner = {
   routing_slug: string;
   specialty: string;
   practice_location: string;
+  store_type?: StoreType;
+  referral_qr_enabled?: boolean;
   joined_at: string;
   orders: number;
   paid_order_value: number;
@@ -286,7 +295,17 @@ export type PartnerDashboardQuery = {
 };
 
 export type PartnerDashboard = {
-  partner: { id: string; full_name: string; routing_slug: string; joined_at: string };
+  partner: {
+    id: string;
+    full_name: string;
+    routing_slug: string;
+    store_type?: StoreType;
+    referral_qr_enabled?: boolean;
+    main_store_id?: string | null;
+    promoted_at?: string | null;
+    promoted_by?: string | null;
+    joined_at: string;
+  };
   clicks: { total: number; last_30_days: number };
   /** paid_amount is gross order value, not commission. */
   totals: {
@@ -316,9 +335,86 @@ export type PartnerDashboard = {
     status: string;
     created_at: string;
   }>;
+  point_sources?: Array<{
+    order_code: string;
+    points: number;
+    depth: number;
+    source_partner: string;
+    source_partner_slug: string;
+    created_at: string;
+  }>;
   orders: PartnerOrder[];
   orders_page: { total: number; limit: number; offset: number; has_more: boolean };
   referred_partners: ReferredPartner[];
+};
+
+export type MainStoreSummary = {
+  id: string;
+  full_name: string;
+  routing_slug: string;
+  email: string;
+  store_type: StoreType;
+  referral_qr_enabled: boolean;
+};
+
+export type MainStoreDashboard = {
+  main_store: MainStoreSummary;
+  lifestyle_count: number;
+  affiliate_count: number;
+  total_orders: number;
+  total_revenue: number;
+  combined_points: number;
+  own_points: number;
+  passup_points: number;
+};
+
+export type MainStoreOrder = {
+  order_code: string;
+  created_at: string;
+  status: ShopOrderStatus;
+  payment_status: ShopPaymentStatus;
+  payment_method?: string;
+  maya_reference?: string | null;
+  maya_payment_status?: string | null;
+  maya_fund_source?: string | null;
+  paid_at?: string | null;
+  total_amount: number;
+  subtotal?: number;
+  shipping_fee?: number;
+  shipping_region?: string | null;
+  buyer_name: string;
+  email?: string;
+  mobile?: string;
+  address?: string;
+  city?: string;
+  province?: string;
+  barangay?: string;
+  zip?: string;
+  items?: Array<{ id: string; name: string; caps: number; qty: number; price: number }>;
+  store_id: string;
+  store_name: string;
+  store_type: StoreType;
+  store_slug: string;
+};
+
+export type MainStoreChildStore = {
+  id: string;
+  full_name: string;
+  store_type: StoreType;
+  routing_slug: string;
+  specialty: string;
+  practice_location: string;
+  created_at: string;
+  referral_qr_enabled: boolean;
+  orders_count: number;
+  revenue: number;
+  points: number;
+};
+
+export type MainStoreReports = {
+  total_orders: number;
+  orders: MainStoreOrder[];
+  stores: MainStoreChildStore[];
 };
 
 export type PartnerInvitation = {
@@ -979,11 +1075,6 @@ export async function verifyPartnerOtp(email: string, token: string): Promise<vo
   });
 
   if (error) throw error;
-
-  // supabaseShop is a second createClient (see lib/supabase.ts) and was built before this
-  // session existed, so it is still anonymous in this tab until it is handed the session.
-  // Without this the first dashboard read fails and only starts working after a reload.
-  if (data.session) await supabaseShop.auth.setSession(data.session);
 }
 
 export async function signOutPartner(): Promise<void> {
@@ -995,11 +1086,9 @@ export async function signOutPartner(): Promise<void> {
 export async function hasPartnerSession(): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase || !supabaseShop) return false;
 
+  // supabaseShop reads this same session per request (see lib/supabase.ts), so nothing to copy.
   const { data } = await supabase.auth.getSession();
-  if (!data.session) return false;
-
-  await supabaseShop.auth.setSession(data.session);
-  return true;
+  return Boolean(data.session);
 }
 
 export async function getPartnerAuthEmail(): Promise<string> {
@@ -1036,6 +1125,11 @@ export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Pr
       id: String(partner.id ?? ""),
       full_name: String(partner.full_name ?? ""),
       routing_slug: String(partner.routing_slug ?? ""),
+      store_type: (partner.store_type ?? "affiliate") as StoreType,
+      referral_qr_enabled: Boolean(partner.referral_qr_enabled ?? false),
+      main_store_id: partner.main_store_id ? String(partner.main_store_id) : null,
+      promoted_at: partner.promoted_at ? String(partner.promoted_at) : null,
+      promoted_by: partner.promoted_by ? String(partner.promoted_by) : null,
       joined_at: String(partner.joined_at ?? ""),
     },
     clicks: {
@@ -1072,6 +1166,17 @@ export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Pr
         created_at: String(rebateRow.created_at ?? ""),
       };
     }),
+    point_sources: (Array.isArray(row.point_sources) ? row.point_sources : []).map((entry) => {
+      const psRow = (entry ?? {}) as Record<string, unknown>;
+      return {
+        order_code: String(psRow.order_code ?? ""),
+        points: Number(psRow.points ?? 0),
+        depth: Number(psRow.depth ?? 0),
+        source_partner: String(psRow.source_partner ?? ""),
+        source_partner_slug: String(psRow.source_partner_slug ?? ""),
+        created_at: String(psRow.created_at ?? ""),
+      };
+    }),
     orders: (Array.isArray(row.orders) ? row.orders : []).map(normalizePartnerOrder),
     orders_page: {
       total: Number(ordersPage.total ?? 0),
@@ -1086,12 +1191,161 @@ export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Pr
         routing_slug: String(partnerRow.routing_slug ?? ""),
         specialty: String(partnerRow.specialty ?? ""),
         practice_location: String(partnerRow.practice_location ?? ""),
+        store_type: (partnerRow.store_type ?? "affiliate") as StoreType,
+        referral_qr_enabled: Boolean(partnerRow.referral_qr_enabled ?? false),
         joined_at: String(partnerRow.joined_at ?? ""),
         orders: Number(partnerRow.orders ?? 0),
         paid_order_value: Number(partnerRow.paid_order_value ?? 0),
       };
     }),
   };
+}
+
+export async function getMainStoreDashboard(): Promise<MainStoreDashboard> {
+  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabaseShop.rpc("get_main_store_dashboard");
+  if (error) throw error;
+
+  const row = (data ?? {}) as Record<string, unknown>;
+  const mainStore = (row.main_store ?? {}) as Record<string, unknown>;
+
+  return {
+    main_store: {
+      id: String(mainStore.id ?? ""),
+      full_name: String(mainStore.full_name ?? ""),
+      routing_slug: String(mainStore.routing_slug ?? ""),
+      email: String(mainStore.email ?? ""),
+      store_type: (mainStore.store_type ?? "main") as StoreType,
+      referral_qr_enabled: Boolean(mainStore.referral_qr_enabled ?? true),
+    },
+    lifestyle_count: Number(row.lifestyle_count ?? 0),
+    affiliate_count: Number(row.affiliate_count ?? 0),
+    total_orders: Number(row.total_orders ?? 0),
+    total_revenue: Number(row.total_revenue ?? 0),
+    combined_points: Number(row.combined_points ?? 0),
+    own_points: Number(row.own_points ?? 0),
+    passup_points: Number(row.passup_points ?? 0),
+  };
+}
+
+export async function getMainStoreReports(query: {
+  scope?: string;
+  storeId?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+  dateFrom?: string;
+  dateTo?: string;
+  sort?: "newest" | "oldest";
+} = {}): Promise<MainStoreReports> {
+  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabaseShop.rpc("get_main_store_reports", {
+    p_scope: query.scope ?? "all",
+    p_store_id: query.storeId || null,
+    p_status: query.status || null,
+    p_limit: query.limit ?? DEFAULT_PARTNER_ORDER_PAGE_SIZE,
+    p_offset: query.offset ?? 0,
+    p_date_from: query.dateFrom || null,
+    p_date_to: query.dateTo || null,
+    p_sort: query.sort ?? "newest",
+  });
+  if (error) throw error;
+
+  const row = (data ?? {}) as Record<string, unknown>;
+  const orders = Array.isArray(row.orders) ? row.orders : [];
+  const stores = Array.isArray(row.stores) ? row.stores : [];
+
+  return {
+    total_orders: Number(row.total_orders ?? 0),
+    orders: orders.map((o) => {
+      const order = (o ?? {}) as Record<string, unknown>;
+      return {
+        order_code: String(order.order_code ?? ""),
+        created_at: String(order.created_at ?? ""),
+        status: (order.status ?? "pending_payment") as ShopOrderStatus,
+        payment_status: (order.payment_status ?? "pending") as ShopPaymentStatus,
+        payment_method: String(order.payment_method ?? "maya"),
+        maya_reference: typeof order.maya_reference === "string" ? order.maya_reference : null,
+        maya_payment_status: typeof order.maya_payment_status === "string" ? order.maya_payment_status : null,
+        maya_fund_source: typeof order.maya_fund_source === "string" ? order.maya_fund_source : null,
+        paid_at: typeof order.paid_at === "string" ? order.paid_at : null,
+        total_amount: Number(order.total_amount ?? 0),
+        subtotal: Number(order.subtotal ?? 0),
+        shipping_fee: Number(order.shipping_fee ?? 0),
+        shipping_region: typeof order.shipping_region === "string" ? order.shipping_region : null,
+        buyer_name: String(order.buyer_name ?? ""),
+        email: String(order.email ?? ""),
+        mobile: String(order.mobile ?? ""),
+        address: String(order.address ?? ""),
+        city: String(order.city ?? ""),
+        province: String(order.province ?? ""),
+        barangay: String(order.barangay ?? ""),
+        zip: String(order.zip ?? ""),
+        items: Array.isArray(order.items) ? (order.items as ShopOrderItem[]) : [],
+        store_id: String(order.store_id ?? ""),
+        store_name: String(order.store_name ?? ""),
+        store_type: (order.store_type ?? "lifestyle") as StoreType,
+        store_slug: String(order.store_slug ?? ""),
+      };
+    }),
+    stores: stores.map((s) => {
+      const store = (s ?? {}) as Record<string, unknown>;
+      return {
+        id: String(store.id ?? ""),
+        full_name: String(store.full_name ?? ""),
+        store_type: (store.store_type ?? "lifestyle") as StoreType,
+        routing_slug: String(store.routing_slug ?? ""),
+        specialty: String(store.specialty ?? ""),
+        practice_location: String(store.practice_location ?? ""),
+        created_at: String(store.created_at ?? ""),
+        referral_qr_enabled: Boolean(store.referral_qr_enabled ?? false),
+        orders_count: Number(store.orders_count ?? 0),
+        revenue: Number(store.revenue ?? 0),
+        points: Number(store.points ?? 0),
+      };
+    }),
+  };
+}
+
+export async function adminUpgradeToMainStore(partnerId: string, note?: string): Promise<{ success: boolean; descendants_moved: number }> {
+  const res = await fetch("/api/admin/doctors/upgrade-main", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ partnerId, note }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to upgrade partner to Main Store.");
+  }
+  return res.json();
+}
+
+export async function adminToggleReferralQr(partnerId: string, enabled: boolean): Promise<{ success: boolean; referral_qr_enabled: boolean }> {
+  const res = await fetch("/api/admin/doctors/toggle-qr", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ partnerId, enabled }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to toggle Referral QR.");
+  }
+  return res.json();
+}
+
+export async function adminPromotePartner(partnerId: string, note?: string): Promise<{ success: boolean; store_type: StoreType }> {
+  const res = await fetch("/api/admin/doctors/promote", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ partnerId, note }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to promote partner to Lifestyle.");
+  }
+  return res.json();
 }
 
 function normalizePartnerOrder(entry: unknown): PartnerOrder {
@@ -1337,6 +1591,7 @@ export async function enrollDoctorInSequence(doctorId: string): Promise<Sequence
     body: { doctorId, stepNumber: 1 },
   });
   if (error) throw error;
+  if (data?.skipped) return data;
   if (!data?.sent) throw new Error(data?.reason || "Drip Campaign Step 1 was not sent.");
   return data;
 }
@@ -1353,12 +1608,14 @@ export async function enrollWelcomeIfNeeded(doctorId: string): Promise<void> {
 }
 
 export async function resendSequenceStep(doctorId: string, stepNumber: number): Promise<SequenceStepSendResponse> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-  const { data, error } = await supabase.functions.invoke<SequenceStepSendResponse>("send-sequence-step", {
-    body: { doctorId, stepNumber },
+  const res = await fetch("/api/admin/sequence", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "resend", doctorId, stepNumber }),
   });
-  if (error) throw error;
-  return data ?? { sent: true };
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Failed to resend step.");
+  return { sent: true };
 }
 
 // ─── Registration Email Settings ───────────────────────────────────────────
@@ -1406,31 +1663,27 @@ export async function sendRegistrationEmailTest(
   return (await res.json()) as RegistrationEmailTestResponse;
 }
 
-export async function getPartnerReferralEmailSettings(adminPassword: string): Promise<RegistrationEmailSettings> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
-    body: { action: "get", templateKind: "partner-referral", adminPassword },
+async function referralEmailRequest(body: Record<string, unknown>) {
+  const res = await fetch("/api/admin/registration-email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...body, templateKind: "partner-referral" }),
   });
-  if (error) throw error;
-  return (data as RegistrationEmailSettingsResponse).settings;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Referral email request failed.");
+  return data;
 }
 
-export async function savePartnerReferralEmailSettings(adminPassword: string, settings: RegistrationEmailSettings): Promise<RegistrationEmailSettings> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
-    body: { action: "save", templateKind: "partner-referral", adminPassword, settings },
-  });
-  if (error) throw error;
-  return (data as RegistrationEmailSettingsResponse).settings;
+export async function getPartnerReferralEmailSettings(_adminPassword?: string): Promise<RegistrationEmailSettings> {
+  return (await referralEmailRequest({ action: "get" })).settings as RegistrationEmailSettings;
 }
 
-export async function sendPartnerReferralEmailTest(adminPassword: string, testEmail: string): Promise<RegistrationEmailTestResponse> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-  const { data, error } = await supabase.functions.invoke("registration-email-settings", {
-    body: { action: "test", templateKind: "partner-referral", adminPassword, testEmail },
-  });
-  if (error) throw error;
-  return data as RegistrationEmailTestResponse;
+export async function savePartnerReferralEmailSettings(_adminPassword: string, settings: RegistrationEmailSettings): Promise<RegistrationEmailSettings> {
+  return (await referralEmailRequest({ action: "save", settings })).settings as RegistrationEmailSettings;
+}
+
+export async function sendPartnerReferralEmailTest(_adminPassword: string, testEmail: string): Promise<RegistrationEmailTestResponse> {
+  return (await referralEmailRequest({ action: "test", testEmail })) as RegistrationEmailTestResponse;
 }
 
 function mapClaimedPrize(row: PrizeRow | null | undefined): Prize {

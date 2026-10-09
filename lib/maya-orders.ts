@@ -63,6 +63,12 @@ export async function applyPaymentToOrder(
   const wasPaid = order.payment_status === "paid";
   const next = mapMayaStatus(mayaStatus, order.status, order.payment_status);
 
+  // A paid order only leaves "paid" when the payment that paid it is voided or refunded. A late
+  // webhook for an earlier, abandoned attempt (PAYMENT_EXPIRED / FAILED) must not un-pay it.
+  if (wasPaid && next.paymentStatus !== "paid" && (order.maya_payment_id !== paymentId || next.paymentStatus !== "refunded")) {
+    return { changed: false, paymentStatus: order.payment_status };
+  }
+
   const { error } = await supabase
     .from("shop_orders")
     .update({
@@ -80,118 +86,17 @@ export async function applyPaymentToOrder(
 
   if (!wasPaid && next.paymentStatus === "paid") {
     try {
-      await supabase.functions.invoke("send-shop-order-email", {
+      // invoke() reports HTTP failures in `error` rather than throwing - log them, or a
+      // rejected call (e.g. service-role key mismatch, 403) disappears without a trace.
+      const { error: emailError } = await supabase.functions.invoke("send-shop-order-email", {
         body: { orderId: order.id, kind: "paid", schema: SHOP_SCHEMA },
       });
-    } catch {
+      if (emailError) console.error("Paid receipt email failed", order.id, emailError.message);
+    } catch (emailError) {
       // Best-effort receipt notification
+      console.error("Paid receipt email failed", order.id, emailError);
     }
   }
 
   return { changed: true, paymentStatus: next.paymentStatus };
-}
-
-async function processOrderPoints(supabase: ShopAdminClient, orderId: string) {
-  // 1. Fetch Order and Buyer's Referrer
-  const { data: order } = await supabase
-    .from("shop_orders")
-    .select("partner_id, doctor_registrations(referred_by_partner_id)")
-    .eq("id", orderId)
-    .single();
-
-  if (!order || !order.partner_id) return;
-
-  const buyerId = order.partner_id;
-  // Supabase returns related table fields inside an object array for one-to-many, 
-  // but here it's many-to-one so it's a single object if joined properly.
-  // @ts-ignore
-  const referrerId = order.doctor_registrations?.referred_by_partner_id || null;
-
-  // 2. Fetch Order Items to calculate points
-  const { data: items } = await supabase
-    .from("shop_order_items")
-    .select("name, quantity")
-    .eq("order_id", orderId);
-
-  if (!items || items.length === 0) return;
-
-  let totalPoints = 0;
-  for (const item of items) {
-    const name = item.name.toLowerCase();
-    if (name.includes("retail")) totalPoints += 1 * item.quantity;
-    else if (name.includes("start")) totalPoints += 3 * item.quantity;
-    else if (name.includes("grow")) totalPoints += 9 * item.quantity;
-    else if (name.includes("peak")) totalPoints += 33 * item.quantity;
-  }
-
-  if (totalPoints === 0) return;
-
-  // 3. Credit Points
-  let targetPartnerId = buyerId;
-  let targetDepth = 0;
-
-  if (referrerId) {
-    // Pass-Up Rule: If buyer has a referrer, referrer gets 100% of points, buyer gets 0.
-    targetPartnerId = referrerId;
-    targetDepth = 1;
-  }
-
-  const { error: insertError } = await supabase
-    .from("partner_points")
-    .insert({
-      order_id: orderId,
-      partner_id: targetPartnerId,
-      points: totalPoints,
-      depth: targetDepth,
-    });
-    
-  // Ignores unique constraint violations (idempotency)
-  if (insertError && !insertError.message.includes("unique constraint")) {
-    throw insertError;
-  }
-
-  // 4. Check Milestones
-  await checkMilestones(supabase, targetPartnerId);
-}
-
-async function checkMilestones(supabase: ShopAdminClient, partnerId: string) {
-  const { data } = await supabase
-    .from("partner_points")
-    .select("points")
-    .eq("partner_id", partnerId);
-
-  if (!data) return;
-
-  const totalPoints = data.reduce((sum, row) => sum + row.points, 0);
-  const completedCycles = Math.floor(totalPoints / 1500);
-  const currentCycle = completedCycles + 1;
-  const pointsInCurrentCycle = totalPoints % 1500;
-
-  const milestones = [
-    { pts: 300, rebate: 18000 },
-    { pts: 750, rebate: 70000 },
-    { pts: 1500, rebate: 150000 },
-  ];
-
-  for (let cycle = 1; cycle <= currentCycle; cycle++) {
-    const cyclePts = cycle < currentCycle ? 1500 : pointsInCurrentCycle;
-
-    for (const ms of milestones) {
-      if (cyclePts >= ms.pts) {
-        try {
-          await supabase
-            .from("milestone_unlocks")
-            .insert({
-              partner_id: partnerId,
-              cycle_number: cycle,
-              milestone_pts: ms.pts,
-              rebate_amount: ms.rebate,
-              status: "unlocked",
-            });
-        } catch {
-          // Catch unique constraint errors quietly
-        }
-      }
-    }
-  }
 }

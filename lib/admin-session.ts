@@ -1,86 +1,65 @@
-import crypto from "node:crypto";
 import { cookies } from "next/headers";
-import { isSupabaseAdminConfigured as isSupabaseConfigured, supabaseAdmin as supabase } from "@/lib/supabase-admin";
+import { Redis } from "@upstash/redis";
+import { ADMIN_SESSION_MS, issueAdminToken, passwordMatches, readAdminToken } from "@/lib/admin-token";
 
 export const ADMIN_SESSION_COOKIE = "gg_admin_session";
-const SESSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+export const ADMIN_SESSION_MAX_AGE_S = ADMIN_SESSION_MS / 1000;
 
-function getSecretKey(): Buffer {
-  const secret =
-    process.env.ADMIN_PASSWORD ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    "gutguard-admin-secret-key-32bytes-fallback!";
-  return crypto.scryptSync(secret, "gg-admin-salt-v1", 32);
+// ADMIN_PASSWORD is required: it is the login secret and the value passed to the
+// assert_wheel_admin RPCs. No fallback key - unset means locked out.
+const adminPassword = () => process.env.ADMIN_PASSWORD?.trim() || null;
+// Cookie HMAC key. Set ADMIN_SESSION_SECRET (long random) so a leaked cookie cannot be used to
+// brute-force the password offline; falls back to the password so existing deploys keep working.
+const sessionKey = () => (adminPassword() ? process.env.ADMIN_SESSION_SECRET?.trim() || adminPassword() : null);
+
+// ponytail: logout revocation needs a store; uses the Upstash Redis already used for rate
+// limits. Without it a logged-out cookie stays valid until expiry (8h) or password rotation.
+const redis = () =>
+  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN ? Redis.fromEnv() : null;
+const revokedKey = (jti: string) => `admin-session-revoked:${jti}`;
+
+/** Checks a login attempt against ADMIN_PASSWORD. Fails closed when it is not configured. */
+export async function verifyAdminPassword(candidate: string): Promise<boolean> {
+  const secret = adminPassword();
+  return Boolean(secret) && Boolean(candidate.trim()) && passwordMatches(candidate, secret!);
 }
 
-export function encryptAdminSession(password: string): string {
-  const key = getSecretKey();
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
-  const payload = JSON.stringify({
-    pwd: password,
-    exp: Date.now() + SESSION_DURATION_MS,
-  });
-  const encrypted = Buffer.concat([cipher.update(payload, "utf8"), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return `${iv.toString("hex")}:${tag.toString("hex")}:${encrypted.toString("hex")}`;
-}
-
-export function decryptAdminSession(token: string): { password?: string; isValid: boolean } {
-  try {
-    const parts = token.split(":");
-    if (parts.length !== 3) return { isValid: false };
-    const [ivHex, tagHex, encryptedHex] = parts;
-    const key = getSecretKey();
-    const iv = Buffer.from(ivHex, "hex");
-    const tag = Buffer.from(tagHex, "hex");
-    const encrypted = Buffer.from(encryptedHex, "hex");
-    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
-    decipher.setAuthTag(tag);
-    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]).toString("utf8");
-    const data = JSON.parse(decrypted) as { pwd?: string; exp?: number };
-    if (!data.exp || Date.now() > data.exp || !data.pwd) {
-      return { isValid: false };
-    }
-    return { password: data.pwd, isValid: true };
-  } catch {
-    return { isValid: false };
-  }
+export function createAdminSessionToken(): string | null {
+  const key = sessionKey();
+  return key ? issueAdminToken(key) : null;
 }
 
 /**
- * Validates the admin session from cookies and returns the admin password to use for Supabase calls.
- * Returns null if the session is invalid or expired.
+ * Validates the admin session cookie and returns the password the server routes pass to the
+ * Supabase RPCs / edge functions. Returns null if the session is missing, expired or revoked.
  */
 export async function getAdminPasswordFromSession(): Promise<string | null> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
-  if (!token) return null;
+  const secret = adminPassword();
+  const key = sessionKey();
+  const token = (await cookies()).get(ADMIN_SESSION_COOKIE)?.value;
+  if (!secret || !key || !token) return null;
 
-  const { password, isValid } = decryptAdminSession(token);
-  if (!isValid || !password) return null;
+  const session = readAdminToken(key, token);
+  if (!session) return null;
 
-  return process.env.ADMIN_PASSWORD || password;
+  const store = redis();
+  if (store) {
+    try {
+      if (await store.get(revokedKey(session.jti))) return null;
+    } catch {
+      return null; // can't confirm the session is live - fail closed
+    }
+  }
+  return secret;
 }
 
-/**
- * Verifies a candidate admin password against env or Supabase RPC.
- */
-export async function verifyAdminPassword(candidate: string): Promise<boolean> {
-  const trimmed = candidate.trim();
-  if (!trimmed) return false;
-
-  if (process.env.ADMIN_PASSWORD && trimmed === process.env.ADMIN_PASSWORD.trim()) {
-    return true;
-  }
-
-  if (isSupabaseConfigured && supabase) {
-    const { error } = await supabase.rpc("admin_list_wheel_prizes", {
-      p_admin_password: trimmed,
-    });
-    if (!error) return true;
-  }
-
-  return false;
+/** Marks the current session revoked so a copied cookie stops working at logout. */
+export async function revokeAdminSession(): Promise<void> {
+  const key = sessionKey();
+  const token = (await cookies()).get(ADMIN_SESSION_COOKIE)?.value;
+  const session = key && token ? readAdminToken(key, token) : null;
+  const store = redis();
+  if (!session || !store) return;
+  const ttl = Math.max(1, Math.ceil((session.exp - Date.now()) / 1000));
+  await store.set(revokedKey(session.jti), 1, { ex: ttl }).catch(() => undefined);
 }

@@ -1,3 +1,4 @@
+import { adminErrorMessage } from "@/lib/admin-error";
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
 import {
@@ -17,7 +18,7 @@ export async function GET() {
     return NextResponse.json({ settings });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to load registration email settings." },
+      { error: adminErrorMessage(error, "Failed to load registration email settings.") },
       { status: 500 },
     );
   }
@@ -31,16 +32,20 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
+    const templateKind = body.templateKind === "partner-referral" ? "partner-referral" : "registration";
+    if (body.action === "get") {
+      return NextResponse.json({ settings: await serverGetRegistrationEmailSettings(adminPassword, templateKind) });
+    }
     if (body.action === "test") {
-      const result = await serverSendRegistrationEmailTest(adminPassword, body.testEmail);
+      const result = await serverSendRegistrationEmailTest(adminPassword, body.testEmail, templateKind);
       return NextResponse.json(result);
     }
 
-    const settings = await serverSaveRegistrationEmailSettings(adminPassword, body.settings);
+    const settings = await serverSaveRegistrationEmailSettings(adminPassword, body.settings, templateKind);
     return NextResponse.json({ settings });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to save registration email settings." },
+      { error: adminErrorMessage(error, "Failed to save registration email settings.") },
       { status: 500 },
     );
   }

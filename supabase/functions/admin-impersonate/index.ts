@@ -9,6 +9,7 @@
 // The only gate is the shared admin password. A leaked password therefore reaches any
 // partner account, and the audit row can only say "an admin" - see the migration note.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.106.2";
+import { serveWithCors } from "../_shared/cors.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,9 +23,15 @@ type ImpersonateRequest = {
   redirectTo?: string;
 };
 
-Deno.serve(async (req) => {
+serveWithCors(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
+
+  // Admin-only: callable by the /api/admin server routes (service role), not by the public anon key,
+  // so this cannot be used to guess the admin password around the login rate limit.
+  if (req.headers.get("Authorization") !== `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`) {
+    return jsonResponse({ error: "Unauthorized" }, 401);
+  }
 
   try {
     const request = (await req.json()) as ImpersonateRequest;
