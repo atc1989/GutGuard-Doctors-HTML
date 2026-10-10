@@ -34,6 +34,11 @@ type AdminDoctorRegistration = {
   redirect_url: string;
   specialty: string;
   practice_location: string;
+  where_did_you_find_us?: string;
+  referred_by_partner_id?: string | null;
+  referrer_name?: string | null;
+  referrer_prefix?: string | null;
+  referrer_slug?: string | null;
   store_type?: "affiliate" | "lifestyle" | "main";
   referral_qr_enabled?: boolean;
   main_store_id?: string | null;
@@ -42,6 +47,7 @@ type AdminDoctorRegistration = {
   created_at: string;
   prize_label?: string | null;
   prize_claimed_at?: string | null;
+  shop_show_protocol?: boolean;
 };
 
 type NewsletterSendHistory = {
@@ -107,6 +113,8 @@ type RegistrationEmailSettings = {
 };
 
 type WheelApi = {
+  checkAdminSession?: () => Promise<boolean>;
+  adminLogin?: (password: string) => Promise<boolean>;
   getWheelPrizes?: (adminPassword: string) => Promise<AdminWheelPrize[]>;
   saveWheelPrize?: (adminPassword: string, prize: AdminWheelPrize) => Promise<AdminWheelPrize>;
   createWheelPrize?: (
@@ -133,6 +141,7 @@ type WheelApi = {
       | "practice_location"
     >,
   ) => Promise<AdminDoctorRegistration>;
+  setDoctorShopProtocol?: (adminPassword: string, doctorId: string, show: boolean) => Promise<boolean>;
   getNewsletterSendHistory?: (adminPassword: string) => Promise<NewsletterSendHistory[]>;
   sendNewsletter?: (
     adminPassword: string,
@@ -314,6 +323,7 @@ export default function AdminWheelPage() {
   const [prizes, setPrizes] = useState<AdminWheelPrize[]>([]);
   const [doctors, setDoctors] = useState<AdminDoctorRegistration[]>([]);
   const [doctorSearch, setDoctorSearch] = useState("");
+  const [doctorOriginFilter, setDoctorOriginFilter] = useState<"all" | "direct" | "referred">("all");
   const [doctorStoreTypeFilter, setDoctorStoreTypeFilter] = useState<string>("all");
   const [upgradingDoctor, setUpgradingDoctor] = useState<AdminDoctorRegistration | null>(null);
   const [upgradeNote, setUpgradeNote] = useState("");
@@ -397,11 +407,20 @@ export default function AdminWheelPage() {
       }, 0),
     [prizes],
   );
+  const doctorMetrics = useMemo(() => {
+    const total = doctors.length;
+    const referred = doctors.filter((d) => Boolean(d.referred_by_partner_id || d.referrer_name)).length;
+    const direct = total - referred;
+    return { total, direct, referred };
+  }, [doctors]);
   const filteredDoctors = useMemo(() => {
     const query = doctorSearch.trim().toLowerCase();
 
     return doctors.filter((doctor) => {
-      if (doctorStoreTypeFilter !== "all" && (doctor.store_type || "lifestyle") !== doctorStoreTypeFilter) {
+      const isReferred = Boolean(doctor.referred_by_partner_id || doctor.referrer_name);
+      if (doctorOriginFilter === "direct" && isReferred) return false;
+      if (doctorOriginFilter === "referred" && !isReferred) return false;
+      if (doctorStoreTypeFilter !== "all" && (doctor.store_type || "affiliate") !== doctorStoreTypeFilter) {
         return false;
       }
       if (!query) return true;
@@ -416,6 +435,11 @@ export default function AdminWheelPage() {
         doctor.redirect_url,
         doctor.specialty,
         doctor.practice_location,
+        doctor.where_did_you_find_us ?? "",
+        doctor.referrer_name ?? "",
+        doctor.referrer_prefix ?? "",
+        doctor.referrer_slug ?? "",
+        isReferred ? "referred" : "direct",
         doctor.prize_label ?? "",
         doctor.store_type ?? "",
       ]
@@ -423,7 +447,7 @@ export default function AdminWheelPage() {
         .toLowerCase()
         .includes(query);
     });
-  }, [doctorSearch, doctorStoreTypeFilter, doctors]);
+  }, [doctorSearch, doctorOriginFilter, doctorStoreTypeFilter, doctors]);
   const totalDoctorPages = Math.max(1, Math.ceil(filteredDoctors.length / doctorPageSize));
   const visibleDoctors = filteredDoctors.slice(
     (doctorPage - 1) * doctorPageSize,
@@ -589,8 +613,8 @@ export default function AdminWheelPage() {
 
   useEffect(() => {
     loadWheelApi().then((api) => {
-      if ((api as any).checkAdminSession) {
-        (api as any).checkAdminSession().then((authenticated: boolean) => {
+      if (api.checkAdminSession) {
+        api.checkAdminSession().then((authenticated: boolean) => {
           if (authenticated) {
             setIsUnlocked(true);
             loadAdminData().catch(() => setIsUnlocked(false));
@@ -638,8 +662,8 @@ export default function AdminWheelPage() {
     try {
       if (password) {
         const api = await loadWheelApi();
-        if ((api as any).adminLogin) {
-          await (api as any).adminLogin(password);
+        if (api.adminLogin) {
+          await api.adminLogin(password);
           setPassword("");
         }
       }
@@ -1108,6 +1132,24 @@ export default function AdminWheelPage() {
       setError(caught instanceof Error ? caught.message : "Unable to update doctor details.");
     } finally {
       setIsDoctorSaving(false);
+    }
+  }
+
+  async function toggleDoctorShopProtocol(doctor: AdminDoctorRegistration, show: boolean) {
+    setError(null);
+    setNotice(null);
+
+    try {
+      const api = await loadWheelApi();
+      if (!api.setDoctorShopProtocol) throw new Error("Missing setDoctorShopProtocol helper in lib/api.ts.");
+
+      const saved = await api.setDoctorShopProtocol(password, doctor.id, show);
+      setDoctors((current) =>
+        current.map((item) => (item.id === doctor.id ? { ...item, shop_show_protocol: saved } : item)),
+      );
+      setNotice(saved ? "Shop link now shows the Full Protocol." : "Shop link now shows Try First only.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to update shop link setting.");
     }
   }
 
@@ -1770,8 +1812,51 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
             <div>
               <p className="admin-wheel-kicker">Registered Doctors</p>
               <h2>Doctor Directory</h2>
+              <div className="admin-doctor-metrics">
+                <span className="admin-metric-pill">
+                  Total: <strong>{doctorMetrics.total}</strong>
+                </span>
+                <span className="admin-metric-pill is-direct">
+                  Direct: <strong>{doctorMetrics.direct}</strong>
+                </span>
+                <span className="admin-metric-pill is-referred">
+                  Referred: <strong>{doctorMetrics.referred}</strong>
+                </span>
+              </div>
             </div>
             <div className="admin-doctor-actions">
+              <div className="admin-origin-filters" role="group" aria-label="Filter by registration origin">
+                <button
+                  type="button"
+                  className={doctorOriginFilter === "all" ? "active" : ""}
+                  onClick={() => {
+                    setDoctorOriginFilter("all");
+                    setDoctorPage(1);
+                  }}
+                >
+                  All ({doctorMetrics.total})
+                </button>
+                <button
+                  type="button"
+                  className={doctorOriginFilter === "direct" ? "active" : ""}
+                  onClick={() => {
+                    setDoctorOriginFilter("direct");
+                    setDoctorPage(1);
+                  }}
+                >
+                  Direct ({doctorMetrics.direct})
+                </button>
+                <button
+                  type="button"
+                  className={doctorOriginFilter === "referred" ? "active" : ""}
+                  onClick={() => {
+                    setDoctorOriginFilter("referred");
+                    setDoctorPage(1);
+                  }}
+                >
+                  Referred ({doctorMetrics.referred})
+                </button>
+              </div>
               <label htmlFor="doctor-store-filter">
                 Store Type
                 <select
@@ -1795,7 +1880,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                   id="doctor-search"
                   type="search"
                   value={doctorSearch}
-                  placeholder="Name, email, TikTok, clinic..."
+                  placeholder="Name, email, referrer, source, clinic..."
                   onChange={(event) => {
                     setDoctorSearch(event.target.value);
                     setDoctorPage(1);
@@ -1871,6 +1956,16 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                           TikTok route
                         </button>
                       </div>
+                      {qrMode === "shop" ? (
+                        <label className="admin-doctor-shop-protocol">
+                          <input
+                            type="checkbox"
+                            checked={doctor.shop_show_protocol === true}
+                            onChange={(event) => toggleDoctorShopProtocol(doctor, event.target.checked)}
+                          />
+                          Show Full Protocol in shop link
+                        </label>
+                      ) : null}
                       {qrUrl ? (
                         <div className="admin-doctor-qr">
                           <QRCodeSVG
@@ -1931,8 +2026,34 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                         <dd>{doctor.specialty || "--"}</dd>
                       </div>
                       <div>
-                        <dt>City address</dt>
+                        <dt>Complete Clinic Address</dt>
                         <dd>{doctor.practice_location || "--"}</dd>
+                      </div>
+                      <div>
+                        <dt>Origin</dt>
+                        <dd>
+                          {doctor.referrer_name ? (
+                            <button
+                              type="button"
+                              className="admin-origin-badge is-referred"
+                              title={`Click to filter by ${formatPrefixedName(doctor.referrer_prefix, doctor.referrer_name)}`}
+                              onClick={() => {
+                                setDoctorSearch(doctor.referrer_name || "");
+                                setDoctorPage(1);
+                              }}
+                            >
+                              Referred by {formatPrefixedName(doctor.referrer_prefix, doctor.referrer_name)}
+                            </button>
+                          ) : (
+                            <span className="admin-origin-badge is-direct">
+                              Direct registration
+                            </span>
+                          )}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Where found</dt>
+                        <dd>{doctor.where_did_you_find_us || "--"}</dd>
                       </div>
                       <div>
                         <dt>Prize</dt>
@@ -3353,7 +3474,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                 />
               </label>
               <label>
-                City address
+                Complete Clinic Address
                 <input
                   required
                   value={editingDoctor.practice_location}

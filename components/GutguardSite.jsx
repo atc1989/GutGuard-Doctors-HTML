@@ -3,7 +3,8 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Menu, X, Check, Lock } from "lucide-react";
-import { TIERS } from "@/lib/catalog";
+import { promoPrice, TIERS } from "@/lib/catalog";
+import { loadPromos } from "@/lib/api";
 
 /* ────────────────────────────────────────────────────────────
    Gutguard — Multi-page site (Home · Science · Shop · Physicians)
@@ -43,18 +44,18 @@ const CSS = `
 .measure-img{width:100%;max-height:540px;object-fit:contain;display:block;}
 
 
-.science-top-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(36px,6vw,80px);align-items:center;}
-@media(max-width:900px){.science-top-grid{grid-template-columns:1fr;gap:48px;}}
-.science-top-copy{display:flex;flex-direction:column;}
+.science-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;}
+@media(max-width:900px){.science-top-grid{grid-template-columns:1fr;gap:32px;}}
+.science-top-copy{display:flex;flex-direction:column;justify-content:center;}
 .science-top-visual{display:flex;align-items:center;justify-content:center;position:relative;}
-.science-floating-molecules{width:100%;max-width:680px;height:auto;object-fit:contain;display:block;background:transparent;box-shadow:none;border:none;filter:drop-shadow(0 20px 40px rgba(0,0,0,.04));}
+.science-floating-molecules{width:100%;max-width:580px;height:auto;object-fit:contain;display:block;background:transparent;box-shadow:none;border:none;}
 
 
 .measure-section-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;}
 @media(max-width:900px){.measure-section-grid{grid-template-columns:1fr;gap:32px;}}
 .measure-section-copy{display:flex;flex-direction:column;justify-content:center;}
 .measure-section-visual{display:flex;align-items:center;justify-content:center;position:relative;}
-.measure-section-img{width:100%;height:100%;max-height:480px;object-fit:cover;display:block;box-shadow:0 10px 30px rgba(0,0,0,.04);}
+.measure-section-img{width:100%;max-height:500px;object-fit:contain;border-radius:16px;display:block;mix-blend-mode:multiply;filter:contrast(1.03) brightness(1.01);}
 
 
 .lca-hero.dark{background:var(--slate);color:#EAF1F0;padding:0;overflow:hidden;}
@@ -128,18 +129,18 @@ const CSS = `
 .measure-img{width:100%;max-height:540px;object-fit:contain;display:block;}
 
 
-.science-top-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(36px,6vw,80px);align-items:center;}
-@media(max-width:900px){.science-top-grid{grid-template-columns:1fr;gap:48px;}}
-.science-top-copy{display:flex;flex-direction:column;}
+.science-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;}
+@media(max-width:900px){.science-top-grid{grid-template-columns:1fr;gap:32px;}}
+.science-top-copy{display:flex;flex-direction:column;justify-content:center;}
 .science-top-visual{display:flex;align-items:center;justify-content:center;position:relative;}
-.science-floating-molecules{width:100%;max-width:680px;height:auto;object-fit:contain;display:block;background:transparent;box-shadow:none;border:none;filter:drop-shadow(0 20px 40px rgba(0,0,0,.04));}
+.science-floating-molecules{width:100%;max-width:580px;height:auto;object-fit:contain;display:block;background:transparent;box-shadow:none;border:none;}
 
 
 .measure-section-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;}
 @media(max-width:900px){.measure-section-grid{grid-template-columns:1fr;gap:32px;}}
 .measure-section-copy{display:flex;flex-direction:column;justify-content:center;}
 .measure-section-visual{display:flex;align-items:center;justify-content:center;position:relative;}
-.measure-section-img{width:100%;height:100%;max-height:480px;object-fit:cover;display:block;box-shadow:0 10px 30px rgba(0,0,0,.04);}
+.measure-section-img{width:100%;max-height:500px;object-fit:contain;border-radius:16px;display:block;mix-blend-mode:multiply;filter:contrast(1.03) brightness(1.01);}
 
 
 .lca-hero.dark{background:var(--slate);color:#EAF1F0;padding:0;overflow:hidden;}
@@ -187,18 +188,18 @@ const CSS = `
 .measure-img{width:100%;max-height:540px;object-fit:contain;display:block;}
 
 
-.science-top-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(36px,6vw,80px);align-items:center;}
-@media(max-width:900px){.science-top-grid{grid-template-columns:1fr;gap:48px;}}
-.science-top-copy{display:flex;flex-direction:column;}
+.science-top-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;}
+@media(max-width:900px){.science-top-grid{grid-template-columns:1fr;gap:32px;}}
+.science-top-copy{display:flex;flex-direction:column;justify-content:center;}
 .science-top-visual{display:flex;align-items:center;justify-content:center;position:relative;}
-.science-floating-molecules{width:100%;max-width:680px;height:auto;object-fit:contain;display:block;background:transparent;box-shadow:none;border:none;filter:drop-shadow(0 20px 40px rgba(0,0,0,.04));}
+.science-floating-molecules{width:100%;max-width:580px;height:auto;object-fit:contain;display:block;background:transparent;box-shadow:none;border:none;}
 
 
 .measure-section-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,5vw,64px);align-items:center;}
 @media(max-width:900px){.measure-section-grid{grid-template-columns:1fr;gap:32px;}}
 .measure-section-copy{display:flex;flex-direction:column;justify-content:center;}
 .measure-section-visual{display:flex;align-items:center;justify-content:center;position:relative;}
-.measure-section-img{width:100%;height:100%;max-height:480px;object-fit:cover;display:block;box-shadow:0 10px 30px rgba(0,0,0,.04);}
+.measure-section-img{width:100%;max-height:500px;object-fit:contain;border-radius:16px;display:block;mix-blend-mode:multiply;filter:contrast(1.03) brightness(1.01);}
 
 
 .lca-hero.dark{background:var(--slate);color:#EAF1F0;padding:0;overflow:hidden;}
@@ -834,6 +835,7 @@ footer{padding:54px 0;border-top:1px solid var(--rule);}
 .bb-name{font-family:var(--serif);font-size:18px;font-weight:500;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .bb-price{display:flex;flex-direction:column;gap:2px;margin-left:auto;text-align:right;}
 .bb-amt{font-family:var(--mono);font-weight:600;font-size:22px;color:var(--ink);line-height:1;}
+.bb-was{font-size:14px;font-weight:500;color:var(--ink-4);margin-right:8px;}
 .bb-unit{font-size:13px;color:var(--ink-3);margin-left:1px;}
 .bb-was{font-family:var(--mono);font-size:12px;color:var(--ink-4);text-decoration:line-through;margin-left:5px;}
 .bb-sub{font-family:var(--mono);font-size:10px;letter-spacing:.03em;color:var(--ink-3);}
@@ -1300,10 +1302,10 @@ function Nav({ route, scrolled, open, setOpen, sheetRef, burgerRef }) {
             ))}
           </div>
           <div className="nav-actions">
-            <a className="nav-login" href="/partner" aria-label="Open the partner login page">Log in</a>
-            <a className="nav-cta" href="/shop">Choose Your Protocol <ArrowRight size={14} /></a>
+            <Link className="nav-login" href="/partner" aria-label="Open the partner login page">Log in</Link>
+            <Link className="nav-cta" href="/shop">Choose Your Protocol <ArrowRight size={14} /></Link>
           </div>
-          <a className="nav-shop-mobile" href="/shop">Shop</a>
+          <Link className="nav-shop-mobile" href="/shop">Shop</Link>
           <button ref={burgerRef} className="burger" aria-label="Open menu" aria-haspopup="dialog" aria-expanded={open} aria-controls="mobile-menu" onClick={() => setOpen(true)}>
             <Menu size={20} />
           </button>
@@ -1316,8 +1318,8 @@ function Nav({ route, scrolled, open, setOpen, sheetRef, burgerRef }) {
             <em>{String(i + 1).padStart(2, "0")}</em>{l}
           </a>
         ))}
-        <a className="nav-cta" href="/shop" onClick={() => setOpen(false)}>Choose Your Protocol <ArrowRight size={16} /></a>
-        <a className="sheet-login" href="/partner">Already a partner? Log in →</a>
+        <Link className="nav-cta" href="/shop" onClick={() => setOpen(false)}>Choose Your Protocol <ArrowRight size={16} /></Link>
+        <Link className="sheet-login" href="/partner">Already a partner? Log in →</Link>
       </div>
     </>
   );
@@ -1576,8 +1578,8 @@ function Home() {
             <h1>Your body’s silently aging toward disease. <em>Take back control.</em></h1>
             <p className="hero-lede">Chronic inflammation can build silently for years before symptoms. <strong>The 90-day protocol is designed to support gut and inflammatory balance.</strong> Routine blood markers at Day 30, 60 and 90 can show how your trajectory changes. <strong>Progress you can follow.</strong></p>
             <div className="hero-actions">
-              <a className="btn-primary" href="/shop" data-buyanchor>Start the 90-Day Protocol <Arrow /></a>
-              <a className="btn-ghost" href="/system"><span className="ring"><ArrowRight size={13} /></span>See how the scan works</a>
+              <Link className="btn-primary" href="/shop" data-buyanchor>Start the 90-Day Protocol <Arrow /></Link>
+              <Link className="btn-ghost" href="/system"><span className="ring"><ArrowRight size={13} /></span>See how the scan works</Link>
             </div>
             <ul className="hero-proof reveal" aria-label="Why this is credible">
               <li>FDA-registered formula</li>
@@ -1669,19 +1671,19 @@ function Home() {
             <span className="ic"><IconClinical size={22} /></span>
             <h3>Physicians</h3>
             <p>Explore the measured protocol and the Lead Clinical Adopter program.</p>
-            <a className="lnk" href="/physicians">Explore the physician program <ArrowRight size={15} /></a>
+            <Link className="lnk" href="/physicians">Explore the physician program <ArrowRight size={15} /></Link>
           </article>
           <article className="door">
             <span className="ic"><IconPeople size={22} /></span>
             <h3>Registered partners</h3>
             <p>Sign in securely to view your tracked links, clicks, and attributed orders.</p>
-            <a className="lnk" href="/partner">Open partner dashboard <ArrowRight size={15} /></a>
+            <Link className="lnk" href="/partner">Open partner dashboard <ArrowRight size={15} /></Link>
           </article>
           <article className="door">
             <span className="ic"><IconNetwork size={22} /></span>
             <h3>Start the protocol</h3>
             <p>Choose the protocol length or begin with one of the trial formats.</p>
-            <a className="lnk" href="/shop">Visit the GutGuard shop <ArrowRight size={15} /></a>
+            <Link className="lnk" href="/shop">Visit the GutGuard shop <ArrowRight size={15} /></Link>
           </article>
         </div>
       </div></section>
@@ -1732,15 +1734,15 @@ function Home() {
 function Science() {
   return (
     <>
-      <section className="section science-top-section" id="top" style={{ paddingTop: 100, paddingBottom: 60 }}>
+      <section className="section science-top-section" id="top" style={{ paddingTop: 40, paddingBottom: 20 }}>
         <div className="wrap">
           <div className="science-top-grid">
             <div className="science-top-copy">
-              <header className="science-hero-copy reveal" style={{ marginBottom: 80 }}>
+              <header className="science-hero-copy reveal" style={{ marginBottom: 56 }}>
                 <span className="eyebrow">The Science</span>
                 <h1>The science, <em>in plain sight.</em></h1>
                 <p className="hero-lede">No black box. Here is exactly how inflammation compounds into the way you feel — and how the right repair runs it in reverse.</p>
-                <div className="hero-actions"><a className="btn-primary" href="/shop">Start the 90-Day Protocol <Arrow /></a></div>
+                <div className="hero-actions"><Link className="btn-primary" href="/shop">Start the 90-Day Protocol <Arrow /></Link></div>
               </header>
 
               <div className="reveal">
@@ -1759,7 +1761,7 @@ function Science() {
           <div className="teaser-body">
             <h3>The gut–inflammation pathway</h3>
             <p>See how gut-barrier disruption, inflammatory signalling, and mitochondrial stress connect—and how the BioScan, GLIS, and MiAge layers are intended to describe that trajectory.</p>
-            <a className="btn-ghost" href="/system"><span className="ring"><ArrowRight size={13} /></span>Explore the measurement system</a>
+            <Link className="btn-ghost" href="/system"><span className="ring"><ArrowRight size={13} /></span>Explore the measurement system</Link>
           </div>
         </div>
         <ol className="ref-list reveal" style={{ marginTop: 26 }}>
@@ -1805,7 +1807,7 @@ function Science() {
             <h2 className="sec">Belief needs <em>proof.</em> Proof needs a method.</h2>
             <p className="sec-body">Understanding the biology is only half of it. The other half is measuring it — repeatably, from routine lab markers, the same way every time.</p>
             <div className="hero-actions" style={{ marginTop: 24 }}>
-              <a className="btn-primary" href="/system">See the measurement system <Arrow /></a>
+              <Link className="btn-primary" href="/system">See the measurement system <Arrow /></Link>
             </div>
           </div>
           <div className="measure-section-visual">
@@ -1845,7 +1847,7 @@ function Physicians() {
               <h1>Practice medicine at the <em>upstream.</em></h1>
               <p className="hero-lede">An invitation to the first 100 founding Filipino physicians treating mitochondrial dysfunction and inflammaging — with measurement, not guesswork.</p>
               <div className="hero-actions" style={{ marginTop: 32 }}>
-                <a className="btn-primary" href="/physicians/register">Request the program brief <Arrow /></a>
+                <Link className="btn-primary" href="/physicians/register">Request the program brief <Arrow /></Link>
               </div>
             </div>
 
@@ -1924,8 +1926,8 @@ function System() {
             <h1>Three layers between a <em>sample</em> and an answer.</h1>
             <p className="hero-lede">No single number tells the whole story. Gutguard reads inflammation through a measured stack — a sample, a composite score, and a translation you can actually feel.</p>
             <div className="hero-actions">
-              <a className="btn-primary" href="/shop">Start the 90-Day Protocol <Arrow /></a>
-              <a className="btn-ghost" href="/physicians"><span className="ring"><ArrowRight size={13} /></span>For physicians</a>
+              <Link className="btn-primary" href="/shop">Start the 90-Day Protocol <Arrow /></Link>
+              <Link className="btn-ghost" href="/physicians"><span className="ring"><ArrowRight size={13} /></span>For physicians</Link>
             </div>
           </div>
           <div className="hero-visual reveal">
@@ -2106,6 +2108,13 @@ function SectionTabs({ items }) {
 
 function BuyBar({ route }) {
   const [shown, setShown] = useState(false);
+  const [grow, setGrow] = useState({ price: GROW.price, perCap: GROW.perCap, percent: 0 });
+  useEffect(() => {
+    loadPromos().then((promos) => {
+      const live = promoPrice(GROW.id, GROW.price, promos, new Date());
+      if (live.percent) setGrow({ price: live.price, perCap: Math.round(live.price / GROW.caps), percent: live.percent });
+    });
+  }, []);
   const enabled = route === "/" || route === "/shop";
   useEffect(() => {
     if (!enabled) { setShown(false); return; }
@@ -2153,10 +2162,15 @@ function BuyBar({ route }) {
           <span className="bb-meta">{GROW.phase} protocol <span className="bb-tag">Most popular</span></span>
         </div>
         <div className="bb-price">
-          <span className="bb-amt">₱{GROW.perCap} / capsule</span>
-          <span className="bb-sub">{GROW.phase} protocol · ₱{GROW.price.toLocaleString("en-PH")} total</span>
+          <span className="bb-amt">
+            {grow.percent ? <s className="bb-was">₱{GROW.perCap}</s> : null}₱{grow.perCap} / capsule
+          </span>
+          <span className="bb-sub">
+            {GROW.phase} protocol · ₱{grow.price.toLocaleString("en-PH")} total
+            {grow.percent ? ` · Save ${grow.percent}%` : ""}
+          </span>
         </div>
-        <a className="btn-primary bb-cta" tabIndex={shown ? 0 : -1} href="/shop#flagship">Compare Protocols <Arrow /></a>
+        <Link className="btn-primary bb-cta" tabIndex={shown ? 0 : -1} href="/shop#flagship">Compare Protocols <Arrow /></Link>
       </div>
     </nav>
   );

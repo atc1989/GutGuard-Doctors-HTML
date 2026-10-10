@@ -1,8 +1,6 @@
--- Clear Dummy Data
-TRUNCATE TABLE sandbox.partner_points CASCADE;
-TRUNCATE TABLE sandbox.milestone_unlocks CASCADE;
-TRUNCATE TABLE doctors.partner_points CASCADE;
-TRUNCATE TABLE doctors.milestone_unlocks CASCADE;
+-- This file originally began by TRUNCATE-ing sandbox/doctors partner_points and
+-- milestone_unlocks to clear dummy data. That ran once (2026-09-29). It is removed so that a
+-- re-run (e.g. `supabase db push` without `migration repair`) cannot wipe live balances.
 
 -- Automated Points Trigger for SANDBOX
 CREATE OR REPLACE FUNCTION sandbox.award_order_points() RETURNS trigger AS $$

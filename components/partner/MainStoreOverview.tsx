@@ -14,12 +14,13 @@ import {
   useCopy,
   usePartner,
 } from "./shared";
-import { getMainStoreDashboard, type MainStoreDashboard } from "@/lib/api";
+import { getMainStoreDashboard, getMainStoreReports, type MainStoreDashboard, type MainStoreOrder } from "@/lib/api";
 
 export default function MainStoreOverview() {
   const { dashboard } = usePartner();
   const { copied, copy } = useCopy();
   const [mainData, setMainData] = useState<MainStoreDashboard | null>(null);
+  const [recentOrders, setRecentOrders] = useState<MainStoreOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
   const regLink = getPartnerQrLink(dashboard.partner, "referral");
@@ -37,6 +38,13 @@ export default function MainStoreOverview() {
         console.error("Failed to load main store dashboard:", err);
         if (!cancelled) setLoading(false);
       });
+    // The whole Main Store tree, same source as Reports. partner_dashboard only covers the
+    // store's own links and its directly referred partners, so it misses deeper stores.
+    getMainStoreReports({ limit: 5 })
+      .then((res) => {
+        if (!cancelled) setRecentOrders(res.orders);
+      })
+      .catch((err) => console.error("Failed to load recent network orders:", err));
 
     return () => {
       cancelled = true;
@@ -75,25 +83,28 @@ export default function MainStoreOverview() {
               View all <ArrowRight aria-hidden="true" size={14} />
             </Link>
           </div>
-          {dashboard.orders.length ? (
+          {recentOrders.length ? (
             <ul className="pp-recent">
-              {dashboard.orders.slice(0, 5).map((order) => (
+              {recentOrders.map((order) => {
+                const direct = order.store_id === dashboard.partner.id;
+                return (
                 <li key={order.order_code}>
                   <span>
-                    <strong>{order.buyer_name || order.buyer_first_name || "A customer"}</strong>
+                    <strong>{order.buyer_name || "A customer"}</strong>
                     <small>
                       {order.order_code} · {formatDate(order.created_at)}
-                      {order.source_partner_name ? ` · Via ${order.source_partner_name}` : " · Direct shop"}
+                      {direct ? " · Direct shop" : ` · Via ${order.store_name}`}
                     </small>
                   </span>
                   <span className="pp-recent-end">
-                    <span className={order.source_type === "direct" ? "pp-tag pp-tag-bone" : "pp-tag pp-tag-blue"}>
-                      {order.source_type === "direct" ? "Direct" : "Child store"}
+                    <span className={direct ? "pp-tag pp-tag-bone" : "pp-tag pp-tag-blue"}>
+                      {direct ? "Direct" : "Child store"}
                     </span>
                     <b>{peso(order.total_amount)}</b>
                   </span>
                 </li>
-              ))}
+                );
+              })}
             </ul>
           ) : (
             <EmptyState title="No network orders yet.">

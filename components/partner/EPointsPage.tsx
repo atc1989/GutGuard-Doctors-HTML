@@ -12,14 +12,22 @@ const MILESTONES = [
   { pts: 1500, rebate: 150000, label: "Full cycle target milestone" },
 ];
 
+// Each track runs its own 1,500-point cycle; milestones are measured inside the current cycle.
+function trackCycle(trackPoints: number) {
+  return { cycle: Math.floor(trackPoints / CYCLE_TARGET) + 1, inCycle: trackPoints % CYCLE_TARGET };
+}
+
 export default function EPointsPage() {
   const { dashboard } = usePartner();
+  // Separate components so a store_type change between renders never changes the hook order.
+  return dashboard.partner.store_type === "main" ? <MainStoreEPointsPage /> : <PartnerEPointsPage />;
+}
 
-  if (dashboard.partner.store_type === "main") {
-    return <MainStoreEPointsPage />;
-  }
-
+function PartnerEPointsPage() {
+  const { dashboard } = usePartner();
   const { points, rebates, point_sources: sources = [] } = dashboard;
+  const direct = trackCycle(points.own_points);
+  const referred = trackCycle(points.passup_points);
   const { copied, copy } = useCopy();
   const [tab, setTab] = useState<"rebates" | "points">("rebates");
   const [pointsFilter, setPointsFilter] = useState<"direct" | "referred" | "all">("direct");
@@ -47,7 +55,7 @@ export default function EPointsPage() {
       <section className="pp-stats" aria-label="E-Points summary">
         <StatTile label="Direct Shop Points" value={`${points.own_points} pts`} note="kept from direct customer orders" />
         <StatTile label="Referred Pass-Up Points" value={`${points.passup_points} pts`} note="earned from referred downline partners" />
-        <StatTile label="Passed Up to Upline" value={`${points.passed_up_to_upline_points} pts`} note="passed up to your sponsor/upline" />
+        <StatTile label="Lifetime E-Points" value={`${points.lifetime_points} pts`} note="direct and pass-up points combined" />
         <StatTile label={`Cycle ${points.current_cycle} Balance`} value={`${points.points_in_cycle} pts`} note={`Target: ${CYCLE_TARGET} pts`} />
       </section>
 
@@ -75,19 +83,19 @@ export default function EPointsPage() {
               </span>
             </div>
             <div className="pp-progress-labels">
-              <strong>{points.own_points} / {CYCLE_TARGET} Direct E-Points (Cycle {points.current_cycle})</strong>
-              <span>{Math.min(100, Math.round((points.own_points / CYCLE_TARGET) * 100))}%</span>
+              <strong>{direct.inCycle} / {CYCLE_TARGET} Direct E-Points (Cycle {direct.cycle})</strong>
+              <span>{Math.round((direct.inCycle / CYCLE_TARGET) * 100)}%</span>
             </div>
-            <div className="pp-progress" role="progressbar" aria-valuemin={0} aria-valuemax={CYCLE_TARGET} aria-valuenow={Math.min(points.own_points, CYCLE_TARGET)} aria-label="Direct sales cycle progress">
-              <div style={{ width: `${Math.min(100, (points.own_points / CYCLE_TARGET) * 100)}%`, background: "var(--gold)" }} />
+            <div className="pp-progress" role="progressbar" aria-valuemin={0} aria-valuemax={CYCLE_TARGET} aria-valuenow={direct.inCycle} aria-label="Direct sales cycle progress">
+              <div style={{ width: `${(direct.inCycle / CYCLE_TARGET) * 100}%`, background: "var(--gold)" }} />
             </div>
 
             <div className="pp-milestones" style={{ marginTop: 16 }}>
               {MILESTONES.map((m) => {
-                const unlocked = points.own_points >= m.pts;
+                const reached = direct.inCycle >= m.pts;
                 return (
-                  <article key={`direct-${m.pts}`} className={unlocked ? "pp-milestone unlocked" : "pp-milestone"}>
-                    <span>{unlocked ? "✓ Unlocked!" : `🎯 ${m.pts} Direct Pts (${points.own_points} / ${m.pts} pts)`}</span>
+                  <article key={`direct-${m.pts}`} className={reached ? "pp-milestone unlocked" : "pp-milestone"}>
+                    <span>{reached ? "✓ Milestone reached" : `🎯 ${m.pts} Direct Pts (${direct.inCycle} / ${m.pts} pts)`}</span>
                     <strong>{peso(m.rebate)}</strong>
                     <small>{m.label}</small>
                   </article>
@@ -108,19 +116,19 @@ export default function EPointsPage() {
               </span>
             </div>
             <div className="pp-progress-labels">
-              <strong>{points.passup_points} / {CYCLE_TARGET} Referred E-Points (Cycle {points.current_cycle})</strong>
-              <span>{Math.min(100, Math.round((points.passup_points / CYCLE_TARGET) * 100))}%</span>
+              <strong>{referred.inCycle} / {CYCLE_TARGET} Referred E-Points (Cycle {referred.cycle})</strong>
+              <span>{Math.round((referred.inCycle / CYCLE_TARGET) * 100)}%</span>
             </div>
-            <div className="pp-progress" role="progressbar" aria-valuemin={0} aria-valuemax={CYCLE_TARGET} aria-valuenow={Math.min(points.passup_points, CYCLE_TARGET)} aria-label="Referred pass-up cycle progress">
-              <div style={{ width: `${Math.min(100, (points.passup_points / CYCLE_TARGET) * 100)}%`, background: "var(--blue)" }} />
+            <div className="pp-progress" role="progressbar" aria-valuemin={0} aria-valuemax={CYCLE_TARGET} aria-valuenow={referred.inCycle} aria-label="Referred pass-up cycle progress">
+              <div style={{ width: `${(referred.inCycle / CYCLE_TARGET) * 100}%`, background: "var(--blue)" }} />
             </div>
 
             <div className="pp-milestones" style={{ marginTop: 16 }}>
               {MILESTONES.map((m) => {
-                const unlocked = points.passup_points >= m.pts;
+                const reached = referred.inCycle >= m.pts;
                 return (
-                  <article key={`referred-${m.pts}`} className={unlocked ? "pp-milestone unlocked" : "pp-milestone"}>
-                    <span>{unlocked ? "✓ Unlocked!" : `🎯 ${m.pts} Referred Pts (${points.passup_points} / ${m.pts} pts)`}</span>
+                  <article key={`referred-${m.pts}`} className={reached ? "pp-milestone unlocked" : "pp-milestone"}>
+                    <span>{reached ? "✓ Milestone reached" : `🎯 ${m.pts} Referred Pts (${referred.inCycle} / ${m.pts} pts)`}</span>
                     <strong>{peso(m.rebate)}</strong>
                     <small>{m.label}</small>
                   </article>

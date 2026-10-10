@@ -50,15 +50,16 @@ export default function PartnersPage() {
   const [offset, setOffset] = useState(0);
   const [pageSize, setPageSize] = useState(10);
 
-  // Map of partner full_name -> total pass-up points & matching order transactions
+  // Map of partner routing_slug -> total pass-up points & matching order transactions.
+  // Keyed by slug (unique), not full_name: two partners can share a name.
   const partnerPointsMap = useMemo(() => {
     const map = new Map<string, { totalPts: number; orders: typeof sources }>();
     sources.forEach((item) => {
-      const name = item.source_partner || "Unknown Partner";
-      const existing = map.get(name) || { totalPts: 0, orders: [] };
+      const key = item.source_partner_slug || item.source_partner || "Unknown Partner";
+      const existing = map.get(key) || { totalPts: 0, orders: [] };
       existing.totalPts += item.points;
       existing.orders.push(item);
-      map.set(name, existing);
+      map.set(key, existing);
     });
     return map;
   }, [sources]);
@@ -77,8 +78,8 @@ export default function PartnersPage() {
     });
 
     list.sort((a, b) => {
-      const aPts = partnerPointsMap.get(a.full_name)?.totalPts || 0;
-      const bPts = partnerPointsMap.get(b.full_name)?.totalPts || 0;
+      const aPts = partnerPointsMap.get(a.routing_slug)?.totalPts || 0;
+      const bPts = partnerPointsMap.get(b.routing_slug)?.totalPts || 0;
       if (sortBy === "points") return bPts - aPts;
       if (sortBy === "orders") return b.orders - a.orders;
       if (sortBy === "volume") return b.paid_order_value - a.paid_order_value;
@@ -227,7 +228,7 @@ export default function PartnersPage() {
             <div className="pp-tree-list">
               {filteredPartners.map((partner) => {
                 const isExpanded = Boolean(expandedPartners[partner.routing_slug]);
-                const pointsData = partnerPointsMap.get(partner.full_name) || { totalPts: 0, orders: [] };
+                const pointsData = partnerPointsMap.get(partner.routing_slug) || { totalPts: 0, orders: [] };
                 const isActive = partner.orders > 0;
 
                 return (
@@ -355,7 +356,7 @@ export default function PartnersPage() {
             <>
               <ul className="pp-partner-list">
                 {paginatedDirectory.map((partner) => {
-                  const pointsData = partnerPointsMap.get(partner.full_name) || { totalPts: 0 };
+                  const pointsData = partnerPointsMap.get(partner.routing_slug) || { totalPts: 0 };
                   return (
                     <li key={partner.routing_slug} className="pp-partner-dir-item">
                       <div className="pp-partner-dir-main">
@@ -481,7 +482,7 @@ export default function PartnersPage() {
                 <div className="pp-sheet-row">
                   <span className="pp-sheet-dt">Contributed E-Points</span>
                   <strong className="pp-sheet-dd" style={{ color: "var(--blue)" }}>
-                    +{partnerPointsMap.get(selectedPartner.full_name)?.totalPts || 0} E-Points
+                    +{partnerPointsMap.get(selectedPartner.routing_slug)?.totalPts || 0} E-Points
                   </strong>
                 </div>
 

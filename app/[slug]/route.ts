@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { PARTNER_SLUG_PATTERN, RESERVED_PARTNER_SLUGS } from "@/lib/referral";
+import { supabase } from "@/lib/supabase";
 
-const RESERVED = new Set(["admin", "api", "beehive", "dr", "partner", "physicians", "r", "science", "shop", "system"]);
 const COOKIE = "gg_partner_ref";
 const MAX_AGE = 30 * 24 * 60 * 60;
 
@@ -16,38 +16,15 @@ export async function GET(request: NextRequest, context: { params: Promise<{ slu
   const { slug: rawSlug } = await context.params;
   const slug = rawSlug.trim().toLowerCase();
   const destination = new URL("/physicians/register", request.url);
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || RESERVED.has(slug)) {
+  if (!PARTNER_SLUG_PATTERN.test(slug) || RESERVED_PARTNER_SLUGS.has(slug)) {
     return invalidInvitation(destination);
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !anonKey) return NextResponse.redirect(destination, 307);
-  const db = createClient(supabaseUrl, anonKey, { auth: { persistSession: false } });
-  let { data, error } = await db.rpc("get_partner_invitation", { p_slug: slug });
-  let invitation = Array.isArray(data) ? data[0] : data;
+  // Not configured is not an invalid invitation: send them to the form without the tag.
+  if (!supabase) return NextResponse.redirect(destination, 307);
 
-  if ((error || !invitation?.routing_slug) && slug === "icsps") {
-    const schema = process.env.NEXT_PUBLIC_SHOP_DB_SCHEMA || "doctors";
-    const { data: pclmDoc } = await db
-      .schema(schema as any)
-      .from("doctor_registrations")
-      .select("id, routing_slug, full_name")
-      .or("email.eq.atcconelwenxyn@gmail.com,full_name.ilike.%pclm%")
-      .limit(1)
-      .maybeSingle();
-
-    if (pclmDoc) {
-      await db
-        .schema(schema as any)
-        .from("doctor_registrations")
-        .update({ routing_slug: "icsps" })
-        .eq("id", pclmDoc.id);
-
-      invitation = { routing_slug: "icsps", full_name: pclmDoc.full_name };
-      error = null;
-    }
-  }
+  const { data, error } = await supabase.rpc("get_partner_invitation", { p_slug: slug });
+  const invitation = Array.isArray(data) ? data[0] : data;
 
   if (error || !invitation?.routing_slug) {
     return invalidInvitation(destination);

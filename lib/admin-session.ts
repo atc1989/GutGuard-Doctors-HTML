@@ -5,9 +5,12 @@ import { ADMIN_SESSION_MS, issueAdminToken, passwordMatches, readAdminToken } fr
 export const ADMIN_SESSION_COOKIE = "gg_admin_session";
 export const ADMIN_SESSION_MAX_AGE_S = ADMIN_SESSION_MS / 1000;
 
-// ADMIN_PASSWORD is required: it is the login secret, the HMAC key for session cookies, and
-// the value passed to the assert_wheel_admin RPCs. No fallback key - unset means locked out.
+// ADMIN_PASSWORD is required: it is the login secret and the value passed to the
+// assert_wheel_admin RPCs. No fallback key - unset means locked out.
 const adminPassword = () => process.env.ADMIN_PASSWORD?.trim() || null;
+// Cookie HMAC key. Set ADMIN_SESSION_SECRET (long random) so a leaked cookie cannot be used to
+// brute-force the password offline; falls back to the password so existing deploys keep working.
+const sessionKey = () => (adminPassword() ? process.env.ADMIN_SESSION_SECRET?.trim() || adminPassword() : null);
 
 // ponytail: logout revocation needs a store; uses the Upstash Redis already used for rate
 // limits. Without it a logged-out cookie stays valid until expiry (8h) or password rotation.
@@ -22,8 +25,8 @@ export async function verifyAdminPassword(candidate: string): Promise<boolean> {
 }
 
 export function createAdminSessionToken(): string | null {
-  const secret = adminPassword();
-  return secret ? issueAdminToken(secret) : null;
+  const key = sessionKey();
+  return key ? issueAdminToken(key) : null;
 }
 
 /**
@@ -32,10 +35,11 @@ export function createAdminSessionToken(): string | null {
  */
 export async function getAdminPasswordFromSession(): Promise<string | null> {
   const secret = adminPassword();
+  const key = sessionKey();
   const token = (await cookies()).get(ADMIN_SESSION_COOKIE)?.value;
-  if (!secret || !token) return null;
+  if (!secret || !key || !token) return null;
 
-  const session = readAdminToken(secret, token);
+  const session = readAdminToken(key, token);
   if (!session) return null;
 
   const store = redis();
@@ -51,9 +55,9 @@ export async function getAdminPasswordFromSession(): Promise<string | null> {
 
 /** Marks the current session revoked so a copied cookie stops working at logout. */
 export async function revokeAdminSession(): Promise<void> {
-  const secret = adminPassword();
+  const key = sessionKey();
   const token = (await cookies()).get(ADMIN_SESSION_COOKIE)?.value;
-  const session = secret && token ? readAdminToken(secret, token) : null;
+  const session = key && token ? readAdminToken(key, token) : null;
   const store = redis();
   if (!session || !store) return;
   const ttl = Math.max(1, Math.ceil((session.exp - Date.now()) / 1000));

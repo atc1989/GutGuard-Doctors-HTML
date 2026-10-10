@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Check, ChevronDown, Coins, Copy, LayoutDashboard, LogOut, Package, QrCode, Users } from "lucide-react";
 import { Logo } from "@/components/GutguardSite";
-import { getPartnerQrLink, useCopy, usePartner } from "./shared";
+import { PUBLIC_MARKETING_ORIGIN, getPartnerQrLink, useCopy, usePartner } from "./shared";
 
 const LIFESTYLE_NAV = [
   { href: "/partner", label: "Overview", short: "Overview", icon: LayoutDashboard },
@@ -59,7 +59,9 @@ export default function PartnerShell({ children }: { children: React.ReactNode }
   return (
     <div className="pp-app">
       <header className="pp-topbar">
-        <Link className="pp-brand" href="/" aria-label="GutGuard home"><Logo h={26} /></Link>
+        {/* Absolute: on partners.gutguard.ph "/" redirects to registration, which bounces a
+            signed-in partner straight back to the dashboard. */}
+        <a className="pp-brand" href={PUBLIC_MARKETING_ORIGIN} aria-label="GutGuard home"><Logo h={26} /></a>
         <span className="pp-portal-name">Partner Portal</span>
         <div className="pp-topbar-spacer" />
         <button type="button" className="pp-copy-btn" onClick={() => copy(shopLink)} aria-label="Copy shop link">

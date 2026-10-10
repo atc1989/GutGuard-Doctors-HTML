@@ -21,8 +21,8 @@ const REVIEW_FIELDS: Array<{
   { label: "Email", key: "email" },
   { label: "Mobile", key: "mobile" },
   { label: "TikTok", key: "tiktokUsername" },
-  { label: "Specialty", key: "specialty" },
-  { label: "City address", key: "location" },
+  { label: "Complete Clinic Address", key: "location" },
+  { label: "Where did you find us", key: "whereDidYouFindUs" },
 ];
 
 export default function ConfirmRegistrationModal({

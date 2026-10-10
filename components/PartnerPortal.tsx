@@ -258,11 +258,15 @@ export default function PartnerPortal({ initialView: initialViewProp, referrerSl
       setView("signing-in");
       setNotice("Signing you in…");
       await load();
-    } catch {
+    } catch (caught) {
       await signOutPartner();
+      // partner_dashboard's own messages are already written for partners
+      // ("This email is not registered as a GutGuard partner."), so show them.
+      // A PostgrestError is a plain object, not an Error, hence the cast.
+      const detail = String((caught as { message?: unknown })?.message ?? "").trim();
       setError({
         field: "form",
-        message: "You signed in, but the partner dashboard could not load. Sign in again in a moment.",
+        message: detail || "You signed in, but the partner dashboard could not load. Sign in again in a moment.",
       });
       setView("email");
       setNotice("");

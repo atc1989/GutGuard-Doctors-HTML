@@ -50,6 +50,10 @@ function getLoginLimiter(): Ratelimit | null {
   return loginLimiter;
 }
 
+// Upstash unreachable: stay closed (as before) but answer with a readable 503, not a crash.
+const limiterUnavailable = (what: string) =>
+  NextResponse.json({ error: `${what} is temporarily unavailable. Try again shortly.` }, { status: 503 });
+
 export async function proxy(req: NextRequest) {
   // 1. Canonical Host Redirect: Redirect any *.vercel.app request to custom domain
   const host = (req.headers.get("x-forwarded-host") || req.headers.get("host") || "").toLowerCase();
@@ -64,7 +68,8 @@ export async function proxy(req: NextRequest) {
     // ponytail: fails open without Redis (local dev); production must set the UPSTASH_* vars.
     if (!limiter) return NextResponse.next();
     const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "127.0.0.1";
-    const result = await limiter.limit(clientIp);
+    const result = await limiter.limit(clientIp).catch(() => null);
+    if (!result) return limiterUnavailable("Admin login");
     if (!result.success) {
       return NextResponse.json(
         { error: "Too many login attempts. Try again in a few minutes." },
@@ -101,7 +106,8 @@ export async function proxy(req: NextRequest) {
   }
 
   // 1. Check the IP limit first (cheapest single-key lookup).
-  const ipResult = await ip.limit(clientIp);
+  const ipResult = await ip.limit(clientIp).catch(() => null);
+  if (!ipResult) return limiterUnavailable("Sign-in");
   if (!ipResult.success) {
     const retryAfter = Math.ceil((ipResult.reset - Date.now()) / 1000);
     return NextResponse.json(
@@ -122,7 +128,8 @@ export async function proxy(req: NextRequest) {
 
   // 2. Check the per-email limit.
   if (email) {
-    const emailResult = await em.limit(email);
+    const emailResult = await em.limit(email).catch(() => null);
+    if (!emailResult) return limiterUnavailable("Sign-in");
     if (!emailResult.success) {
       const retryAfter = Math.ceil((emailResult.reset - Date.now()) / 1000);
       return NextResponse.json(

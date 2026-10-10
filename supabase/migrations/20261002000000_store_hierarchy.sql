@@ -66,6 +66,12 @@ BEGIN
   WHERE routing_slug = 'gutguard-main' OR store_type = 'main'
   LIMIT 1;
 
+  -- One-time setup: if a main store already exists this already ran. Re-running the
+  -- classification below would demote every partner an admin promoted without a paid order.
+  IF v_main_store_id IS NOT NULL THEN
+    RETURN;
+  END IF;
+
   IF v_main_store_id IS NULL THEN
     INSERT INTO doctors.doctor_registrations (
       full_name,

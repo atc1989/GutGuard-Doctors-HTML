@@ -1,4 +1,5 @@
 import { PRIZES } from "@/lib/constants";
+import { normalizePromo, PROMO_COLUMNS, type Promo } from "@/lib/catalog";
 import { pickPrizeIndex } from "@/lib/prizes";
 import { isSupabaseConfigured, supabase, supabaseShop, SHOP_SCHEMA } from "@/lib/supabase";
 import { checkImageFile, TESTIMONIAL_BUCKET } from "@/lib/testimonials";
@@ -50,6 +51,11 @@ export type AdminDoctorRegistration = {
   redirect_url: string;
   specialty: string;
   practice_location: string;
+  where_did_you_find_us?: string;
+  referred_by_partner_id?: string | null;
+  referrer_name?: string | null;
+  referrer_prefix?: string | null;
+  referrer_slug?: string | null;
   store_type?: StoreType;
   referral_qr_enabled?: boolean;
   main_store_id?: string | null;
@@ -58,6 +64,8 @@ export type AdminDoctorRegistration = {
   created_at: string;
   prize_label?: string | null;
   prize_claimed_at?: string | null;
+  /** Whether this partner's shared shop link also sells the Full Protocol. */
+  shop_show_protocol?: boolean;
 };
 
 export type AdminDoctorRegistrationUpdate = {
@@ -321,10 +329,10 @@ export type PartnerDashboard = {
     lifetime_points: number;
     own_points: number;
     passup_points: number;
-    passed_up_to_upline_points: number;
   };
   rebates: Array<{
     cycle_number: number;
+    milestone_type?: "direct" | "referred";
     milestone_pts: number;
     rebate_amount: number;
     status: string;
@@ -335,6 +343,7 @@ export type PartnerDashboard = {
     points: number;
     depth: number;
     source_partner: string;
+    source_partner_slug: string;
     created_at: string;
   }>;
   orders: PartnerOrder[];
@@ -564,7 +573,7 @@ type RegistrationEmailTestResponse = {
 
 export async function registerDoctor(payload: RegistrationPayload) {
   if (isSupabaseConfigured && supabase) {
-    const { data, error } = await supabase.rpc("register_doctor", {
+    let { data, error } = await supabase.rpc("register_doctor", {
       p_full_name: payload.fullName,
       p_name_prefix: payload.namePrefix,
       p_email: payload.email,
@@ -573,7 +582,28 @@ export async function registerDoctor(payload: RegistrationPayload) {
       p_specialty: payload.specialty,
       p_practice_location: payload.location,
       p_referrer_slug: payload.referrerSlug || null,
+      p_where_did_you_find_us: payload.whereDidYouFindUs || "",
     });
+
+    if (
+      error &&
+      (error.message?.includes("Could not find the function") ||
+        error.code === "PGRST202" ||
+        error.message?.includes("does not exist"))
+    ) {
+      const fallback = await supabase.rpc("register_doctor", {
+        p_full_name: payload.fullName,
+        p_name_prefix: payload.namePrefix,
+        p_email: payload.email,
+        p_mobile: payload.mobile,
+        p_tiktok_username: payload.tiktokUsername,
+        p_specialty: payload.specialty,
+        p_practice_location: payload.location,
+        p_referrer_slug: payload.referrerSlug || null,
+      });
+      data = fallback.data;
+      error = fallback.error;
+    }
 
     if (error) throw new Error(`Registration failed: ${error.message}`);
 
@@ -825,6 +855,21 @@ export async function updateDoctorRegistration(
   return normalizeAdminDoctorRegistration((Array.isArray(data.doctor) ? data.doctor[0] : data.doctor) as AdminDoctorRegistration);
 }
 
+export async function setDoctorShopProtocol(
+  _adminPassword: string,
+  doctorId: string,
+  show: boolean,
+): Promise<boolean> {
+  const res = await fetch("/api/admin/doctors", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: doctorId, shop_show_protocol: show }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Failed to update shop link setting.");
+  return data.shop_show_protocol === true;
+}
+
 export async function getNewsletterSendHistory(_adminPassword?: string): Promise<NewsletterSendHistory[]> {
   const res = await fetch("/api/admin/newsletter/history");
   if (!res.ok) {
@@ -1048,11 +1093,6 @@ export async function verifyPartnerOtp(email: string, token: string): Promise<vo
   });
 
   if (error) throw error;
-
-  // supabaseShop is a second createClient (see lib/supabase.ts) and was built before this
-  // session existed, so it is still anonymous in this tab until it is handed the session.
-  // Without this the first dashboard read fails and only starts working after a reload.
-  if (data.session) await supabaseShop.auth.setSession(data.session);
 }
 
 export async function signOutPartner(): Promise<void> {
@@ -1064,11 +1104,9 @@ export async function signOutPartner(): Promise<void> {
 export async function hasPartnerSession(): Promise<boolean> {
   if (!isSupabaseConfigured || !supabase || !supabaseShop) return false;
 
+  // supabaseShop reads this same session per request (see lib/supabase.ts), so nothing to copy.
   const { data } = await supabase.auth.getSession();
-  if (!data.session) return false;
-
-  await supabaseShop.auth.setSession(data.session);
-  return true;
+  return Boolean(data.session);
 }
 
 export async function getPartnerAuthEmail(): Promise<string> {
@@ -1134,12 +1172,12 @@ export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Pr
       lifetime_points: Number(points.total_all_time ?? points.lifetime_points ?? 0),
       own_points: Number(points.own_points ?? 0),
       passup_points: Number(points.passup_points ?? 0),
-      passed_up_to_upline_points: Number(points.passed_up_to_upline_points ?? 0),
     },
     rebates: (Array.isArray(row.rebates) ? row.rebates : []).map((entry) => {
       const rebateRow = (entry ?? {}) as Record<string, unknown>;
       return {
         cycle_number: Number(rebateRow.cycle_number ?? 1),
+        milestone_type: (rebateRow.milestone_type as "direct" | "referred") ?? "referred",
         milestone_pts: Number(rebateRow.milestone_pts ?? 0),
         rebate_amount: Number(rebateRow.rebate_amount ?? 0),
         status: String(rebateRow.status ?? "unlocked"),
@@ -1153,6 +1191,7 @@ export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Pr
         points: Number(psRow.points ?? 0),
         depth: Number(psRow.depth ?? 0),
         source_partner: String(psRow.source_partner ?? ""),
+        source_partner_slug: String(psRow.source_partner_slug ?? ""),
         created_at: String(psRow.created_at ?? ""),
       };
     }),
@@ -1262,7 +1301,7 @@ export async function getMainStoreReports(query: {
         province: String(order.province ?? ""),
         barangay: String(order.barangay ?? ""),
         zip: String(order.zip ?? ""),
-        items: Array.isArray(order.items) ? (order.items as any[]) : [],
+        items: Array.isArray(order.items) ? (order.items as ShopOrderItem[]) : [],
         store_id: String(order.store_id ?? ""),
         store_name: String(order.store_name ?? ""),
         store_type: (order.store_type ?? "lifestyle") as StoreType,
@@ -1748,6 +1787,11 @@ function normalizeAdminDoctorRegistration(doctor: AdminDoctorRegistration): Admi
     routing_slug: routingSlug,
     redirect_url:
       (doctor.redirect_url ?? "").trim() || (tiktokUsername ? `https://www.tiktok.com/@${tiktokUsername}` : ""),
+    where_did_you_find_us: doctor.where_did_you_find_us ?? "",
+    referred_by_partner_id: doctor.referred_by_partner_id ?? null,
+    referrer_name: doctor.referrer_name ?? null,
+    referrer_prefix: doctor.referrer_prefix ?? null,
+    referrer_slug: doctor.referrer_slug ?? null,
   };
 }
 
@@ -1943,4 +1987,11 @@ export async function adminReviewTestimonial(
   }
   const data = await res.json();
   return data.story as AdminTestimonial;
+}
+
+/** Switched-on promos for shop pricing. Any failure means full prices - checkout falls back the same way. */
+export async function loadPromos(): Promise<Promo[]> {
+  if (!supabaseShop) return [];
+  const { data } = await supabaseShop.from("promos").select(PROMO_COLUMNS).eq("enabled", true);
+  return (data ?? []).map((row) => normalizePromo(row as Record<string, unknown>));
 }
