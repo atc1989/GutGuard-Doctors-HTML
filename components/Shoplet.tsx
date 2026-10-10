@@ -6,8 +6,8 @@ import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { ArrowRightIcon, CheckIcon } from "@/components/Icons";
 import { Logo } from "@/components/GutguardSite";
-import { createShopOrder, sendShopOrderEmail, startMayaCheckout, type ShopOrderItem } from "@/lib/api";
-import { formatPromoDay, normalizePromo, PROMO_COLUMNS, promoPrice, TIERS, TRIALS, type Promo, type PromoPrice } from "@/lib/catalog";
+import { createShopOrder, loadPromos, sendShopOrderEmail, startMayaCheckout, type ShopOrderItem } from "@/lib/api";
+import { formatPromoDay, promoPrice, TIERS, TRIALS, type Promo, type PromoPrice } from "@/lib/catalog";
 import {
   fetchBarangays,
   fetchLocalities,
@@ -18,7 +18,6 @@ import {
 } from "@/lib/philippines-address";
 import { readReferralShopName, readReferralSlug } from "@/lib/referral";
 import { getOrderTotal, quoteShipping } from "@/lib/shipping";
-import { supabaseShop } from "@/lib/supabase";
 
 // Bump this suffix whenever catalog prices change. A stored basket carries the price
 // it was added at, and the server re-derives prices at checkout - so a stale basket
@@ -185,12 +184,7 @@ export default function Shoplet() {
   }, []);
 
   useEffect(() => {
-    if (!supabaseShop) return setPromos([]);
-    supabaseShop
-      .from("promos")
-      .select(PROMO_COLUMNS)
-      .eq("enabled", true)
-      .then(({ data }) => setPromos((data ?? []).map((row) => normalizePromo(row as Record<string, unknown>))));
+    loadPromos().then(setPromos);
   }, []);
 
   // A saved basket carries the price it was added at; promos start and end, so re-price it

@@ -3,7 +3,8 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Menu, X, Check, Lock } from "lucide-react";
-import { TIERS } from "@/lib/catalog";
+import { promoPrice, TIERS } from "@/lib/catalog";
+import { loadPromos } from "@/lib/api";
 
 /* ────────────────────────────────────────────────────────────
    Gutguard — Multi-page site (Home · Science · Shop · Physicians)
@@ -834,6 +835,7 @@ footer{padding:54px 0;border-top:1px solid var(--rule);}
 .bb-name{font-family:var(--serif);font-size:18px;font-weight:500;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .bb-price{display:flex;flex-direction:column;gap:2px;margin-left:auto;text-align:right;}
 .bb-amt{font-family:var(--mono);font-weight:600;font-size:22px;color:var(--ink);line-height:1;}
+.bb-was{font-size:14px;font-weight:500;color:var(--ink-4);margin-right:8px;}
 .bb-unit{font-size:13px;color:var(--ink-3);margin-left:1px;}
 .bb-was{font-family:var(--mono);font-size:12px;color:var(--ink-4);text-decoration:line-through;margin-left:5px;}
 .bb-sub{font-family:var(--mono);font-size:10px;letter-spacing:.03em;color:var(--ink-3);}
@@ -2106,6 +2108,13 @@ function SectionTabs({ items }) {
 
 function BuyBar({ route }) {
   const [shown, setShown] = useState(false);
+  const [grow, setGrow] = useState({ price: GROW.price, perCap: GROW.perCap, percent: 0 });
+  useEffect(() => {
+    loadPromos().then((promos) => {
+      const live = promoPrice(GROW.id, GROW.price, promos, new Date());
+      if (live.percent) setGrow({ price: live.price, perCap: Math.round(live.price / GROW.caps), percent: live.percent });
+    });
+  }, []);
   const enabled = route === "/" || route === "/shop";
   useEffect(() => {
     if (!enabled) { setShown(false); return; }
@@ -2153,8 +2162,13 @@ function BuyBar({ route }) {
           <span className="bb-meta">{GROW.phase} protocol <span className="bb-tag">Most popular</span></span>
         </div>
         <div className="bb-price">
-          <span className="bb-amt">₱{GROW.perCap} / capsule</span>
-          <span className="bb-sub">{GROW.phase} protocol · ₱{GROW.price.toLocaleString("en-PH")} total</span>
+          <span className="bb-amt">
+            {grow.percent ? <s className="bb-was">₱{GROW.perCap}</s> : null}₱{grow.perCap} / capsule
+          </span>
+          <span className="bb-sub">
+            {GROW.phase} protocol · ₱{grow.price.toLocaleString("en-PH")} total
+            {grow.percent ? ` · Save ${grow.percent}%` : ""}
+          </span>
         </div>
         <Link className="btn-primary bb-cta" tabIndex={shown ? 0 : -1} href="/shop#flagship">Compare Protocols <Arrow /></Link>
       </div>
