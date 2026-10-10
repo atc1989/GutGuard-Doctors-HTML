@@ -124,6 +124,8 @@ export default function Shoplet() {
   const [isLoadingLocalities, setIsLoadingLocalities] = useState(false);
   const [isLoadingBarangays, setIsLoadingBarangays] = useState(false);
   const [referralShopName, setReferralShopName] = useState("");
+  // Set by /r/<slug> for partners whose link may not sell the Full Protocol.
+  const [trialOnly, setTrialOnly] = useState(false);
 
   const selectedTrial = TRIALS.find((item) => item.id === trialId) ?? TRIALS[0];
   const selectedTier = TIERS.find((item) => item.id === tierId) ?? TIERS[2];
@@ -174,13 +176,19 @@ export default function Shoplet() {
 
   useEffect(() => {
     setReferralShopName(readReferralShopName());
+    setTrialOnly(new URLSearchParams(window.location.search).has("trial"));
   }, []);
 
   // Coming back from a cancelled Maya checkout should not cost the customer their basket.
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(BASKET_STORAGE_KEY);
-      if (saved) setBasket(JSON.parse(saved) as ShopOrderItem[]);
+      if (saved) {
+        const items = JSON.parse(saved) as ShopOrderItem[];
+        // A basket from an earlier full-shop visit must not carry protocol packs into a trial-only link.
+        const trialOnlyLink = new URLSearchParams(window.location.search).has("trial");
+        setBasket(trialOnlyLink ? items.filter((item) => TRIALS.some((trial) => trial.id === item.id)) : items);
+      }
     } catch {
       window.localStorage.removeItem(BASKET_STORAGE_KEY);
     }
@@ -516,7 +524,7 @@ export default function Shoplet() {
           <div className="shop-section-head">
             <div>
               <p className="shop-kicker">Choose your order</p>
-              <h2>Start small or begin the protocol.</h2>
+              <h2>{trialOnly ? "Start small - try it first." : "Start small or begin the protocol."}</h2>
             </div>
             <button className="shop-secondary" type="button" onClick={() => setDrawerOpen(true)}>
               Open basket ({basketCount})
@@ -524,16 +532,18 @@ export default function Shoplet() {
           </div>
 
           <div className="shop-card" aria-label="Product options">
-            <div className="shop-segment">
-              <button type="button" className={mode === "trial" ? "active" : ""} onClick={() => setMode("trial")}>
-                Try first
-              </button>
-              <button type="button" className={mode === "protocol" ? "active" : ""} onClick={() => setMode("protocol")}>
-                Full protocol
-              </button>
-            </div>
+            {trialOnly ? null : (
+              <div className="shop-segment">
+                <button type="button" className={mode === "trial" ? "active" : ""} onClick={() => setMode("trial")}>
+                  Try first
+                </button>
+                <button type="button" className={mode === "protocol" ? "active" : ""} onClick={() => setMode("protocol")}>
+                  Full protocol
+                </button>
+              </div>
+            )}
 
-            {mode === "trial" ? (
+            {mode === "trial" || trialOnly ? (
               <>
                 <p className="shop-options-label">
                   <span>Start here · low risk</span>
@@ -557,9 +567,11 @@ export default function Shoplet() {
                     </button>
                   ))}
                 </div>
-                <p className="shop-note">
-                  The same living formula as the full protocol - try it before you commit.
-                </p>
+                {trialOnly ? null : (
+                  <p className="shop-note">
+                    The same living formula as the full protocol - try it before you commit.
+                  </p>
+                )}
               </>
             ) : (
               <>
