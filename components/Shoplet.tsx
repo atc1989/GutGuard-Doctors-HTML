@@ -7,7 +7,7 @@ import { Menu, X } from "lucide-react";
 import { ArrowRightIcon, CheckIcon } from "@/components/Icons";
 import { Logo } from "@/components/GutguardSite";
 import { createShopOrder, sendShopOrderEmail, startMayaCheckout, type ShopOrderItem } from "@/lib/api";
-import { TIERS, TRIALS } from "@/lib/catalog";
+import { formatPromoDay, normalizePromo, PROMO_COLUMNS, promoPrice, TIERS, TRIALS, type Promo, type PromoPrice } from "@/lib/catalog";
 import {
   fetchBarangays,
   fetchLocalities,
@@ -18,6 +18,7 @@ import {
 } from "@/lib/philippines-address";
 import { readReferralShopName, readReferralSlug } from "@/lib/referral";
 import { getOrderTotal, quoteShipping } from "@/lib/shipping";
+import { supabaseShop } from "@/lib/supabase";
 
 // Bump this suffix whenever catalog prices change. A stored basket carries the price
 // it was added at, and the server re-derives prices at checkout - so a stale basket
@@ -126,6 +127,9 @@ export default function Shoplet() {
   const [referralShopName, setReferralShopName] = useState("");
   // Set by /r/<slug> for partners whose link may not sell the Full Protocol.
   const [trialOnly, setTrialOnly] = useState(false);
+  // null until loaded; a failed load means full prices, which checkout falls back to as well.
+  const [promos, setPromos] = useState<Promo[] | null>(null);
+  const priceOf = (id: string, basePrice: number) => promoPrice(id, basePrice, promos ?? [], new Date());
 
   const selectedTrial = TRIALS.find((item) => item.id === trialId) ?? TRIALS[0];
   const selectedTier = TIERS.find((item) => item.id === tierId) ?? TIERS[2];
@@ -172,12 +176,34 @@ export default function Shoplet() {
   }, [menuOpen]);
   const totalAmount = getOrderTotal(subtotal, shippingQuote.fee);
   const currentBuyLabel = mode === "trial" ? `Add ${selectedTrial.name}` : `Add ${selectedTier.name}`;
-  const currentPrice = mode === "trial" ? selectedTrial.price : selectedTier.price;
+  const selectedItem = mode === "trial" || trialOnly ? selectedTrial : selectedTier;
+  const currentPrice = priceOf(selectedItem.id, selectedItem.price);
 
   useEffect(() => {
     setReferralShopName(readReferralShopName());
     setTrialOnly(new URLSearchParams(window.location.search).has("trial"));
   }, []);
+
+  useEffect(() => {
+    if (!supabaseShop) return setPromos([]);
+    supabaseShop
+      .from("promos")
+      .select(PROMO_COLUMNS)
+      .eq("enabled", true)
+      .then(({ data }) => setPromos((data ?? []).map((row) => normalizePromo(row as Record<string, unknown>))));
+  }, []);
+
+  // A saved basket carries the price it was added at; promos start and end, so re-price it
+  // to today's price or checkout would reject it after the customer filled in the form.
+  useEffect(() => {
+    if (!promos) return;
+    setBasket((current) =>
+      current.map((item) => {
+        const product = [...TIERS, ...TRIALS].find((entry) => entry.id === item.id);
+        return product ? { ...item, price: promoPrice(item.id, product.price, promos, new Date()).price } : item;
+      }),
+    );
+  }, [promos]);
 
   // Coming back from a cancelled Maya checkout should not cost the customer their basket.
   useEffect(() => {
@@ -276,7 +302,8 @@ export default function Shoplet() {
       if (existing) {
         return current.map((item) => (item.id === source.id ? { ...item, qty: Math.min(item.qty + 1, 20) } : item));
       }
-      return [...current, { id: source.id, name: source.name, caps: source.caps, price: source.price, qty: 1 }];
+      const price = priceOf(source.id, source.price).price;
+      return [...current, { id: source.id, name: source.name, caps: source.caps, price, qty: 1 }];
     });
     setDrawerOpen(true);
   }
@@ -563,7 +590,7 @@ export default function Shoplet() {
                           {item.caps} caps · {peso(Math.round(item.price / item.caps))}/cap
                         </small>
                       </span>
-                      <b>{peso(item.price)}</b>
+                      <PriceTag value={priceOf(item.id, item.price)} />
                     </button>
                   ))}
                 </div>
@@ -577,7 +604,16 @@ export default function Shoplet() {
               <>
                 <p className="shop-options-label">
                   <span>When you&apos;re ready</span>
-                  <em>₱133 → ₱90 / cap</em>
+                  <em>
+                    {/* The per-cap range, first tier to last, at today's promo prices. */}
+                    {[TIERS[0], TIERS[TIERS.length - 1]]
+                      .map((tier) => {
+                        const price = priceOf(tier.id, tier.price);
+                        return peso(price.percent ? Math.round(price.price / tier.caps) : tier.perCap);
+                      })
+                      .join(" → ")}{" "}
+                    / cap
+                  </em>
                 </p>
                 <div className="shop-options protocol">
                   {TIERS.map((item) => (
@@ -596,17 +632,31 @@ export default function Shoplet() {
                           {item.phase} · {item.caps} capsules
                         </small>
                       </span>
-                      <b>{peso(item.perCap)}/cap</b>
+                      <PriceTag value={priceOf(item.id, item.price)} perCap={{ caps: item.caps, base: item.perCap }} />
                     </button>
                   ))}
                 </div>
               </>
             )}
 
+            {currentPrice.promo ? (
+              <p className="shop-promo-note">
+                {[
+                  currentPrice.promo.label,
+                  `Save ${currentPrice.percent}%`,
+                  currentPrice.promo.ends_on ? `until ${formatPromoDay(currentPrice.promo.ends_on)}` : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            ) : null}
+
             <button type="button" className="shop-primary" onClick={addCurrentItem}>
               <span>
                 {currentBuyLabel}
-                <small>{peso(currentPrice)}</small>
+                <small>
+                  {currentPrice.percent ? <s>{peso(currentPrice.basePrice)}</s> : null} {peso(currentPrice.price)}
+                </small>
               </span>
               <ArrowRightIcon />
             </button>
@@ -780,6 +830,19 @@ export default function Shoplet() {
         </div>
       ) : null}
     </main>
+  );
+}
+
+/** Price with the pre-promo amount struck through. perCap shows the per-capsule rate instead. */
+function PriceTag({ value, perCap }: { value: PromoPrice; perCap?: { caps: number; base: number } }) {
+  const now = perCap ? Math.round(value.price / perCap.caps) : value.price;
+  const was = perCap ? perCap.base : value.basePrice;
+  const suffix = perCap ? "/cap" : "";
+  return (
+    <b className="shop-price">
+      {value.percent ? <s>{`${peso(was)}${suffix}`}</s> : null}
+      {`${peso(value.percent ? now : was)}${suffix}`}
+    </b>
   );
 }
 

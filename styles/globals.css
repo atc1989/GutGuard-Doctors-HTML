@@ -3045,6 +3045,23 @@
   white-space: nowrap;
 }
 
+.shop-price s,
+.shop-primary small s {
+  margin-right: 6px;
+  color: var(--ink-3);
+  font-weight: 500;
+  opacity: 0.7;
+}
+
+.shop-promo-note {
+  margin: 12px 2px 0;
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .shop-note {
   padding: 8px 2px 0;
 }
@@ -7970,4 +7987,102 @@
 @media print {
   .pp-topbar, .pp-side, .pp-bottom, .pp-screen { display: none !important; }
   .pp-main { padding: 0; }
+}
+
+/* Admin promos */
+.admin-promo-editor {
+  margin-bottom: 20px;
+}
+
+.admin-promo-dates {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-promo-products {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.admin-promo-product {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px minmax(120px, auto);
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.admin-wheel-prize .admin-promo-percent {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  grid-column: 2;
+}
+
+.admin-wheel-shell .admin-promo-percent input {
+  padding: 8px;
+  text-align: right;
+}
+
+.admin-promo-preview {
+  grid-column: 3;
+  color: var(--ink-3);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.admin-wheel-prize-footer:has(> button + button) {
+  grid-template-columns: 1fr auto auto;
+}
+
+.admin-promo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid var(--rule);
+  padding: 16px 18px;
+  background: rgba(244, 241, 234, 0.54);
+}
+
+.admin-promo-row.ended,
+.admin-promo-row.off {
+  opacity: 0.6;
+}
+
+.admin-promo-row p {
+  margin: 6px 0 0;
+  color: var(--ink-3);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.admin-promo-status {
+  margin-left: 10px;
+  padding: 3px 8px;
+  background: var(--ink);
+  color: var(--bone);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-promo-row.live .admin-promo-status {
+  background: var(--blue);
+}
+
+@media (max-width: 520px) {
+  .admin-promo-product {
+    grid-template-columns: 1fr 88px;
+  }
+
+  .admin-promo-preview {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
 }
