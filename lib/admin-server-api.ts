@@ -319,6 +319,23 @@ export async function serverAdminPromotePartner(
   return data as { success: boolean; store_type: string };
 }
 
+export async function serverSetDoctorShopProtocol(
+  adminPassword: string,
+  doctorId: string,
+  show: boolean,
+): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.rpc("admin_set_doctor_shop_protocol", {
+    p_admin_password: adminPassword,
+    p_doctor_id: doctorId,
+    p_show: show,
+  });
+
+  if (error) throw error;
+  return data === true;
+}
+
 // ─── Newsletter ─────────────────────────────────────────────────────────────
 
 export async function serverGetNewsletterSendHistory(adminPassword: string): Promise<NewsletterSendHistory[]> {

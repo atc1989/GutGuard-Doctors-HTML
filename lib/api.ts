@@ -63,6 +63,8 @@ export type AdminDoctorRegistration = {
   created_at: string;
   prize_label?: string | null;
   prize_claimed_at?: string | null;
+  /** Whether this partner's shared shop link also sells the Full Protocol. */
+  shop_show_protocol?: boolean;
 };
 
 export type AdminDoctorRegistrationUpdate = {
@@ -850,6 +852,21 @@ export async function updateDoctorRegistration(
   }
   const data = await res.json();
   return normalizeAdminDoctorRegistration((Array.isArray(data.doctor) ? data.doctor[0] : data.doctor) as AdminDoctorRegistration);
+}
+
+export async function setDoctorShopProtocol(
+  _adminPassword: string,
+  doctorId: string,
+  show: boolean,
+): Promise<boolean> {
+  const res = await fetch("/api/admin/doctors", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: doctorId, shop_show_protocol: show }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Failed to update shop link setting.");
+  return data.shop_show_protocol === true;
 }
 
 export async function getNewsletterSendHistory(_adminPassword?: string): Promise<NewsletterSendHistory[]> {

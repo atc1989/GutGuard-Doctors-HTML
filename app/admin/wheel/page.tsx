@@ -47,6 +47,7 @@ type AdminDoctorRegistration = {
   created_at: string;
   prize_label?: string | null;
   prize_claimed_at?: string | null;
+  shop_show_protocol?: boolean;
 };
 
 type NewsletterSendHistory = {
@@ -140,6 +141,7 @@ type WheelApi = {
       | "practice_location"
     >,
   ) => Promise<AdminDoctorRegistration>;
+  setDoctorShopProtocol?: (adminPassword: string, doctorId: string, show: boolean) => Promise<boolean>;
   getNewsletterSendHistory?: (adminPassword: string) => Promise<NewsletterSendHistory[]>;
   sendNewsletter?: (
     adminPassword: string,
@@ -1133,6 +1135,24 @@ export default function AdminWheelPage() {
     }
   }
 
+  async function toggleDoctorShopProtocol(doctor: AdminDoctorRegistration, show: boolean) {
+    setError(null);
+    setNotice(null);
+
+    try {
+      const api = await loadWheelApi();
+      if (!api.setDoctorShopProtocol) throw new Error("Missing setDoctorShopProtocol helper in lib/api.ts.");
+
+      const saved = await api.setDoctorShopProtocol(password, doctor.id, show);
+      setDoctors((current) =>
+        current.map((item) => (item.id === doctor.id ? { ...item, shop_show_protocol: saved } : item)),
+      );
+      setNotice(saved ? "Shop link now shows the Full Protocol." : "Shop link now shows Try First only.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to update shop link setting.");
+    }
+  }
+
   async function copyDoctorQrUrl(url: string) {
     setError(null);
     setNotice(null);
@@ -1936,6 +1956,16 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                           TikTok route
                         </button>
                       </div>
+                      {qrMode === "shop" ? (
+                        <label className="admin-doctor-shop-protocol">
+                          <input
+                            type="checkbox"
+                            checked={doctor.shop_show_protocol === true}
+                            onChange={(event) => toggleDoctorShopProtocol(doctor, event.target.checked)}
+                          />
+                          Show Full Protocol in shop link
+                        </label>
+                      ) : null}
                       {qrUrl ? (
                         <div className="admin-doctor-qr">
                           <QRCodeSVG

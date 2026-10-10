@@ -1688,6 +1688,15 @@
   color: var(--bone);
 }
 
+.admin-doctor-shop-protocol {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .admin-doctor-qr-code {
   width: 108px;
   height: 108px;

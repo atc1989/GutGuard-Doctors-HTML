@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseShop } from "@/lib/supabase";
+import { supabase, supabaseShop } from "@/lib/supabase";
 import { REFERRAL_COOKIE, REFERRAL_MAX_AGE_SECONDS, REFERRAL_SHOP_NAME_COOKIE } from "@/lib/referral";
 
 export const dynamic = "force-dynamic";
@@ -18,13 +18,19 @@ type RouteContext = { params: Promise<{ slug: string }> };
  */
 export async function GET(request: NextRequest, context: RouteContext) {
   const { slug } = await context.params;
-  const shopUrl = new URL("/shop", request.url);
+  const clean = decodeURIComponent(slug ?? "").trim().toLowerCase();
+
+  // Shared links sell Try First only unless an admin turned Full Protocol on for this
+  // partner. Partners live in `doctors` even on the sandbox shop, hence `supabase`.
+  // Unknown slug or lookup error -> trial only, never the wider shop.
+  const showsProtocol =
+    clean && supabase
+      ? (await supabase.rpc("shop_link_shows_protocol", { p_key: clean })).data === true
+      : false;
+  const shopUrl = new URL(showsProtocol ? "/shop" : "/shop?trial", request.url);
   const response = NextResponse.redirect(shopUrl, { status: 302 });
 
-  if (!slug || !supabaseShop) return response;
-
-  const clean = decodeURIComponent(slug).trim().toLowerCase();
-  if (!clean) return response;
+  if (!clean || !supabaseShop) return response;
 
   // Resolves the slug and records the click in one call - see track_referral_click.
   const { data, error } = await supabaseShop.rpc("track_referral_click", { p_slug: clean });
