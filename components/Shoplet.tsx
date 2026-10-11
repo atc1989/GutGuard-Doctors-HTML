@@ -6,8 +6,17 @@ import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { ArrowRightIcon, CheckIcon } from "@/components/Icons";
 import { Logo } from "@/components/GutguardSite";
-import { createShopOrder, loadPromos, sendShopOrderEmail, startMayaCheckout, type ShopOrderItem } from "@/lib/api";
-import { formatPromoDay, promoPrice, TIERS, TRIALS, type Promo, type PromoPrice } from "@/lib/catalog";
+import { createShopOrder, loadShopCatalog, sendShopOrderEmail, startMayaCheckout, type ShopOrderItem } from "@/lib/api";
+import {
+  DEFAULT_PRODUCTS,
+  formatPromoDay,
+  promoPerCap,
+  promoPrice,
+  shopProducts,
+  type Product,
+  type Promo,
+  type PromoPrice,
+} from "@/lib/catalog";
 import {
   fetchBarangays,
   fetchLocalities,
@@ -99,7 +108,7 @@ const peso = (value: number) =>
 
 export default function Shoplet() {
   const [mode, setMode] = useState<Mode>("trial");
-  const [trialId, setTrialId] = useState(TRIALS[0].id);
+  const [trialId, setTrialId] = useState("");
   const [tierId, setTierId] = useState("peak");
   const [basket, setBasket] = useState<ShopOrderItem[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -126,12 +135,17 @@ export default function Shoplet() {
   const [referralShopName, setReferralShopName] = useState("");
   // Set by /r/<slug> for partners whose link may not sell the Full Protocol.
   const [trialOnly, setTrialOnly] = useState(false);
-  // null until loaded; a failed load means full prices, which checkout falls back to as well.
-  const [promos, setPromos] = useState<Promo[] | null>(null);
-  const priceOf = (id: string, basePrice: number) => promoPrice(id, basePrice, promos ?? [], new Date());
+  // null until loaded; the fallback list until then. See loadCatalog for failure handling.
+  const [catalog, setCatalog] = useState<{ products: Product[]; promos: Promo[] } | null>(null);
+  const products = catalog?.products ?? DEFAULT_PRODUCTS;
+  const priceOf = (product: Product) => promoPrice(product.id, product.price, catalog?.promos ?? [], new Date());
+  const trials = shopProducts(products, "trial");
+  const tiers = shopProducts(products, "protocol");
+  // No Full Protocol tab on a trial-only link, or when every protocol product is hidden.
+  const protocolOff = trialOnly || tiers.length === 0;
 
-  const selectedTrial = TRIALS.find((item) => item.id === trialId) ?? TRIALS[0];
-  const selectedTier = TIERS.find((item) => item.id === tierId) ?? TIERS[2];
+  const selectedTrial = trials.find((item) => item.id === trialId) ?? trials[0];
+  const selectedTier = tiers.find((item) => item.id === tierId) ?? tiers[tiers.length - 1];
   const basketCount = basket.reduce((sum, item) => sum + item.qty, 0);
   const subtotal = basket.reduce((sum, item) => sum + item.price * item.qty, 0);
   const shippingQuote = quoteShipping(basket, {
@@ -174,9 +188,10 @@ export default function Shoplet() {
     };
   }, [menuOpen]);
   const totalAmount = getOrderTotal(subtotal, shippingQuote.fee);
-  const currentBuyLabel = mode === "trial" ? `Add ${selectedTrial.name}` : `Add ${selectedTier.name}`;
-  const selectedItem = mode === "trial" || trialOnly ? selectedTrial : selectedTier;
-  const currentPrice = priceOf(selectedItem.id, selectedItem.price);
+  // ponytail: assumes at least one trial stays active; hiding every product empties the shop.
+  const selectedItem = mode === "trial" || protocolOff ? selectedTrial : selectedTier;
+  const currentBuyLabel = `Add ${selectedItem.name}`;
+  const currentPrice = priceOf(selectedItem);
 
   useEffect(() => {
     setReferralShopName(readReferralShopName());
@@ -184,30 +199,33 @@ export default function Shoplet() {
   }, []);
 
   useEffect(() => {
-    loadPromos().then(setPromos);
+    loadShopCatalog().then(setCatalog);
   }, []);
 
-  // A saved basket carries the price it was added at; promos start and end, so re-price it
-  // to today's price or checkout would reject it after the customer filled in the form.
+  // A saved basket carries the price, capsules and name it was added with; admin edits and
+  // promos change those, so bring it up to date or checkout would reject it after the
+  // customer filled in the form. Products no longer for sale - or protocol packs on a
+  // trial-only link - drop out.
   useEffect(() => {
-    if (!promos) return;
+    if (!catalog) return;
+    const trialOnlyLink = new URLSearchParams(window.location.search).has("trial");
     setBasket((current) =>
-      current.map((item) => {
-        const product = [...TIERS, ...TRIALS].find((entry) => entry.id === item.id);
-        return product ? { ...item, price: promoPrice(item.id, product.price, promos, new Date()).price } : item;
+      current.flatMap((item) => {
+        const product = catalog.products.find((entry) => entry.id === item.id && entry.status === "active");
+        if (!product || (trialOnlyLink && product.kind !== "trial")) return [];
+        const price = promoPrice(product.id, product.price, catalog.promos, new Date()).price;
+        return [{ ...item, name: `SynBIOTIC+ ${product.name}`, caps: product.caps, price }];
       }),
     );
-  }, [promos]);
+  }, [catalog]);
 
   // Coming back from a cancelled Maya checkout should not cost the customer their basket.
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(BASKET_STORAGE_KEY);
       if (saved) {
-        const items = JSON.parse(saved) as ShopOrderItem[];
-        // A basket from an earlier full-shop visit must not carry protocol packs into a trial-only link.
-        const trialOnlyLink = new URLSearchParams(window.location.search).has("trial");
-        setBasket(trialOnlyLink ? items.filter((item) => TRIALS.some((trial) => trial.id === item.id)) : items);
+        // Re-priced and filtered once the catalog loads (see above).
+        setBasket(JSON.parse(saved) as ShopOrderItem[]);
       }
     } catch {
       window.localStorage.removeItem(BASKET_STORAGE_KEY);
@@ -286,18 +304,15 @@ export default function Shoplet() {
   }, [form.cityMunicipalityCode]);
 
   function addCurrentItem() {
-    const source =
-      mode === "trial"
-        ? { ...selectedTrial, name: `SynBIOTIC+ ${selectedTrial.name}` }
-        : { ...selectedTier, name: `SynBIOTIC+ ${selectedTier.name}` };
+    const source = selectedItem;
 
     setBasket((current) => {
       const existing = current.find((item) => item.id === source.id);
       if (existing) {
         return current.map((item) => (item.id === source.id ? { ...item, qty: Math.min(item.qty + 1, 20) } : item));
       }
-      const price = priceOf(source.id, source.price).price;
-      return [...current, { id: source.id, name: source.name, caps: source.caps, price, qty: 1 }];
+      const price = priceOf(source).price;
+      return [...current, { id: source.id, name: `SynBIOTIC+ ${source.name}`, caps: source.caps, price, qty: 1 }];
     });
     setDrawerOpen(true);
   }
@@ -545,7 +560,7 @@ export default function Shoplet() {
           <div className="shop-section-head">
             <div>
               <p className="shop-kicker">Choose your order</p>
-              <h2>{trialOnly ? "Start small - try it first." : "Start small or begin the protocol."}</h2>
+              <h2>{protocolOff ? "Start small - try it first." : "Start small or begin the protocol."}</h2>
             </div>
             <button className="shop-secondary" type="button" onClick={() => setDrawerOpen(true)}>
               Open basket ({basketCount})
@@ -553,7 +568,7 @@ export default function Shoplet() {
           </div>
 
           <div className="shop-card" aria-label="Product options">
-            {trialOnly ? null : (
+            {protocolOff ? null : (
               <div className="shop-segment">
                 <button type="button" className={mode === "trial" ? "active" : ""} onClick={() => setMode("trial")}>
                   Try first
@@ -564,13 +579,13 @@ export default function Shoplet() {
               </div>
             )}
 
-            {mode === "trial" || trialOnly ? (
+            {mode === "trial" || protocolOff ? (
               <>
                 <p className="shop-options-label">
                   <span>Start here · low risk</span>
                 </p>
                 <div className="shop-options trial">
-                  {TRIALS.map((item) => (
+                  {trials.map((item) => (
                     <button
                       key={item.id}
                       type="button"
@@ -581,14 +596,14 @@ export default function Shoplet() {
                       <span>
                         <strong>{item.name}</strong>
                         <small>
-                          {item.caps} caps · {peso(Math.round(item.price / item.caps))}/cap
+                          {item.caps} caps · {peso(promoPerCap(item, priceOf(item)))}/cap
                         </small>
                       </span>
-                      <PriceTag value={priceOf(item.id, item.price)} />
+                      <PriceTag value={priceOf(item)} />
                     </button>
                   ))}
                 </div>
-                {trialOnly ? null : (
+                {protocolOff ? null : (
                   <p className="shop-note">
                     The same living formula as the full protocol - try it before you commit.
                   </p>
@@ -600,17 +615,14 @@ export default function Shoplet() {
                   <span>When you&apos;re ready</span>
                   <em>
                     {/* The per-cap range, first tier to last, at today's promo prices. */}
-                    {[TIERS[0], TIERS[TIERS.length - 1]]
-                      .map((tier) => {
-                        const price = priceOf(tier.id, tier.price);
-                        return peso(price.percent ? Math.round(price.price / tier.caps) : tier.perCap);
-                      })
+                    {[tiers[0], tiers[tiers.length - 1]]
+                      .map((tier) => peso(promoPerCap(tier, priceOf(tier))))
                       .join(" → ")}{" "}
                     / cap
                   </em>
                 </p>
                 <div className="shop-options protocol">
-                  {TIERS.map((item) => (
+                  {tiers.map((item) => (
                     <button
                       key={item.id}
                       type="button"
@@ -626,7 +638,7 @@ export default function Shoplet() {
                           {item.phase} · {item.caps} capsules
                         </small>
                       </span>
-                      <PriceTag value={priceOf(item.id, item.price)} perCap={{ caps: item.caps, base: item.perCap }} />
+                      <PriceTag value={priceOf(item)} perCap={{ base: item.perCap, now: promoPerCap(item, priceOf(item)) }} />
                     </button>
                   ))}
                 </div>
@@ -828,8 +840,8 @@ export default function Shoplet() {
 }
 
 /** Price with the pre-promo amount struck through. perCap shows the per-capsule rate instead. */
-function PriceTag({ value, perCap }: { value: PromoPrice; perCap?: { caps: number; base: number } }) {
-  const now = perCap ? Math.round(value.price / perCap.caps) : value.price;
+function PriceTag({ value, perCap }: { value: PromoPrice; perCap?: { base: number; now: number } }) {
+  const now = perCap ? perCap.now : value.price;
   const was = perCap ? perCap.base : value.basePrice;
   const suffix = perCap ? "/cap" : "";
   return (

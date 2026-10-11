@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { normalizePromo, PROMO_COLUMNS, recomputeSubtotal, type Promo } from "@/lib/catalog";
+import { loadCatalog, recomputeSubtotal, type Product, type Promo } from "@/lib/catalog";
 import { createMayaCheckout, isMayaConfigured, toMayaAmount } from "@/lib/maya";
 import { isValidShippingFee } from "@/lib/shipping";
 import { getSupabaseAdmin, isSupabaseAdminConfigured } from "@/lib/supabase-admin";
@@ -63,11 +63,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ alreadyPaid: true, orderUrl });
   }
 
-  // No promos readable -> full catalog prices, which is also what the shop shows in that case.
-  const { data: promoRows } = await supabase.from("promos").select(PROMO_COLUMNS).eq("enabled", true);
-  const promos = (promoRows ?? []).map((row) => normalizePromo(row as Record<string, unknown>));
+  // Same reads and fallbacks as the shop, so both agree on every price.
+  const { products, promos } = await loadCatalog(supabase);
 
-  const amounts = verifyAmounts(order, promos);
+  const amounts = verifyAmounts(order, products, promos);
   if (!amounts) {
     return NextResponse.json(
       { error: "Order totals could not be verified. Please rebuild your basket or contact support." },
@@ -144,9 +143,9 @@ export async function POST(request: Request) {
  * Line prices are re-derived from the server catalog and the shipping fee is bounded by
  * the published rate table before any amount is sent to Maya.
  */
-function verifyAmounts(order: OrderRow, promos: Promo[]) {
+function verifyAmounts(order: OrderRow, products: Product[], promos: Promo[]) {
   // Order time or now: a promo that ended between placing and paying still honours the order.
-  const subtotal = recomputeSubtotal(order.items, promos, [new Date(order.created_at), new Date()]);
+  const subtotal = recomputeSubtotal(order.items, products, promos, [new Date(order.created_at), new Date()]);
   if (subtotal === null) return null;
 
   const shippingFee = Number(order.shipping_fee) || 0;

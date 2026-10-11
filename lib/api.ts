@@ -1,5 +1,5 @@
 import { PRIZES } from "@/lib/constants";
-import { normalizePromo, PROMO_COLUMNS, type Promo } from "@/lib/catalog";
+import { loadCatalog } from "@/lib/catalog";
 import { pickPrizeIndex } from "@/lib/prizes";
 import { isSupabaseConfigured, supabase, supabaseShop, SHOP_SCHEMA } from "@/lib/supabase";
 import { checkImageFile, TESTIMONIAL_BUCKET } from "@/lib/testimonials";
@@ -1989,9 +1989,7 @@ export async function adminReviewTestimonial(
   return data.story as AdminTestimonial;
 }
 
-/** Switched-on promos for shop pricing. Any failure means full prices - checkout falls back the same way. */
-export async function loadPromos(): Promise<Promo[]> {
-  if (!supabaseShop) return [];
-  const { data } = await supabaseShop.from("promos").select(PROMO_COLUMNS).eq("enabled", true);
-  return (data ?? []).map((row) => normalizePromo(row as Record<string, unknown>));
+/** Products + live promos for the shop. See loadCatalog for the fallback rules. */
+export function loadShopCatalog() {
+  return loadCatalog(supabaseShop);
 }

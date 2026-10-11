@@ -9,15 +9,12 @@ import {
   manilaDate,
   MAX_PROMO_PERCENT,
   promoStatus,
-  TIERS,
-  TRIALS,
+  type Product,
   type Promo,
 } from "@/lib/catalog";
 
-const PRODUCTS = [
-  ...TIERS.map((tier) => ({ id: tier.id, name: `${tier.name} (${tier.phase})`, price: tier.price })),
-  ...TRIALS.map((trial) => ({ id: trial.id, name: trial.name, price: trial.price })),
-];
+const productLabel = (product: Product) =>
+  `${product.name}${product.phase ? ` (${product.phase})` : ""}${product.status === "active" ? "" : ` - ${product.status}`}`;
 
 const peso = (value: number) =>
   new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value);
@@ -30,6 +27,7 @@ const emptyDraft = (): Promo => ({
   ends_on: null,
   enabled: true,
   discounts: {},
+  perCap: {},
 });
 
 async function request<T>(method: string, body?: unknown, query = ""): Promise<T> {
@@ -48,6 +46,11 @@ export default function AdminPromosPage() {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [promos, setPromos] = useState<Promo[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  // Archived products leave the picker, unless a promo being edited still has them.
+  const pickable = products
+    .filter((product) => product.status !== "archived" || draft?.discounts[product.id] !== undefined)
+    .sort((a, b) => a.kind.localeCompare(b.kind) || a.sortOrder - b.sortOrder);
   const [draft, setDraft] = useState<Promo | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +66,9 @@ export default function AdminPromosPage() {
     setIsLoading(true);
     setError(null);
     try {
-      setPromos((await request<{ promos: Promo[] }>("GET")).promos);
+      const data = await request<{ promos: Promo[]; products: Product[] }>("GET");
+      setPromos(data.promos);
+      setProducts(data.products);
       setIsUnlocked(true);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load promos.");
@@ -126,9 +131,22 @@ export default function AdminPromosPage() {
   function setPercent(productId: string, value: string | null) {
     if (!draft) return;
     const discounts = { ...draft.discounts };
-    if (value === null) delete discounts[productId];
-    else discounts[productId] = Math.min(Math.max(Math.round(Number(value) || 0), 0), MAX_PROMO_PERCENT);
-    setDraft({ ...draft, discounts });
+    const perCap = { ...draft.perCap };
+    if (value === null) {
+      delete discounts[productId];
+      delete perCap[productId];
+    } else discounts[productId] = Math.min(Math.max(Math.round(Number(value) || 0), 0), MAX_PROMO_PERCENT);
+    setDraft({ ...draft, discounts, perCap });
+  }
+
+  /** Blank = use the calculation, which is what the field shows as its placeholder. */
+  function setPerCap(productId: string, value: string) {
+    if (!draft) return;
+    const perCap = { ...draft.perCap };
+    const pesos = Math.round(Number(value));
+    if (!value || !pesos || pesos < 1) delete perCap[productId];
+    else perCap[productId] = pesos;
+    setDraft({ ...draft, perCap });
   }
 
   const now = new Date();
@@ -240,9 +258,16 @@ export default function AdminPromosPage() {
               </div>
 
               <div className="admin-promo-products">
-                {PRODUCTS.map((product) => {
+                <div className="admin-promo-product admin-promo-product-head" aria-hidden="true">
+                  <span>Product</span>
+                  <span>Discount</span>
+                  <span>Promo ₱/cap</span>
+                  <span>Price</span>
+                </div>
+                {pickable.map((product) => {
                   const pct = draft.discounts[product.id];
                   const chosen = pct !== undefined;
+                  const calculatedPerCap = discountedPrice(product.perCap, pct || 0);
                   return (
                     <div className="admin-promo-product" key={product.id}>
                       <label className="admin-wheel-toggle">
@@ -251,7 +276,7 @@ export default function AdminPromosPage() {
                           checked={chosen}
                           onChange={(event) => setPercent(product.id, event.target.checked ? "10" : null)}
                         />
-                        {product.name}
+                        {productLabel(product)}
                       </label>
                       {chosen ? (
                         <>
@@ -266,12 +291,30 @@ export default function AdminPromosPage() {
                             />
                             %
                           </label>
+                          <label className="admin-promo-percap">
+                            ₱
+                            <input
+                              type="number"
+                              min={1}
+                              value={draft.perCap[product.id] ?? ""}
+                              placeholder={String(calculatedPerCap)}
+                              title={`Blank uses the calculation: ₱${product.perCap} less ${pct || 0}% = ₱${calculatedPerCap}`}
+                              aria-label={`${product.name} promo price per capsule`}
+                              onChange={(event) => setPerCap(product.id, event.target.value)}
+                            />
+                          </label>
                           <span className="admin-promo-preview">
                             {peso(product.price)} → <strong>{peso(discountedPrice(product.price, pct || 0))}</strong>
+                            <small>
+                              {peso(product.perCap)} → {peso(draft.perCap[product.id] || calculatedPerCap)} /cap
+                            </small>
                           </span>
                         </>
                       ) : (
-                        <span className="admin-promo-preview">{peso(product.price)}</span>
+                        <span className="admin-promo-preview">
+                          {peso(product.price)}
+                          <small>{peso(product.perCap)} /cap</small>
+                        </span>
                       )}
                     </div>
                   );
@@ -320,8 +363,12 @@ export default function AdminPromosPage() {
                         {promo.label ? ` · shows as "${promo.label}"` : ""}
                       </p>
                       <p>
-                        {PRODUCTS.filter((product) => promo.discounts[product.id])
-                          .map((product) => `${product.name} ${promo.discounts[product.id]}%`)
+                        {products
+                          .filter((product) => promo.discounts[product.id])
+                          .map((product) => {
+                            const typed = promo.perCap[product.id];
+                            return `${product.name} ${promo.discounts[product.id]}%${typed ? ` (₱${typed}/cap)` : ""}`;
+                          })
                           .join(" · ")}
                       </p>
                     </div>

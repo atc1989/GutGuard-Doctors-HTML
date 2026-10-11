@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminErrorMessage } from "@/lib/admin-error";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
-import { MAX_PROMO_PERCENT, normalizePromo, PROMO_COLUMNS, TIERS, TRIALS } from "@/lib/catalog";
+import { loadCatalog, MAX_PROMO_PERCENT, normalizePromo, PROMO_COLUMNS, type Product } from "@/lib/catalog";
 import { supabaseAdminShop } from "@/lib/supabase-admin";
 
 // The admin session check below is the authorisation; the service role then writes the
 // promos table in the shop schema (doctors, or sandbox on the mirror).
-const PRODUCT_IDS = new Set([...TIERS, ...TRIALS].map((item) => item.id));
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 async function guard() {
@@ -28,7 +27,12 @@ export async function GET() {
   if (error) {
     return NextResponse.json({ error: adminErrorMessage(error, "Failed to load promos.") }, { status: 500 });
   }
-  return NextResponse.json({ promos: (data ?? []).map((row) => normalizePromo(row as Record<string, unknown>)) });
+  // Products drive the promo picker and price previews; archived ones are left out there.
+  const { products } = await loadCatalog(supabaseAdminShop);
+  return NextResponse.json({
+    promos: (data ?? []).map((row) => normalizePromo(row as Record<string, unknown>)),
+    products,
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -36,7 +40,8 @@ export async function POST(req: NextRequest) {
   if (denied) return denied;
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-  const row = validate(body);
+  const { products } = await loadCatalog(supabaseAdminShop);
+  const row = validate(body, products);
   if (typeof row === "string") return NextResponse.json({ error: row }, { status: 400 });
 
   const id = typeof body.id === "string" && body.id ? body.id : null;
@@ -65,7 +70,8 @@ export async function DELETE(req: NextRequest) {
 }
 
 /** Returns the row to write, or an error message for the admin. */
-function validate(body: Record<string, unknown>) {
+function validate(body: Record<string, unknown>, products: Product[]) {
+  const productIds = new Set(products.map((product) => product.id));
   const name = String(body.name ?? "").trim();
   const label = String(body.label ?? "").trim();
   const startsOn = String(body.starts_on ?? "");
@@ -79,7 +85,7 @@ function validate(body: Record<string, unknown>) {
   const discounts: Record<string, number> = {};
   for (const [id, value] of Object.entries((body.discounts ?? {}) as Record<string, unknown>)) {
     const pct = Number(value);
-    if (!PRODUCT_IDS.has(id)) return `Unknown product: ${id}.`;
+    if (!productIds.has(id)) return `Unknown product: ${id}.`;
     if (!Number.isInteger(pct) || pct < 1 || pct > MAX_PROMO_PERCENT) {
       return `Discount must be a whole number from 1 to ${MAX_PROMO_PERCENT}%.`;
     }
@@ -87,5 +93,22 @@ function validate(body: Record<string, unknown>) {
   }
   if (Object.keys(discounts).length === 0) return "Choose at least one product.";
 
-  return { name, label, starts_on: startsOn, ends_on: endsOn, enabled: body.enabled !== false, discounts };
+  // Promo per-capsule price, display only. Blank means "use the calculation".
+  const perCap: Record<string, number> = {};
+  for (const [id, value] of Object.entries((body.perCap ?? {}) as Record<string, unknown>)) {
+    if (!discounts[id] || value === null || value === "" || value === 0) continue;
+    const pesos = Number(value);
+    if (!Number.isInteger(pesos) || pesos < 1) return "Promo per-capsule price must be a whole peso amount.";
+    perCap[id] = pesos;
+  }
+
+  return {
+    name,
+    label,
+    starts_on: startsOn,
+    ends_on: endsOn,
+    enabled: body.enabled !== false,
+    discounts,
+    per_cap: perCap,
+  };
 }
