@@ -3,8 +3,8 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Menu, X, Check, Lock } from "lucide-react";
-import { promoPrice, TIERS } from "@/lib/catalog";
-import { loadPromos } from "@/lib/api";
+import { DEFAULT_PRODUCTS, promoPerCap, promoPrice } from "@/lib/catalog";
+import { loadShopCatalog } from "@/lib/api";
 
 /* ────────────────────────────────────────────────────────────
    Gutguard — Multi-page site (Home · Science · Shop · Physicians)
@@ -1159,7 +1159,7 @@ export function Logo({ h = 26, className = "", style = undefined }) {
 const DISEASE_FACTORY_URL = "/science#mechanism";
 
 /* protocol ladder — per-cap follows TikTok. CONFIRM caps for Start & Grow (scaled from Peak: 400 caps / 90 days). */
-const GROW = TIERS.find((tier) => tier.id === "grow");
+const DEFAULT_GROW = DEFAULT_PRODUCTS.find((product) => product.id === "grow");
 /* signature motion: measurement numbers resolve into view (the "we measure" feel) */
 function CountUp({ to, from = 0, prefix = "", suffix = "", dur = 1300 }) {
   const [val, setVal] = useState(from);
@@ -2108,13 +2108,21 @@ function SectionTabs({ items }) {
 
 function BuyBar({ route }) {
   const [shown, setShown] = useState(false);
-  const [grow, setGrow] = useState({ price: GROW.price, perCap: GROW.perCap, percent: 0 });
+  // Grow as admin last set it, at today's promo price. Fallback list until it loads.
+  const [grow, setGrow] = useState(() => {
+    const live = promoPrice(DEFAULT_GROW.id, DEFAULT_GROW.price, [], new Date());
+    return { product: DEFAULT_GROW, live, perCap: DEFAULT_GROW.perCap };
+  });
   useEffect(() => {
-    loadPromos().then((promos) => {
-      const live = promoPrice(GROW.id, GROW.price, promos, new Date());
-      if (live.percent) setGrow({ price: live.price, perCap: Math.round(live.price / GROW.caps), percent: live.percent });
+    loadShopCatalog().then(({ products, promos }) => {
+      // Hidden or archived in admin: stop advertising it.
+      const product = products.find((item) => item.id === "grow" && item.status === "active");
+      if (!product) return setGrow(null);
+      const live = promoPrice(product.id, product.price, promos, new Date());
+      setGrow({ product, live, perCap: promoPerCap(product, live) });
     });
   }, []);
+  const GROW = grow?.product;
   const enabled = route === "/" || route === "/shop";
   useEffect(() => {
     if (!enabled) { setShown(false); return; }
@@ -2150,7 +2158,7 @@ function BuyBar({ route }) {
     return () => { if (aObs) aObs.disconnect(); if (onScroll) window.removeEventListener("scroll", onScroll); eObs.disconnect(); };
   }, [route, enabled]);
 
-  if (!enabled) return null;
+  if (!enabled || !grow) return null;
   return (
     <nav className={"buybar" + (shown ? " show" : "")} aria-label="Purchase SynBIOTIC+">
       <div className="buybar-inner">
@@ -2163,11 +2171,11 @@ function BuyBar({ route }) {
         </div>
         <div className="bb-price">
           <span className="bb-amt">
-            {grow.percent ? <s className="bb-was">₱{GROW.perCap}</s> : null}₱{grow.perCap} / capsule
+            {grow.live.percent ? <s className="bb-was">₱{GROW.perCap}</s> : null}₱{grow.perCap} / capsule
           </span>
           <span className="bb-sub">
-            {GROW.phase} protocol · ₱{grow.price.toLocaleString("en-PH")} total
-            {grow.percent ? ` · Save ${grow.percent}%` : ""}
+            {GROW.phase} protocol · ₱{grow.live.price.toLocaleString("en-PH")} total
+            {grow.live.percent ? ` · Save ${grow.live.percent}%` : ""}
           </span>
         </div>
         <Link className="btn-primary bb-cta" tabIndex={shown ? 0 : -1} href="/shop#flagship">Compare Protocols <Arrow /></Link>
