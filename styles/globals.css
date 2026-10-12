@@ -3053,6 +3053,24 @@
   opacity: 0.7;
 }
 
+.shop-price {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+}
+
+.shop-save {
+  padding: 2px 8px;
+  border-radius: var(--r-pill, 999px);
+  background: var(--gold);
+  color: #fff;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .shop-promo-note {
   margin: 12px 2px 0;
   color: var(--gold);
@@ -8008,7 +8026,7 @@
 
 .admin-promo-product {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 84px 104px minmax(140px, auto);
+  grid-template-columns: minmax(0, 1fr) 84px 120px 104px minmax(150px, auto);
   align-items: center;
   gap: 10px;
   min-height: 46px;
@@ -8016,6 +8034,7 @@
 }
 
 .admin-wheel-prize .admin-promo-percent,
+.admin-wheel-prize .admin-promo-final,
 .admin-wheel-prize .admin-promo-percap {
   flex-direction: row;
   align-items: center;
@@ -8023,8 +8042,12 @@
   grid-column: 2;
 }
 
-.admin-wheel-prize .admin-promo-percap {
+.admin-wheel-prize .admin-promo-final {
   grid-column: 3;
+}
+
+.admin-wheel-prize .admin-promo-percap {
+  grid-column: 4;
 }
 
 .admin-promo-product-head {
@@ -8048,13 +8071,14 @@
 }
 
 .admin-wheel-shell .admin-promo-percap input,
+.admin-wheel-shell .admin-promo-final input,
 .admin-wheel-shell .admin-promo-percent input {
   padding: 8px;
   text-align: right;
 }
 
 .admin-promo-preview {
-  grid-column: 4;
+  grid-column: 5;
   color: var(--ink-3);
   font-size: 13px;
   font-weight: 700;
@@ -8113,6 +8137,7 @@
     display: none;
   }
 
+  .admin-wheel-prize .admin-promo-final,
   .admin-wheel-prize .admin-promo-percap {
     grid-column: 2;
   }

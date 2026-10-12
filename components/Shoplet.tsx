@@ -839,15 +839,22 @@ export default function Shoplet() {
   );
 }
 
-/** Price with the pre-promo amount struck through. perCap shows the per-capsule rate instead. */
+/**
+ * Price with the pre-promo amount struck through and a "Save X%" badge (the % admin
+ * entered, even when a typed final price makes the real saving slightly different).
+ * perCap shows the per-capsule rate instead.
+ */
 function PriceTag({ value, perCap }: { value: PromoPrice; perCap?: { base: number; now: number } }) {
   const now = perCap ? perCap.now : value.price;
   const was = perCap ? perCap.base : value.basePrice;
   const suffix = perCap ? "/cap" : "";
   return (
     <b className="shop-price">
-      {value.percent ? <s>{`${peso(was)}${suffix}`}</s> : null}
-      {`${peso(value.percent ? now : was)}${suffix}`}
+      {value.percent ? <i className="shop-save">Save {value.percent}%</i> : null}
+      <span>
+        {value.percent ? <s>{`${peso(was)}${suffix}`}</s> : null}
+        {`${peso(value.percent ? now : was)}${suffix}`}
+      </span>
     </b>
   );
 }

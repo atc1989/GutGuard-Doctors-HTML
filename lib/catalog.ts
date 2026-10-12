@@ -127,6 +127,7 @@ export function recomputeSubtotal(
 
 /**
  * A row of the `promos` table. `discounts` maps product id -> whole percent off;
+ * `prices` maps product id -> the final price admin typed (charged; overrides the % maths);
  * `perCap` maps product id -> the promo per-capsule price admin typed (display only).
  */
 export type Promo = {
@@ -137,6 +138,7 @@ export type Promo = {
   ends_on: string | null; // inclusive; null = no end date
   enabled: boolean;
   discounts: Record<string, number>;
+  prices: Record<string, number>;
   perCap: Record<string, number>;
 };
 
@@ -164,7 +166,11 @@ export function discountedPrice(basePrice: number, percent: number): number {
   return Math.ceil((basePrice * (100 - percent)) / 100);
 }
 
-/** Overlapping promos never stack - the biggest live discount for the product wins. */
+/**
+ * Overlapping promos never stack - the biggest live % for the product wins. The winner's
+ * typed final price, when set, is the price; otherwise the % maths. `percent` stays the
+ * entered % (the shop says "Save 40%" even when a typed ₱29,999 is really 39.4% off).
+ */
 export function promoPrice(productId: string, basePrice: number, promos: Promo[], at: Date): PromoPrice {
   let best: Promo | null = null;
   let percent = 0;
@@ -175,7 +181,8 @@ export function promoPrice(productId: string, basePrice: number, promos: Promo[]
       percent = pct;
     }
   }
-  return { price: percent ? discountedPrice(basePrice, percent) : basePrice, basePrice, percent, promo: best };
+  if (!best) return { price: basePrice, basePrice, percent: 0, promo: null };
+  return { price: best.prices[productId] || discountedPrice(basePrice, percent), basePrice, percent, promo: best };
 }
 
 /** Per-capsule price to show: the promo's typed value, else the calculation, else the product's own. */
@@ -208,11 +215,17 @@ export function normalizePromo(row: Record<string, unknown>): Promo {
     const pct = Math.round(Number(value));
     if (pct > 0 && pct <= MAX_PROMO_PERCENT) discounts[id] = pct;
   }
-  const perCap: Record<string, number> = {};
-  for (const [id, value] of Object.entries((row.per_cap ?? {}) as Record<string, unknown>)) {
-    const pesos = Math.round(Number(value));
-    if (pesos > 0 && discounts[id]) perCap[id] = pesos;
-  }
+  // Typed values only count for products the promo discounts.
+  const typed = (raw: unknown) => {
+    const out: Record<string, number> = {};
+    for (const [id, value] of Object.entries((raw ?? {}) as Record<string, unknown>)) {
+      const pesos = Math.round(Number(value));
+      if (pesos > 0 && discounts[id]) out[id] = pesos;
+    }
+    return out;
+  };
+  const perCap = typed(row.per_cap);
+  const prices = typed(row.prices);
   return {
     id: String(row.id ?? ""),
     name: String(row.name ?? ""),
@@ -221,8 +234,9 @@ export function normalizePromo(row: Record<string, unknown>): Promo {
     ends_on: row.ends_on ? String(row.ends_on) : null,
     enabled: row.enabled !== false,
     discounts,
+    prices,
     perCap,
   };
 }
 
-export const PROMO_COLUMNS = "id, name, label, starts_on, ends_on, enabled, discounts, per_cap";
+export const PROMO_COLUMNS = "id, name, label, starts_on, ends_on, enabled, discounts, prices, per_cap";

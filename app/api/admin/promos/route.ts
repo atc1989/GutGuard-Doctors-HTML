@@ -71,7 +71,7 @@ export async function DELETE(req: NextRequest) {
 
 /** Returns the row to write, or an error message for the admin. */
 function validate(body: Record<string, unknown>, products: Product[]) {
-  const productIds = new Set(products.map((product) => product.id));
+  const byId = new Map(products.map((product) => [product.id, product]));
   const name = String(body.name ?? "").trim();
   const label = String(body.label ?? "").trim();
   const startsOn = String(body.starts_on ?? "");
@@ -85,7 +85,7 @@ function validate(body: Record<string, unknown>, products: Product[]) {
   const discounts: Record<string, number> = {};
   for (const [id, value] of Object.entries((body.discounts ?? {}) as Record<string, unknown>)) {
     const pct = Number(value);
-    if (!productIds.has(id)) return `Unknown product: ${id}.`;
+    if (!byId.has(id)) return `Unknown product: ${id}.`;
     if (!Number.isInteger(pct) || pct < 1 || pct > MAX_PROMO_PERCENT) {
       return `Discount must be a whole number from 1 to ${MAX_PROMO_PERCENT}%.`;
     }
@@ -102,6 +102,19 @@ function validate(body: Record<string, unknown>, products: Product[]) {
     perCap[id] = pesos;
   }
 
+  // Promo final price, charged at checkout. Blank means "use the % maths".
+  const prices: Record<string, number> = {};
+  for (const [id, value] of Object.entries((body.prices ?? {}) as Record<string, unknown>)) {
+    if (!discounts[id] || value === null || value === "" || value === 0) continue;
+    const pesos = Number(value);
+    const product = byId.get(id)!;
+    if (!Number.isInteger(pesos) || pesos < 1) return "Promo final price must be a whole peso amount.";
+    if (pesos >= product.price) {
+      return `${product.name}: the promo final price must be below its full price (₱${product.price.toLocaleString("en-PH")}).`;
+    }
+    prices[id] = pesos;
+  }
+
   return {
     name,
     label,
@@ -109,6 +122,7 @@ function validate(body: Record<string, unknown>, products: Product[]) {
     ends_on: endsOn,
     enabled: body.enabled !== false,
     discounts,
+    prices,
     per_cap: perCap,
   };
 }

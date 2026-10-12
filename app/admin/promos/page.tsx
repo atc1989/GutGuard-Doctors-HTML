@@ -27,6 +27,7 @@ const emptyDraft = (): Promo => ({
   ends_on: null,
   enabled: true,
   discounts: {},
+  prices: {},
   perCap: {},
 });
 
@@ -131,22 +132,27 @@ export default function AdminPromosPage() {
   function setPercent(productId: string, value: string | null) {
     if (!draft) return;
     const discounts = { ...draft.discounts };
+    const prices = { ...draft.prices };
     const perCap = { ...draft.perCap };
     if (value === null) {
       delete discounts[productId];
+      delete prices[productId];
       delete perCap[productId];
     } else discounts[productId] = Math.min(Math.max(Math.round(Number(value) || 0), 0), MAX_PROMO_PERCENT);
-    setDraft({ ...draft, discounts, perCap });
+    setDraft({ ...draft, discounts, prices, perCap });
   }
 
-  /** Blank = use the calculation, which is what the field shows as its placeholder. */
-  function setPerCap(productId: string, value: string) {
+  /**
+   * Final price or promo per-capsule. Blank = use the calculation, which is what the field
+   * shows as its placeholder, and keeps following the % if it changes.
+   */
+  function setTyped(field: "prices" | "perCap", productId: string, value: string) {
     if (!draft) return;
-    const perCap = { ...draft.perCap };
+    const typed = { ...draft[field] };
     const pesos = Math.round(Number(value));
-    if (!value || !pesos || pesos < 1) delete perCap[productId];
-    else perCap[productId] = pesos;
-    setDraft({ ...draft, perCap });
+    if (!value || !pesos || pesos < 1) delete typed[productId];
+    else typed[productId] = pesos;
+    setDraft({ ...draft, [field]: typed });
   }
 
   const now = new Date();
@@ -261,13 +267,15 @@ export default function AdminPromosPage() {
                 <div className="admin-promo-product admin-promo-product-head" aria-hidden="true">
                   <span>Product</span>
                   <span>Discount</span>
+                  <span>Final price</span>
                   <span>Promo ₱/cap</span>
-                  <span>Price</span>
+                  <span>Shop shows</span>
                 </div>
                 {pickable.map((product) => {
                   const pct = draft.discounts[product.id];
                   const chosen = pct !== undefined;
                   const calculatedPerCap = discountedPrice(product.perCap, pct || 0);
+                  const calculatedPrice = discountedPrice(product.price, pct || 0);
                   return (
                     <div className="admin-promo-product" key={product.id}>
                       <label className="admin-wheel-toggle">
@@ -291,6 +299,19 @@ export default function AdminPromosPage() {
                             />
                             %
                           </label>
+                          <label className="admin-promo-final">
+                            ₱
+                            <input
+                              type="number"
+                              min={1}
+                              max={product.price - 1}
+                              value={draft.prices[product.id] ?? ""}
+                              placeholder={String(calculatedPrice)}
+                              title={`Blank uses the calculation: ₱${product.price} less ${pct || 0}% = ₱${calculatedPrice}. This is what checkout charges.`}
+                              aria-label={`${product.name} promo final price`}
+                              onChange={(event) => setTyped("prices", product.id, event.target.value)}
+                            />
+                          </label>
                           <label className="admin-promo-percap">
                             ₱
                             <input
@@ -300,11 +321,11 @@ export default function AdminPromosPage() {
                               placeholder={String(calculatedPerCap)}
                               title={`Blank uses the calculation: ₱${product.perCap} less ${pct || 0}% = ₱${calculatedPerCap}`}
                               aria-label={`${product.name} promo price per capsule`}
-                              onChange={(event) => setPerCap(product.id, event.target.value)}
+                              onChange={(event) => setTyped("perCap", product.id, event.target.value)}
                             />
                           </label>
                           <span className="admin-promo-preview">
-                            {peso(product.price)} → <strong>{peso(discountedPrice(product.price, pct || 0))}</strong>
+                            {peso(product.price)} → <strong>{peso(draft.prices[product.id] || calculatedPrice)}</strong>
                             <small>
                               {peso(product.perCap)} → {peso(draft.perCap[product.id] || calculatedPerCap)} /cap
                             </small>
@@ -366,8 +387,11 @@ export default function AdminPromosPage() {
                         {products
                           .filter((product) => promo.discounts[product.id])
                           .map((product) => {
-                            const typed = promo.perCap[product.id];
-                            return `${product.name} ${promo.discounts[product.id]}%${typed ? ` (₱${typed}/cap)` : ""}`;
+                            const typed = [
+                              promo.prices[product.id] ? `₱${promo.prices[product.id].toLocaleString("en-PH")}` : "",
+                              promo.perCap[product.id] ? `₱${promo.perCap[product.id]}/cap` : "",
+                            ].filter(Boolean);
+                            return `${product.name} ${promo.discounts[product.id]}%${typed.length ? ` (${typed.join(", ")})` : ""}`;
                           })
                           .join(" · ")}
                       </p>
