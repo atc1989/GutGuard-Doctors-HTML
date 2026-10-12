@@ -7991,6 +7991,8 @@
 
 /* Admin promos */
 .admin-promo-editor {
+  /* Stacked: the 4-column product table needs the full width, beside the form it overlapped. */
+  grid-template-columns: 1fr;
   margin-bottom: 20px;
 }
 
