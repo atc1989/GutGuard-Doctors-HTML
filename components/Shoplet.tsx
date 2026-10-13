@@ -583,6 +583,7 @@ export default function Shoplet() {
               <>
                 <p className="shop-options-label">
                   <span>Start here · low risk</span>
+                  {trials.some((item) => priceOf(item).promo) ? <em className="shop-lto">Limited time offer</em> : null}
                 </p>
                 <div className="shop-options trial">
                   {trials.map((item) => (
@@ -613,6 +614,7 @@ export default function Shoplet() {
               <>
                 <p className="shop-options-label">
                   <span>When you&apos;re ready</span>
+                  {tiers.some((item) => priceOf(item).promo) ? <em className="shop-lto">Limited time offer</em> : null}
                 </p>
                 <div className="shop-options protocol">
                   {tiers.map((item) => (
