@@ -570,6 +570,8 @@ export default function Shoplet() {
             </button>
           </div>
 
+          {/* Wait for the real catalog: the built-in fallback prices would flash for a moment. */}
+          {catalog ? (
           <div className="shop-card" aria-label="Product options">
             {protocolOff || trialsOff ? null : (
               <div className="shop-segment">
@@ -665,6 +667,11 @@ export default function Shoplet() {
             </button>
             ) : null}
           </div>
+          ) : (
+            <div className="shop-card" aria-busy="true">
+              <p className="shop-note">Loading prices…</p>
+            </div>
+          )}
         </div>
       </section>
 
