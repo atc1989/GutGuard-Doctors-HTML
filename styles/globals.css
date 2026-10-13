@@ -3073,7 +3073,9 @@
   opacity: 0.7;
 }
 
-.shop-price-runner {
+/* .shop-option span is a grid; keep "Usually ₱124/cap · ₱279 bonus value" on one line. */
+.shop-option .shop-price-runner {
+  display: block;
   white-space: nowrap;
 }
 
@@ -3083,7 +3085,8 @@
   display: none;
 }
 
-.shop-primary .shop-wide {
+.shop-primary .shop-wide,
+.shop-price-runner .shop-wide {
   display: inline;
 }
 
@@ -3119,11 +3122,6 @@
     grid-column: 1 / -1;
   }
 
-  /* Room for the badge beside the name line only; the details line below gets full width. */
-  .shop-option.has-promo strong {
-    padding-right: 104px;
-  }
-
   .shop-option.has-promo > .shop-price {
     flex: 1 1 100%;
     justify-items: start;
@@ -3133,10 +3131,12 @@
   }
 
   .shop-option .shop-save {
-    position: absolute;
-    top: 16px;
-    right: 16px;
     white-space: nowrap;
+  }
+
+  /* "₱11,999 in bonus value." / "Until Dec 31, 2026 only." - two whole lines, no orphan. */
+  .shop-promo-note span {
+    display: block;
   }
 
   .shop-option .shop-price-compare {
