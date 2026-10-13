@@ -182,7 +182,10 @@ export function promoPrice(productId: string, basePrice: number, promos: Promo[]
     }
   }
   if (!best) return { price: basePrice, basePrice, percent: 0, promo: null };
-  return { price: best.prices[productId] || discountedPrice(basePrice, percent), basePrice, percent, promo: best };
+  // A typed price at or above the SRP (SRP lowered after the promo was saved) is ignored.
+  const typed = best.prices[productId];
+  const price = typed && typed < basePrice ? typed : discountedPrice(basePrice, percent);
+  return { price, basePrice, percent, promo: best };
 }
 
 /** Name the shop shows for a promo: its customer-facing label, else its admin name. */
