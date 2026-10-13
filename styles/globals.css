@@ -8445,3 +8445,101 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Full Protocol redesign (boss's mockup, 13 October 2026): package cards, Compare sheet and
+   full comparison page. Copied from the mockup; its checkout installment / promo code rules are
+   left out (separate features later). ── */
+.shop-tier{display:grid;grid-template-columns:minmax(0,1fr);justify-content:stretch;align-items:stretch;gap:12px;width:100%;text-align:left}
+.shop-tier-row{display:flex !important;align-items:flex-start;justify-content:space-between;gap:14px}
+.shop-tier-row > span:first-child{min-width:0}
+.shop-tier .shop-tier-size{color:var(--ink-2)}
+.shop-tier-rate{font-family:var(--serif);font-size:28px;font-weight:400;line-height:1;white-space:nowrap}
+.shop-tier-rate i{margin-left:2px;color:var(--ink-3);font-family:var(--sans);font-size:12px;font-style:normal;font-weight:800}
+.shop-tier.active .shop-tier-rate{color:var(--blue)}
+.shop-tier .shop-price-now{white-space:nowrap}
+.shop-tier .shop-price-compare{white-space:nowrap}
+.shop-tier-more{display:grid !important;gap:8px;padding-top:12px;border-top:1px solid var(--rule-soft)}
+.shop-tier-incl{display:grid !important;gap:6px}
+.shop-tier-incl-h{color:var(--gold);font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+.shop-tier-li{display:flex !important;align-items:center;gap:8px;color:var(--ink);font-size:14px;font-weight:800}
+.shop-tier-li svg{width:16px;height:16px;flex:none;color:var(--blue)}
+.shop-tier .shop-tier-last{font-style:italic}
+.shop-tier-proof{text-align:center}
+.shop-compare-link{margin:2px auto 0;color:var(--blue)}
+.shop-compare-link:hover{color:var(--blue-press)}
+@media (max-width:420px){
+  .shop-tier-row{flex-direction:column;gap:10px}
+  .shop-tier .shop-price{justify-items:start;text-align:left}
+  .shop-tier .shop-price-compare{white-space:normal}
+}
+/* Compare sheet and full view. Table rules follow .shop-facts (Supplement Facts panel). */
+.shop-compare{display:grid;gap:14px}
+.shop-compare-sub{color:var(--ink-2);font-size:15px;font-weight:700;line-height:1.5}
+.shop-compare-table{width:100%;border-collapse:collapse;border-top:2px solid var(--ink);font-size:13px}
+.shop-compare-table th,.shop-compare-table td{padding:9px 8px;border-bottom:1px dotted var(--rule);text-align:center;vertical-align:middle}
+.shop-compare-table thead th{border-bottom:1.5px solid var(--ink);color:var(--ink-3);font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;line-height:1.3}
+.shop-compare-table thead th:first-child,.shop-compare-table tbody th{text-align:left}
+.shop-compare-table tbody th{color:var(--ink);font-weight:600;line-height:1.35}
+.shop-compare-table td{color:var(--ink-2);font-weight:700;white-space:nowrap}
+.shop-compare-table td.no{color:var(--ink-4)}
+.shop-compare-table td small{display:block;color:var(--ink-3);font-size:10px;font-weight:600}
+.shop-compare-table .ours{background:rgba(6,8,169,.07);color:var(--blue);font-weight:900}
+.shop-compare-table thead .ours{color:var(--blue)}
+.shop-compare-table td.ours svg{width:16px;height:16px;vertical-align:middle;color:var(--blue)}
+.shop-compare-table tr.total th,.shop-compare-table tr.total td,.shop-compare-table tr.price th,.shop-compare-table tr.price td{font-weight:900}
+.shop-compare-table tbody tr:last-child th,.shop-compare-table tbody tr:last-child td{border-bottom:1.5px solid var(--ink)}
+.shop-compare-foot{color:var(--ink-3);font-size:11px;font-style:italic;font-weight:400;line-height:1.45}
+.shop-compare .shop-primary{margin-top:4px}
+.shop-compare-back{width:100%;text-align:center}
+.shop-compare-sheet .shop-drawer-head h2{line-height:1.05}
+.shop-fullcompare{position:fixed;inset:0;z-index:130;overflow-y:auto;overflow-x:hidden;background:var(--bone)}
+.shop-fullcompare-inner{display:grid;gap:16px;width:min(980px,100%);margin:0 auto;padding:24px clamp(16px,4vw,32px) 40px;min-width:0}
+.shop-fullcompare-inner .shop-drawer-head{margin-bottom:0}
+.shop-fullcompare-inner .shop-drawer-head .shop-compare-back{width:auto;flex:none}
+.shop-fullcompare-card{margin-top:0;padding:0;overflow:hidden;min-width:0}
+.shop-fullcompare-scroll{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.shop-fullcompare-scroll:focus-visible{outline:3px solid var(--gold);outline-offset:-3px}
+.shop-fullcompare-table{min-width:860px;border-top:0}
+.shop-fullcompare-table th,.shop-fullcompare-table td{padding:11px 10px}
+.shop-fullcompare-table tbody th{min-width:160px;padding-left:16px}
+.shop-fullcompare-table thead th:first-child{padding-left:16px}
+.shop-fullcompare-table .ours{position:sticky;right:0;z-index:1;background:#ebecf7;box-shadow:-8px 0 12px -8px rgba(15,15,24,.22)}
+.shop-fullcompare-table tbody tr:last-child th,.shop-fullcompare-table tbody tr:last-child td{border-bottom:0}
+.shop-fullcompare h2 em{color:var(--blue);font-style:normal}
+.shop-fullcompare .shop-compare-sub b{color:var(--ink);font-weight:900}
+/* Three benefit cards: .shop-option surface, kicker + badge like the section label + "Limited time offer" pill. */
+.shop-fullcompare-features{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.shop-fullcompare-features article{display:grid;align-content:start;gap:8px;padding:18px;border:1px solid var(--rule);border-top:3px solid var(--blue);border-radius:var(--r-md);background:#fcfaf5}
+.shop-fullcompare-features article.lead{border:1px solid var(--blue);border-top:3px solid var(--blue);box-shadow:inset 0 0 0 1px var(--blue);background:rgba(6,8,169,.05)}
+.shop-fullcompare-features .shop-kicker{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.shop-fullcompare-features .shop-kicker em{padding:3px 10px;border-radius:var(--r-pill);background:var(--blue);color:var(--bone);font-size:10px;font-style:normal;letter-spacing:.1em}
+.shop-fullcompare-features strong{font-family:var(--serif);font-size:22px;font-weight:400;line-height:1.15}
+.shop-fullcompare-features p:not(.shop-kicker){color:var(--ink-3);font-size:14px;font-weight:700;line-height:1.5}
+.shop-fullcompare-features p b{color:var(--ink);font-weight:900}
+/* Two fact boxes: .shop-trust-grid article, number on the left. */
+.shop-fullcompare-facts article{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:16px;border-color:var(--blue);background:#fcfaf5;text-align:left}
+.shop-fullcompare-facts article > div{display:grid;justify-items:start;min-width:0}
+.shop-fullcompare-facts strong{color:var(--blue);font-size:40px;line-height:1}
+.shop-fullcompare-facts article > div span{color:var(--blue);font-size:11px}
+.shop-fullcompare-facts p{margin:0;color:var(--ink-3);font-size:14px;font-weight:700;line-height:1.5;text-transform:none;letter-spacing:0}
+.shop-fullcompare-facts p b{color:var(--ink);font-weight:900}
+/* Table additions: product type under each name, sub-line under each benefit, star rows in blue. */
+.shop-compare-table thead th small{display:block;margin-top:3px;color:var(--ink-3);font-size:11px;font-weight:600;letter-spacing:0;text-transform:none}
+.shop-compare-table thead .ours small{color:var(--blue)}
+.shop-fullcompare-table thead th{color:var(--ink);font-size:11px}
+.shop-fullcompare-table tbody th span{display:block}
+.shop-fullcompare-table tbody th small{display:block;margin-top:2px;color:var(--ink-3);font-size:12px;font-weight:600}
+.shop-fullcompare-table tr.star th span{color:var(--blue);font-weight:900}
+.shop-fullcompare-table tbody th{font-weight:900}
+.shop-compare-table td.part svg{width:16px;height:16px;vertical-align:middle;color:var(--ink-4)}
+.shop-fullcompare-table tr.total th,.shop-fullcompare-table tr.total td{font-family:var(--serif);font-size:18px;font-weight:400}
+.shop-fullcompare-table tr.total td.ours{font-weight:600}
+.shop-fullcompare-table tr.price td.ours{font-size:15px}
+.shop-fullcompare-legal{font-style:normal}
+@media (max-width:760px){
+  .shop-fullcompare-features{grid-template-columns:1fr}
+  .shop-fullcompare-facts article{gap:12px;padding:16px}
+  .shop-fullcompare-table tbody th,.shop-fullcompare-table thead th:first-child{min-width:0;width:150px}
+  .shop-fullcompare-table{min-width:800px}
+  .shop-fullcompare-facts strong{font-size:32px}
+}

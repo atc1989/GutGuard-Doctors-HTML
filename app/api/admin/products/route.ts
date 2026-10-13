@@ -83,8 +83,15 @@ function validate(body: Record<string, unknown>) {
   if (image && !SHOP_IMAGES.includes(image)) return "Pick one of the listed images.";
   if (!status) return "Pick a status: active, hidden or archived.";
 
+  const includes = Array.isArray(body.includes)
+    ? body.includes.map((item) => String(item).trim()).filter(Boolean).slice(0, 10)
+    : [];
+
   return {
     name,
+    dosage: String(body.dosage ?? "").trim(),
+    includes,
+    includes_note: String(body.includesNote ?? "").trim(),
     phase: String(body.phase ?? "").trim(),
     days,
     caps,

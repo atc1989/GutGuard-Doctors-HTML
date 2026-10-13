@@ -309,6 +309,34 @@ export default function AdminProductsPage() {
                               />
                             </label>
                           </div>
+                          {kind === "protocol" ? (
+                            <>
+                              <label>
+                                Dosage line (on the card)
+                                <input
+                                  value={draft.dosage}
+                                  placeholder="2–4 capsules a day"
+                                  onChange={(event) => edit(product, { dosage: event.target.value })}
+                                />
+                              </label>
+                              <label>
+                                What&apos;s included (one per line, shown when selected)
+                                <textarea
+                                  value={draft.includes.join("\n")}
+                                  placeholder={"SynBIOTIC+ (330 capsules)\nLifestyle Protocol"}
+                                  onChange={(event) => edit(product, { includes: event.target.value.split("\n") })}
+                                />
+                              </label>
+                              <label>
+                                Note under the included list
+                                <input
+                                  value={draft.includesNote}
+                                  placeholder="Lower rate for completing the full 90 days."
+                                  onChange={(event) => edit(product, { includesNote: event.target.value })}
+                                />
+                              </label>
+                            </>
+                          ) : null}
                         </div>
 
                         <div className="admin-product-preview" aria-live="polite">

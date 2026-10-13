@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { ArrowRightIcon, CheckIcon } from "@/components/Icons";
 import { Logo } from "@/components/GutguardSite";
+import { CompareSheet, FullCompare } from "@/components/ShopCompare";
 import { createShopOrder, loadShopCatalog, sendShopOrderEmail, startMayaCheckout, type ShopOrderItem } from "@/lib/api";
 import {
   DEFAULT_PRODUCTS,
@@ -117,6 +118,8 @@ export default function Shoplet() {
   const menuPanelRef = useRef<HTMLDivElement>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [infoModal, setInfoModal] = useState<InfoModal>(null);
+  // "Why this price? Compare": the sheet, then optionally the full comparison page.
+  const [compare, setCompare] = useState<"sheet" | "full" | null>(null);
   const [stage, setStage] = useState<Stage>("shop");
   const [form, setForm] = useState<FormState>(emptyForm);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
@@ -194,6 +197,13 @@ export default function Shoplet() {
   // Undefined only when admin has hidden everything this page could sell - no buy button then.
   const selectedItem: Product | undefined = showTrials ? selectedTrial : selectedTier;
   const currentPrice = selectedItem ? priceOf(selectedItem) : null;
+  // Live per-capsule range of the packages, for the Compare table ("₱90–₱130").
+  const tierRates = tiers.map((tier) => promoPerCap(tier, priceOf(tier)));
+  const tierRateRange = tierRates.length
+    ? Math.min(...tierRates) === Math.max(...tierRates)
+      ? peso(tierRates[0])
+      : `${peso(Math.min(...tierRates))}–${peso(Math.max(...tierRates))}`
+    : "";
 
   useEffect(() => {
     setReferralShopName(readReferralShopName());
@@ -621,26 +631,62 @@ export default function Shoplet() {
                   <span>When you&apos;re ready</span>
                   {tiers.some((item) => priceOf(item).promo) ? <em className="shop-lto">Limited time offer</em> : null}
                 </p>
-                <div className="shop-options protocol">
-                  {tiers.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className={`shop-option${tierId === item.id ? " active" : ""}${priceOf(item).promo ? " has-promo" : ""}`}
-                      onClick={() => setTierId(item.id)}
-                    >
-                      <span>
-                        <strong>
-                          {item.name}
-                          {item.tag ? <em>{item.tag}</em> : null}
-                        </strong>
-                        <small>
-                          {item.phase} · {item.caps} capsules
-                        </small>
-                      </span>
-                      <PriceTag product={item} value={priceOf(item)} perCap />
-                    </button>
-                  ))}
+                {/* Package cards from the boss's Full Protocol mockup (13 Oct 2026), plus the bonus value badge. */}
+                <div className="shop-options shop-tiers" role="radiogroup" aria-label="Full protocol packages">
+                  {tiers.map((item) => {
+                    const pricing = priceOf(item);
+                    const active = tierId === item.id || (!tiers.some((tier) => tier.id === tierId) && item === selectedTier);
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        className={`shop-option shop-tier${active ? " active" : ""}`}
+                        onClick={() => setTierId(item.id)}
+                      >
+                        <span className="shop-tier-row">
+                          <span>
+                            <strong>
+                              {item.name}
+                              {item.tag ? <em>{item.tag}</em> : null}
+                            </strong>
+                            <small className="shop-tier-size">
+                              {item.phase} · {item.caps} capsules
+                            </small>
+                            {item.dosage ? <small>{item.dosage}</small> : null}
+                          </span>
+                          <span className="shop-price">
+                            {pricing.promo ? <i className="shop-save">{peso(bonusValue(pricing))} bonus value</i> : null}
+                            <b className="shop-tier-rate">
+                              {peso(promoPerCap(item, pricing))}
+                              <i> / capsule</i>
+                            </b>
+                            <span className="shop-price-now">{peso(pricing.price)} total</span>
+                            {pricing.promo ? (
+                              <span className="shop-price-compare">Standard {peso(item.perCap)} / capsule · Program rate</span>
+                            ) : null}
+                          </span>
+                        </span>
+                        {item.includes.length || item.includesNote ? (
+                          <span className="shop-tier-more">
+                            {item.includes.length ? (
+                              <span className="shop-tier-incl">
+                                <span className="shop-tier-incl-h">What&apos;s included</span>
+                                {item.includes.map((line) => (
+                                  <span className="shop-tier-li" key={line}>
+                                    <CheckIcon />
+                                    {line}
+                                  </span>
+                                ))}
+                              </span>
+                            ) : null}
+                            {item.includesNote ? <small className="shop-tier-last">{item.includesNote}</small> : null}
+                          </span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
                 </div>
               </>
             )}
@@ -666,6 +712,15 @@ export default function Shoplet() {
               <ArrowRightIcon />
             </button>
             ) : null}
+            {showTrials ? null : (
+              <>
+                <p className="shop-note shop-tier-proof">FDA-registered · Made in an ISO-certified facility</p>
+                <button type="button" className="shop-facts-link shop-compare-link" onClick={() => setCompare("sheet")}>
+                  Why this price? Compare
+                  <ArrowRightIcon />
+                </button>
+              </>
+            )}
           </div>
           ) : (
             <div className="shop-card" aria-busy="true">
@@ -674,6 +729,11 @@ export default function Shoplet() {
           )}
         </div>
       </section>
+
+      {compare === "sheet" ? (
+        <CompareSheet rateRange={tierRateRange} onClose={() => setCompare(null)} onFull={() => setCompare("full")} />
+      ) : null}
+      {compare === "full" ? <FullCompare rateRange={tierRateRange} onClose={() => setCompare(null)} /> : null}
 
       {drawerOpen ? (
         <div className="shop-drawer-wrap" role="presentation">

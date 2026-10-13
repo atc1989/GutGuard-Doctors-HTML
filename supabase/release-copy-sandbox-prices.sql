@@ -6,7 +6,8 @@
 -- doctors.promos yet, so customers see no change until the new code deploys.
 --
 -- Copies what sandbox has at the moment it runs:
---   * products: every product id that exists in both schemas (price, per-cap, caps, labels, status)
+--   * products: every product id that exists in both schemas (price, per-cap, caps, labels, status,
+--               dosage line and "What's included" - needs migration 20261013000000_product_details)
 --   * promos:   "Holiday Promo" and "Standard discount" only, matched by name
 --               (any test promos created on sandbox are NOT copied)
 
@@ -23,6 +24,9 @@ set name = s.name,
     image = s.image,
     sort_order = s.sort_order,
     status = s.status,
+    dosage = s.dosage,
+    includes = s.includes,
+    includes_note = s.includes_note,
     updated_at = now()
 from sandbox.products s
 where d.id = s.id;
@@ -45,7 +49,8 @@ commit;
 -- Check: every row should say "same". "is not distinct from" so a null (e.g. no end date)
 -- counts as equal - a plain "=" made "Standard discount" read DIFFERENT when it was the same.
 select 'product ' || d.id as row,
-       case when (d.price, d.per_cap_price, d.caps, d.status, d.name) is not distinct from (s.price, s.per_cap_price, s.caps, s.status, s.name)
+       case when (d.price, d.per_cap_price, d.caps, d.status, d.name, d.phase, d.tag, d.dosage, d.includes, d.includes_note)
+               is not distinct from (s.price, s.per_cap_price, s.caps, s.status, s.name, s.phase, s.tag, s.dosage, s.includes, s.includes_note)
             then 'same' else 'DIFFERENT' end as result
 from doctors.products d join sandbox.products s using (id)
 union all
