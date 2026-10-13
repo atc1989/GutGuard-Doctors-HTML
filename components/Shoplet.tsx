@@ -12,7 +12,6 @@ import {
   formatPromoDay,
   promoPerCap,
   promoPrice,
-  runnerUpPrice,
   shopProducts,
   type Product,
   type Promo,
@@ -140,8 +139,6 @@ export default function Shoplet() {
   const [catalog, setCatalog] = useState<{ products: Product[]; promos: Promo[] } | null>(null);
   const products = catalog?.products ?? DEFAULT_PRODUCTS;
   const priceOf = (product: Product) => promoPrice(product.id, product.price, catalog?.promos ?? [], new Date());
-  // The next-best live promo, shown beside the winner so the winner reads as the better deal.
-  const runnerOf = (product: Product) => runnerUpPrice(product.id, product.price, catalog?.promos ?? [], new Date());
   const trials = shopProducts(products, "trial");
   const tiers = shopProducts(products, "protocol");
   // No Full Protocol tab on a trial-only link, or when every protocol product is hidden.
@@ -195,8 +192,6 @@ export default function Shoplet() {
   const selectedItem = mode === "trial" || protocolOff ? selectedTrial : selectedTier;
   const currentBuyLabel = `Add ${selectedItem.name}`;
   const currentPrice = priceOf(selectedItem);
-  const currentRunner = runnerOf(selectedItem);
-  const extraSaving = currentRunner ? currentRunner.price - currentPrice.price : 0;
 
   useEffect(() => {
     setReferralShopName(readReferralShopName());
@@ -604,7 +599,7 @@ export default function Shoplet() {
                           {item.caps} caps · {peso(promoPerCap(item, priceOf(item)))}/cap
                         </small>
                       </span>
-                      <PriceTag product={item} value={priceOf(item)} compare={runnerOf(item)} />
+                      <PriceTag product={item} value={priceOf(item)} />
                     </button>
                   ))}
                 </div>
@@ -636,7 +631,7 @@ export default function Shoplet() {
                           {item.phase} · {item.caps} capsules
                         </small>
                       </span>
-                      <PriceTag product={item} value={priceOf(item)} compare={runnerOf(item)} perCap />
+                      <PriceTag product={item} value={priceOf(item)} perCap />
                     </button>
                   ))}
                 </div>
@@ -658,16 +653,7 @@ export default function Shoplet() {
                 <small>
                   {currentPrice.percent ? <s>{peso(currentPrice.basePrice)}</s> : null}
                   <strong>{peso(currentPrice.price)}</strong>
-                  {currentRunner?.promo ? (
-                    <span className="shop-primary-runner">vs {peso(currentRunner.price)}</span>
-                  ) : null}
                 </small>
-                {extraSaving > 0 && currentPrice.promo ? (
-                  <small className="shop-primary-saving">
-                    <span className="shop-wide">You get {peso(extraSaving)} more in bonus value</span>
-                    <span className="shop-narrow">+{peso(extraSaving)} more bonus value</span>
-                  </small>
-                ) : null}
               </span>
               <ArrowRightIcon />
             </button>
@@ -854,21 +840,11 @@ const bonusValue = (pricing: PromoPrice) => pricing.basePrice - pricing.price;
 const formatPromoDate = (day: string) => `${formatPromoDay(day)}, ${day.slice(0, 4)}`;
 
 /**
- * A package's price: a "₱19,501 bonus value" badge, the regular price struck through, the
- * next-best promo greyed out as "Usually ₱128/cap · ₱7,425 bonus value", then the winning
- * price, highlighted. perCap shows per-capsule prices; bonus values are always per package.
+ * A package's price: a "₱19,501 bonus value" badge, the regular price struck through, then
+ * the promo price, highlighted. perCap shows per-capsule prices; bonus values are always per
+ * package. No comparison with other promos (removed on the boss's request).
  */
-function PriceTag({
-  product,
-  value,
-  compare,
-  perCap = false,
-}: {
-  product: Product;
-  value: PromoPrice;
-  compare: PromoPrice | null;
-  perCap?: boolean;
-}) {
+function PriceTag({ product, value, perCap = false }: { product: Product; value: PromoPrice; perCap?: boolean }) {
   const suffix = perCap ? "/cap" : "";
   const show = (pricing: PromoPrice) => `${peso(perCap ? promoPerCap(product, pricing) : pricing.price)}${suffix}`;
   const regular = `${peso(perCap ? product.perCap : product.price)}${suffix}`;
@@ -884,12 +860,6 @@ function PriceTag({
       <i className="shop-save">{peso(bonusValue(value))} bonus value</i>
       <span className="shop-price-compare">
         <s>{regular}</s>
-        {compare?.promo ? (
-          <span className="shop-price-runner">
-            Usually {show(compare)}
-            <span className="shop-wide"> · {peso(bonusValue(compare))} bonus value</span>
-          </span>
-        ) : null}
       </span>
       <span className="shop-price-now">{show(value)}</span>
     </b>
