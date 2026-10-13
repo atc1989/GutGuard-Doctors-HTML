@@ -664,13 +664,22 @@ export default function Shoplet() {
                   <strong>{peso(currentPrice.price)}</strong>
                   {currentRunner?.promo ? (
                     <span className="shop-primary-runner">
-                      vs {promoDisplayName(currentRunner.promo)} {peso(currentRunner.price)}
+                      <span className="shop-wide">
+                        vs {promoDisplayName(currentRunner.promo)} {peso(currentRunner.price)}
+                      </span>
+                      <span className="shop-narrow">
+                        vs {shortPromoName(currentRunner.promo)} {peso(currentRunner.price)}
+                      </span>
                     </span>
                   ) : null}
                 </small>
                 {extraSaving > 0 && currentPrice.promo ? (
                   <small className="shop-primary-saving">
-                    You save {peso(extraSaving)} more with {promoDisplayName(currentPrice.promo)}
+                    <span className="shop-wide">
+                      You save {peso(extraSaving)} more with {promoDisplayName(currentPrice.promo)}
+                    </span>
+                    {/* Phones: the "vs ..." line above already names the comparison. */}
+                    <span className="shop-narrow">Save {peso(extraSaving)} more</span>
                   </small>
                 ) : null}
               </span>
@@ -849,8 +858,11 @@ export default function Shoplet() {
   );
 }
 
-/** Phones: "Holiday Promo" -> "Holiday", so the badge and comparison fit on one line. */
-const shortPromoName = (promo: Promo) => promoDisplayName(promo).replace(/\s+promo$/i, "");
+/**
+ * Phones: the first word ("Holiday Promo" -> "Holiday", "Standard discount" -> "Standard"),
+ * so the badge, comparison and saving line fit on one line.
+ */
+const shortPromoName = (promo: Promo) => promoDisplayName(promo).trim().split(/\s+/)[0];
 
 /**
  * A package's price: the winning promo's badge ("Holiday Promo · Save 40%" - the entered %,

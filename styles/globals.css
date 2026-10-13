@@ -3083,13 +3083,19 @@
   display: none;
 }
 
+.shop-primary .shop-wide {
+  display: inline;
+}
+
 /* Phones: rows stack (name on top, prices below, badge top-right) so nothing wraps mid-line. */
 @media (max-width: 520px) {
-  .shop-option .shop-wide {
+  .shop-option .shop-wide,
+  .shop-primary .shop-wide {
     display: none;
   }
 
-  .shop-option .shop-narrow {
+  .shop-option .shop-narrow,
+  .shop-primary .shop-narrow {
     display: inline;
   }
 
