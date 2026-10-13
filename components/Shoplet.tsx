@@ -10,7 +10,6 @@ import { createShopOrder, loadShopCatalog, sendShopOrderEmail, startMayaCheckout
 import {
   DEFAULT_PRODUCTS,
   formatPromoDay,
-  promoDisplayName,
   promoPerCap,
   promoPrice,
   runnerUpPrice,
@@ -646,13 +645,10 @@ export default function Shoplet() {
 
             {currentPrice.promo ? (
               <p className="shop-promo-note">
-                {[
-                  currentPrice.promo.label,
-                  `Save ${currentPrice.percent}%`,
-                  currentPrice.promo.ends_on ? `until ${formatPromoDay(currentPrice.promo.ends_on)}` : "",
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
+                {peso(bonusValue(currentPrice))} in bonus value.
+                {currentPrice.promo.ends_on ? (
+                  <span> Until {formatPromoDate(currentPrice.promo.ends_on)} only.</span>
+                ) : null}
               </p>
             ) : null}
 
@@ -663,14 +659,13 @@ export default function Shoplet() {
                   {currentPrice.percent ? <s>{peso(currentPrice.basePrice)}</s> : null}
                   <strong>{peso(currentPrice.price)}</strong>
                   {currentRunner?.promo ? (
-                    <span className="shop-primary-runner">
-                      vs {promoDisplayName(currentRunner.promo)} {peso(currentRunner.price)}
-                    </span>
+                    <span className="shop-primary-runner">vs {peso(currentRunner.price)}</span>
                   ) : null}
                 </small>
                 {extraSaving > 0 && currentPrice.promo ? (
                   <small className="shop-primary-saving">
-                    You save {peso(extraSaving)} more with {promoDisplayName(currentPrice.promo)}
+                    <span className="shop-wide">You get {peso(extraSaving)} more in bonus value</span>
+                    <span className="shop-narrow">+{peso(extraSaving)} more bonus value</span>
                   </small>
                 ) : null}
               </span>
@@ -849,14 +844,19 @@ export default function Shoplet() {
   );
 }
 
-/** Phones: "Holiday Promo" -> "Holiday", so the badge and comparison fit on one line. */
-const shortPromoName = (promo: Promo) => promoDisplayName(promo).replace(/\s+promo$/i, "");
+/**
+ * What the shop calls a promo's saving: "bonus value", in pesos, never a % or a promo name
+ * (the chairman finds "discount" cheap). Full package price minus the promo's package price.
+ */
+const bonusValue = (pricing: PromoPrice) => pricing.basePrice - pricing.price;
+
+/** "Dec 31, 2026" from a YYYY-MM-DD promo date. */
+const formatPromoDate = (day: string) => `${formatPromoDay(day)}, ${day.slice(0, 4)}`;
 
 /**
- * A package's price: the winning promo's badge ("Holiday Promo · Save 40%" - the entered %,
- * even when a typed final price makes the real saving slightly different), the regular price
- * struck through, the runner-up promo greyed out for comparison, then the winning price,
- * highlighted. perCap shows per-capsule prices instead of package prices.
+ * A package's price: a "₱19,501 bonus value" badge, the regular price struck through, the
+ * next-best promo greyed out as "Usually ₱128/cap · ₱7,425 bonus value", then the winning
+ * price, highlighted. perCap shows per-capsule prices; bonus values are always per package.
  */
 function PriceTag({
   product,
@@ -881,24 +881,13 @@ function PriceTag({
   }
   return (
     <b className="shop-price">
-      <i className="shop-save">
-        <span className="shop-wide">
-          {promoDisplayName(value.promo)} · Save {value.percent}%
-        </span>
-        <span className="shop-narrow">
-          {shortPromoName(value.promo)} −{value.percent}%
-        </span>
-      </i>
+      <i className="shop-save">{peso(bonusValue(value))} bonus value</i>
       <span className="shop-price-compare">
         <s>{regular}</s>
         {compare?.promo ? (
           <span className="shop-price-runner">
-            <span className="shop-wide">
-              {promoDisplayName(compare.promo)} {show(compare)} · −{compare.percent}%
-            </span>
-            <span className="shop-narrow">
-              {shortPromoName(compare.promo)} {show(compare)} (−{compare.percent}%)
-            </span>
+            Usually {show(compare)}
+            <span className="shop-wide"> · {peso(bonusValue(compare))} bonus value</span>
           </span>
         ) : null}
       </span>
