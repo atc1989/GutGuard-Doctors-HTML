@@ -185,6 +185,20 @@ export function promoPrice(productId: string, basePrice: number, promos: Promo[]
   return { price: best.prices[productId] || discountedPrice(basePrice, percent), basePrice, percent, promo: best };
 }
 
+/**
+ * The best live promo other than the winner - what the shop shows as the comparison
+ * ("Standard ₱42,075" beside Holiday's ₱29,999). Null when only one promo applies.
+ */
+export function runnerUpPrice(productId: string, basePrice: number, promos: Promo[], at: Date): PromoPrice | null {
+  const winner = promoPrice(productId, basePrice, promos, at);
+  if (!winner.promo) return null;
+  const next = promoPrice(productId, basePrice, promos.filter((promo) => promo.id !== winner.promo!.id), at);
+  return next.promo ? next : null;
+}
+
+/** Name the shop shows for a promo: its customer-facing label, else its admin name. */
+export const promoDisplayName = (promo: Promo) => promo.label || promo.name;
+
 /** Per-capsule price to show: the promo's typed value, else the calculation, else the product's own. */
 export function promoPerCap(product: Product, pricing: PromoPrice): number {
   if (!pricing.promo) return product.perCap;
