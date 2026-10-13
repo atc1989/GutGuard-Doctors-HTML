@@ -595,7 +595,7 @@ export default function Shoplet() {
                     <button
                       key={item.id}
                       type="button"
-                      className={trialId === item.id ? "shop-option active has-image" : "shop-option has-image"}
+                      className={`shop-option has-image${trialId === item.id ? " active" : ""}${priceOf(item).promo ? " has-promo" : ""}`}
                       onClick={() => setTrialId(item.id)}
                     >
                       <Image src={item.image} alt={item.name} width={150} height={150} />
@@ -625,7 +625,7 @@ export default function Shoplet() {
                     <button
                       key={item.id}
                       type="button"
-                      className={tierId === item.id ? "shop-option active" : "shop-option"}
+                      className={`shop-option${tierId === item.id ? " active" : ""}${priceOf(item).promo ? " has-promo" : ""}`}
                       onClick={() => setTierId(item.id)}
                     >
                       <span>
@@ -661,12 +661,12 @@ export default function Shoplet() {
                 {currentBuyLabel}
                 <small>
                   {currentPrice.percent ? <s>{peso(currentPrice.basePrice)}</s> : null}
+                  <strong>{peso(currentPrice.price)}</strong>
                   {currentRunner?.promo ? (
                     <span className="shop-primary-runner">
-                      {promoDisplayName(currentRunner.promo)} {peso(currentRunner.price)} →
+                      vs {promoDisplayName(currentRunner.promo)} {peso(currentRunner.price)}
                     </span>
-                  ) : null}{" "}
-                  <strong>{peso(currentPrice.price)}</strong>
+                  ) : null}
                 </small>
                 {extraSaving > 0 && currentPrice.promo ? (
                   <small className="shop-primary-saving">
@@ -849,6 +849,9 @@ export default function Shoplet() {
   );
 }
 
+/** Phones: "Holiday Promo" -> "Holiday", so the badge and comparison fit on one line. */
+const shortPromoName = (promo: Promo) => promoDisplayName(promo).replace(/\s+promo$/i, "");
+
 /**
  * A package's price: the winning promo's badge ("Holiday Promo · Save 40%" - the entered %,
  * even when a typed final price makes the real saving slightly different), the regular price
@@ -879,13 +882,23 @@ function PriceTag({
   return (
     <b className="shop-price">
       <i className="shop-save">
-        {promoDisplayName(value.promo)} · Save {value.percent}%
+        <span className="shop-wide">
+          {promoDisplayName(value.promo)} · Save {value.percent}%
+        </span>
+        <span className="shop-narrow">
+          {shortPromoName(value.promo)} −{value.percent}%
+        </span>
       </i>
       <span className="shop-price-compare">
         <s>{regular}</s>
         {compare?.promo ? (
           <span className="shop-price-runner">
-            {promoDisplayName(compare.promo)} {show(compare)} · −{compare.percent}%
+            <span className="shop-wide">
+              {promoDisplayName(compare.promo)} {show(compare)} · −{compare.percent}%
+            </span>
+            <span className="shop-narrow">
+              {shortPromoName(compare.promo)} {show(compare)} (−{compare.percent}%)
+            </span>
           </span>
         ) : null}
       </span>
