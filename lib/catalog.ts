@@ -18,6 +18,9 @@ export type Product = {
   image: string; // trials only
   sortOrder: number;
   status: ProductStatus;
+  dosage: string; // "1–2 capsules a day"
+  includes: string[]; // "What's included" on the package card
+  includesNote: string; // line under the included list
 };
 
 /**
@@ -25,17 +28,18 @@ export type Product = {
  * so they always agree on prices. Matches the seed in the shop_products migration.
  */
 export const DEFAULT_PRODUCTS: Product[] = [
-  { id: "start", kind: "protocol", name: "Start", phase: "30-day", days: 30, caps: 30, price: 3999, perCap: 133, tag: "", image: "", sortOrder: 1, status: "active" },
-  { id: "grow", kind: "protocol", name: "Grow", phase: "60-day", days: 60, caps: 90, price: 10999, perCap: 122, tag: "Popular", image: "", sortOrder: 2, status: "active" },
-  { id: "peak", kind: "protocol", name: "Peak", phase: "90-day", days: 90, caps: 330, price: 29999, perCap: 90, tag: "Best rate", image: "", sortOrder: 3, status: "active" },
-  { id: "trial-blister", kind: "trial", name: "Blister Trial", phase: "", days: 0, caps: 10, price: 1499, perCap: 150, tag: "", image: "/shop/blister.png", sortOrder: 1, status: "active" },
-  { id: "trial-bottle", kind: "trial", name: "Bottle Trial", phase: "", days: 0, caps: 30, price: 4299, perCap: 143, tag: "", image: "/shop/bottle.png", sortOrder: 2, status: "active" },
+  { id: "start", kind: "protocol", name: "Start", phase: "30-day", days: 30, caps: 30, price: 3999, perCap: 133, tag: "", image: "", sortOrder: 1, status: "active", dosage: "1–2 capsules a day", includes: [], includesNote: "" },
+  { id: "grow", kind: "protocol", name: "Grow", phase: "60-day", days: 60, caps: 90, price: 10999, perCap: 122, tag: "Popular", image: "", sortOrder: 2, status: "active", dosage: "2–4 capsules a day", includes: [], includesNote: "" },
+  { id: "peak", kind: "protocol", name: "Peak", phase: "90-day", days: 90, caps: 330, price: 29999, perCap: 90, tag: "Best rate", image: "", sortOrder: 3, status: "active", dosage: "4–6 capsules a day", includes: [], includesNote: "" },
+  { id: "trial-blister", kind: "trial", name: "Blister Trial", phase: "", days: 0, caps: 10, price: 1499, perCap: 150, tag: "", image: "/shop/blister.png", sortOrder: 1, status: "active", dosage: "", includes: [], includesNote: "" },
+  { id: "trial-bottle", kind: "trial", name: "Bottle Trial", phase: "", days: 0, caps: 30, price: 4299, perCap: 143, tag: "", image: "/shop/bottle.png", sortOrder: 2, status: "active", dosage: "", includes: [], includesNote: "" },
 ];
 
 export const PRODUCT_STATUSES: ProductStatus[] = ["active", "hidden", "archived"];
 /** Product images that exist in public/shop. Uploads come with "Add product" later. */
 export const SHOP_IMAGES = ["/shop/blister.png", "/shop/bottle.png"];
-export const PRODUCT_COLUMNS = "id, kind, name, phase, days, caps, price, per_cap_price, tag, image, sort_order, status";
+export const PRODUCT_COLUMNS =
+  "id, kind, name, phase, days, caps, price, per_cap_price, tag, image, sort_order, status, dosage, includes, includes_note";
 
 /** Active products of one kind, in display order. */
 export function shopProducts(products: Product[], kind: ProductKind): Product[] {
@@ -59,6 +63,9 @@ export function normalizeProduct(row: Record<string, unknown>): Product {
     image: String(row.image ?? ""),
     sortOrder: Number(row.sort_order) || 0,
     status,
+    dosage: String(row.dosage ?? ""),
+    includes: Array.isArray(row.includes) ? row.includes.map(String).filter(Boolean) : [],
+    includesNote: String(row.includes_note ?? ""),
   };
 }
 
