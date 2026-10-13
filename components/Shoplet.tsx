@@ -10,8 +10,10 @@ import { createShopOrder, loadShopCatalog, sendShopOrderEmail, startMayaCheckout
 import {
   DEFAULT_PRODUCTS,
   formatPromoDay,
+  promoDisplayName,
   promoPerCap,
   promoPrice,
+  runnerUpPrice,
   shopProducts,
   type Product,
   type Promo,
@@ -139,6 +141,8 @@ export default function Shoplet() {
   const [catalog, setCatalog] = useState<{ products: Product[]; promos: Promo[] } | null>(null);
   const products = catalog?.products ?? DEFAULT_PRODUCTS;
   const priceOf = (product: Product) => promoPrice(product.id, product.price, catalog?.promos ?? [], new Date());
+  // The next-best live promo, shown beside the winner so the winner reads as the better deal.
+  const runnerOf = (product: Product) => runnerUpPrice(product.id, product.price, catalog?.promos ?? [], new Date());
   const trials = shopProducts(products, "trial");
   const tiers = shopProducts(products, "protocol");
   // No Full Protocol tab on a trial-only link, or when every protocol product is hidden.
@@ -192,6 +196,8 @@ export default function Shoplet() {
   const selectedItem = mode === "trial" || protocolOff ? selectedTrial : selectedTier;
   const currentBuyLabel = `Add ${selectedItem.name}`;
   const currentPrice = priceOf(selectedItem);
+  const currentRunner = runnerOf(selectedItem);
+  const extraSaving = currentRunner ? currentRunner.price - currentPrice.price : 0;
 
   useEffect(() => {
     setReferralShopName(readReferralShopName());
@@ -599,7 +605,7 @@ export default function Shoplet() {
                           {item.caps} caps · {peso(promoPerCap(item, priceOf(item)))}/cap
                         </small>
                       </span>
-                      <PriceTag value={priceOf(item)} />
+                      <PriceTag product={item} value={priceOf(item)} compare={runnerOf(item)} />
                     </button>
                   ))}
                 </div>
@@ -613,13 +619,6 @@ export default function Shoplet() {
               <>
                 <p className="shop-options-label">
                   <span>When you&apos;re ready</span>
-                  <em>
-                    {/* The per-cap range, first tier to last, at today's promo prices. */}
-                    {[tiers[0], tiers[tiers.length - 1]]
-                      .map((tier) => peso(promoPerCap(tier, priceOf(tier))))
-                      .join(" → ")}{" "}
-                    / cap
-                  </em>
                 </p>
                 <div className="shop-options protocol">
                   {tiers.map((item) => (
@@ -638,7 +637,7 @@ export default function Shoplet() {
                           {item.phase} · {item.caps} capsules
                         </small>
                       </span>
-                      <PriceTag value={priceOf(item)} perCap={{ base: item.perCap, now: promoPerCap(item, priceOf(item)) }} />
+                      <PriceTag product={item} value={priceOf(item)} compare={runnerOf(item)} perCap />
                     </button>
                   ))}
                 </div>
@@ -661,8 +660,19 @@ export default function Shoplet() {
               <span>
                 {currentBuyLabel}
                 <small>
-                  {currentPrice.percent ? <s>{peso(currentPrice.basePrice)}</s> : null} {peso(currentPrice.price)}
+                  {currentPrice.percent ? <s>{peso(currentPrice.basePrice)}</s> : null}
+                  {currentRunner?.promo ? (
+                    <span className="shop-primary-runner">
+                      {promoDisplayName(currentRunner.promo)} {peso(currentRunner.price)} →
+                    </span>
+                  ) : null}{" "}
+                  <strong>{peso(currentPrice.price)}</strong>
                 </small>
+                {extraSaving > 0 && currentPrice.promo ? (
+                  <small className="shop-primary-saving">
+                    You save {peso(extraSaving)} more with {promoDisplayName(currentPrice.promo)}
+                  </small>
+                ) : null}
               </span>
               <ArrowRightIcon />
             </button>
@@ -840,21 +850,46 @@ export default function Shoplet() {
 }
 
 /**
- * Price with the pre-promo amount struck through and a "Save X%" badge (the % admin
- * entered, even when a typed final price makes the real saving slightly different).
- * perCap shows the per-capsule rate instead.
+ * A package's price: the winning promo's badge ("Holiday Promo · Save 40%" - the entered %,
+ * even when a typed final price makes the real saving slightly different), the regular price
+ * struck through, the runner-up promo greyed out for comparison, then the winning price,
+ * highlighted. perCap shows per-capsule prices instead of package prices.
  */
-function PriceTag({ value, perCap }: { value: PromoPrice; perCap?: { base: number; now: number } }) {
-  const now = perCap ? perCap.now : value.price;
-  const was = perCap ? perCap.base : value.basePrice;
+function PriceTag({
+  product,
+  value,
+  compare,
+  perCap = false,
+}: {
+  product: Product;
+  value: PromoPrice;
+  compare: PromoPrice | null;
+  perCap?: boolean;
+}) {
   const suffix = perCap ? "/cap" : "";
+  const show = (pricing: PromoPrice) => `${peso(perCap ? promoPerCap(product, pricing) : pricing.price)}${suffix}`;
+  const regular = `${peso(perCap ? product.perCap : product.price)}${suffix}`;
+  if (!value.promo) {
+    return (
+      <b className="shop-price">
+        <span className="shop-price-now">{regular}</span>
+      </b>
+    );
+  }
   return (
     <b className="shop-price">
-      {value.percent ? <i className="shop-save">Save {value.percent}%</i> : null}
-      <span>
-        {value.percent ? <s>{`${peso(was)}${suffix}`}</s> : null}
-        {`${peso(value.percent ? now : was)}${suffix}`}
+      <i className="shop-save">
+        {promoDisplayName(value.promo)} · Save {value.percent}%
+      </i>
+      <span className="shop-price-compare">
+        <s>{regular}</s>
+        {compare?.promo ? (
+          <span className="shop-price-runner">
+            {promoDisplayName(compare.promo)} {show(compare)} · −{compare.percent}%
+          </span>
+        ) : null}
       </span>
+      <span className="shop-price-now">{show(value)}</span>
     </b>
   );
 }

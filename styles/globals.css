@@ -3057,6 +3057,57 @@
   display: grid;
   justify-items: end;
   gap: 4px;
+  text-align: right;
+}
+
+.shop-price-compare {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.shop-price-compare s {
+  opacity: 0.7;
+}
+
+.shop-price-runner {
+  white-space: nowrap;
+}
+
+/* Phones: the comparison line and badge wrap instead of pushing the row off-screen. */
+@media (max-width: 520px) {
+  .shop-price {
+    min-width: 0;
+  }
+
+  .shop-price-runner,
+  .shop-save {
+    white-space: normal;
+    text-align: right;
+  }
+}
+
+.shop-price-now {
+  font-size: 17px;
+  font-weight: 900;
+}
+
+/* .shop-primary span is a grid elsewhere; keep the comparison on the price line. */
+.shop-primary .shop-primary-runner {
+  display: inline;
+  margin: 0 6px 0 0;
+  opacity: 0.8;
+}
+
+.shop-primary .shop-primary-saving {
+  display: block;
+  margin-top: 4px;
+  color: var(--gold, #c9a86a);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .shop-save {
