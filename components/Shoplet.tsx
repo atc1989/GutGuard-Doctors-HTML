@@ -6,8 +6,18 @@ import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { ArrowRightIcon, CheckIcon } from "@/components/Icons";
 import { Logo } from "@/components/GutguardSite";
-import { createShopOrder, sendShopOrderEmail, startMayaCheckout, type ShopOrderItem } from "@/lib/api";
-import { TIERS, TRIALS } from "@/lib/catalog";
+import { CompareSheet, FullCompare } from "@/components/ShopCompare";
+import { createShopOrder, loadShopCatalog, sendShopOrderEmail, startMayaCheckout, type ShopOrderItem } from "@/lib/api";
+import {
+  DEFAULT_PRODUCTS,
+  formatPromoDay,
+  promoPerCap,
+  promoPrice,
+  shopProducts,
+  type Product,
+  type Promo,
+  type PromoPrice,
+} from "@/lib/catalog";
 import {
   fetchBarangays,
   fetchLocalities,
@@ -99,7 +109,7 @@ const peso = (value: number) =>
 
 export default function Shoplet() {
   const [mode, setMode] = useState<Mode>("trial");
-  const [trialId, setTrialId] = useState(TRIALS[0].id);
+  const [trialId, setTrialId] = useState("");
   const [tierId, setTierId] = useState("peak");
   const [basket, setBasket] = useState<ShopOrderItem[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -108,6 +118,8 @@ export default function Shoplet() {
   const menuPanelRef = useRef<HTMLDivElement>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [infoModal, setInfoModal] = useState<InfoModal>(null);
+  // "Why this price? Compare": the sheet, then optionally the full comparison page.
+  const [compare, setCompare] = useState<"sheet" | "full" | null>(null);
   const [stage, setStage] = useState<Stage>("shop");
   const [form, setForm] = useState<FormState>(emptyForm);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
@@ -126,9 +138,20 @@ export default function Shoplet() {
   const [referralShopName, setReferralShopName] = useState("");
   // Set by /r/<slug> for partners whose link may not sell the Full Protocol.
   const [trialOnly, setTrialOnly] = useState(false);
+  // null until loaded; the fallback list until then. See loadCatalog for failure handling.
+  const [catalog, setCatalog] = useState<{ products: Product[]; promos: Promo[] } | null>(null);
+  const products = catalog?.products ?? DEFAULT_PRODUCTS;
+  const priceOf = (product: Product) => promoPrice(product.id, product.price, catalog?.promos ?? [], new Date());
+  const trials = shopProducts(products, "trial");
+  const tiers = shopProducts(products, "protocol");
+  // No Full Protocol tab on a trial-only link, or when every protocol product is hidden;
+  // no Try First tab when every trial is hidden. Either can be switched off in admin.
+  const protocolOff = trialOnly || tiers.length === 0;
+  const trialsOff = trials.length === 0;
+  const showTrials = protocolOff || (mode === "trial" && !trialsOff);
 
-  const selectedTrial = TRIALS.find((item) => item.id === trialId) ?? TRIALS[0];
-  const selectedTier = TIERS.find((item) => item.id === tierId) ?? TIERS[2];
+  const selectedTrial = trials.find((item) => item.id === trialId) ?? trials[0];
+  const selectedTier = tiers.find((item) => item.id === tierId) ?? tiers[tiers.length - 1];
   const basketCount = basket.reduce((sum, item) => sum + item.qty, 0);
   const subtotal = basket.reduce((sum, item) => sum + item.price * item.qty, 0);
   const shippingQuote = quoteShipping(basket, {
@@ -171,23 +194,50 @@ export default function Shoplet() {
     };
   }, [menuOpen]);
   const totalAmount = getOrderTotal(subtotal, shippingQuote.fee);
-  const currentBuyLabel = mode === "trial" ? `Add ${selectedTrial.name}` : `Add ${selectedTier.name}`;
-  const currentPrice = mode === "trial" ? selectedTrial.price : selectedTier.price;
+  // Undefined only when admin has hidden everything this page could sell - no buy button then.
+  const selectedItem: Product | undefined = showTrials ? selectedTrial : selectedTier;
+  const currentPrice = selectedItem ? priceOf(selectedItem) : null;
+  // Live per-capsule range of the packages, for the Compare table ("₱90–₱130").
+  const tierRates = tiers.map((tier) => promoPerCap(tier, priceOf(tier)));
+  const tierRateRange = tierRates.length
+    ? Math.min(...tierRates) === Math.max(...tierRates)
+      ? peso(tierRates[0])
+      : `${peso(Math.min(...tierRates))}–${peso(Math.max(...tierRates))}`
+    : "";
 
   useEffect(() => {
     setReferralShopName(readReferralShopName());
     setTrialOnly(new URLSearchParams(window.location.search).has("trial"));
   }, []);
 
+  useEffect(() => {
+    loadShopCatalog().then(setCatalog);
+  }, []);
+
+  // A saved basket carries the price, capsules and name it was added with; admin edits and
+  // promos change those, so bring it up to date or checkout would reject it after the
+  // customer filled in the form. Products no longer for sale - or protocol packs on a
+  // trial-only link - drop out.
+  useEffect(() => {
+    if (!catalog) return;
+    const trialOnlyLink = new URLSearchParams(window.location.search).has("trial");
+    setBasket((current) =>
+      current.flatMap((item) => {
+        const product = catalog.products.find((entry) => entry.id === item.id && entry.status === "active");
+        if (!product || (trialOnlyLink && product.kind !== "trial")) return [];
+        const price = promoPrice(product.id, product.price, catalog.promos, new Date()).price;
+        return [{ ...item, name: `SynBIOTIC+ ${product.name}`, caps: product.caps, price }];
+      }),
+    );
+  }, [catalog]);
+
   // Coming back from a cancelled Maya checkout should not cost the customer their basket.
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(BASKET_STORAGE_KEY);
       if (saved) {
-        const items = JSON.parse(saved) as ShopOrderItem[];
-        // A basket from an earlier full-shop visit must not carry protocol packs into a trial-only link.
-        const trialOnlyLink = new URLSearchParams(window.location.search).has("trial");
-        setBasket(trialOnlyLink ? items.filter((item) => TRIALS.some((trial) => trial.id === item.id)) : items);
+        // Re-priced and filtered once the catalog loads (see above).
+        setBasket(JSON.parse(saved) as ShopOrderItem[]);
       }
     } catch {
       window.localStorage.removeItem(BASKET_STORAGE_KEY);
@@ -266,17 +316,16 @@ export default function Shoplet() {
   }, [form.cityMunicipalityCode]);
 
   function addCurrentItem() {
-    const source =
-      mode === "trial"
-        ? { ...selectedTrial, name: `SynBIOTIC+ ${selectedTrial.name}` }
-        : { ...selectedTier, name: `SynBIOTIC+ ${selectedTier.name}` };
+    const source = selectedItem;
+    if (!source) return;
 
     setBasket((current) => {
       const existing = current.find((item) => item.id === source.id);
       if (existing) {
         return current.map((item) => (item.id === source.id ? { ...item, qty: Math.min(item.qty + 1, 20) } : item));
       }
-      return [...current, { id: source.id, name: source.name, caps: source.caps, price: source.price, qty: 1 }];
+      const price = priceOf(source).price;
+      return [...current, { id: source.id, name: `SynBIOTIC+ ${source.name}`, caps: source.caps, price, qty: 1 }];
     });
     setDrawerOpen(true);
   }
@@ -524,50 +573,53 @@ export default function Shoplet() {
           <div className="shop-section-head">
             <div>
               <p className="shop-kicker">Choose your order</p>
-              <h2>{trialOnly ? "Start small - try it first." : "Start small or begin the protocol."}</h2>
+              <h2>{protocolOff ? "Start small - try it first." : "Start small or begin the protocol."}</h2>
             </div>
             <button className="shop-secondary" type="button" onClick={() => setDrawerOpen(true)}>
               Open basket ({basketCount})
             </button>
           </div>
 
+          {/* Wait for the real catalog: the built-in fallback prices would flash for a moment. */}
+          {catalog ? (
           <div className="shop-card" aria-label="Product options">
-            {trialOnly ? null : (
+            {protocolOff || trialsOff ? null : (
               <div className="shop-segment">
-                <button type="button" className={mode === "trial" ? "active" : ""} onClick={() => setMode("trial")}>
+                <button type="button" className={showTrials ? "active" : ""} onClick={() => setMode("trial")}>
                   Try first
                 </button>
-                <button type="button" className={mode === "protocol" ? "active" : ""} onClick={() => setMode("protocol")}>
+                <button type="button" className={showTrials ? "" : "active"} onClick={() => setMode("protocol")}>
                   Full protocol
                 </button>
               </div>
             )}
 
-            {mode === "trial" || trialOnly ? (
+            {showTrials ? (
               <>
                 <p className="shop-options-label">
                   <span>Start here · low risk</span>
+                  {trials.some((item) => priceOf(item).promo) ? <em className="shop-lto">Limited time offer</em> : null}
                 </p>
                 <div className="shop-options trial">
-                  {TRIALS.map((item) => (
+                  {trials.map((item) => (
                     <button
                       key={item.id}
                       type="button"
-                      className={trialId === item.id ? "shop-option active has-image" : "shop-option has-image"}
+                      className={`shop-option has-image${trialId === item.id ? " active" : ""}${priceOf(item).promo ? " has-promo" : ""}`}
                       onClick={() => setTrialId(item.id)}
                     >
                       <Image src={item.image} alt={item.name} width={150} height={150} />
                       <span>
                         <strong>{item.name}</strong>
                         <small>
-                          {item.caps} caps · {peso(Math.round(item.price / item.caps))}/cap
+                          {item.caps} caps · {peso(promoPerCap(item, priceOf(item)))}/cap
                         </small>
                       </span>
-                      <b>{peso(item.price)}</b>
+                      <PriceTag product={item} value={priceOf(item)} />
                     </button>
                   ))}
                 </div>
-                {trialOnly ? null : (
+                {protocolOff ? null : (
                   <p className="shop-note">
                     The same living formula as the full protocol - try it before you commit.
                   </p>
@@ -577,42 +629,111 @@ export default function Shoplet() {
               <>
                 <p className="shop-options-label">
                   <span>When you&apos;re ready</span>
-                  <em>₱133 → ₱90 / cap</em>
+                  {tiers.some((item) => priceOf(item).promo) ? <em className="shop-lto">Limited time offer</em> : null}
                 </p>
-                <div className="shop-options protocol">
-                  {TIERS.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className={tierId === item.id ? "shop-option active" : "shop-option"}
-                      onClick={() => setTierId(item.id)}
-                    >
-                      <span>
-                        <strong>
-                          {item.name}
-                          {item.tag ? <em>{item.tag}</em> : null}
-                        </strong>
-                        <small>
-                          {item.phase} · {item.caps} capsules
-                        </small>
-                      </span>
-                      <b>{peso(item.perCap)}/cap</b>
-                    </button>
-                  ))}
+                {/* Package cards from the boss's Full Protocol mockup (13 Oct 2026), plus the bonus value badge. */}
+                <div className="shop-options shop-tiers" role="radiogroup" aria-label="Full protocol packages">
+                  {tiers.map((item) => {
+                    const pricing = priceOf(item);
+                    const active = tierId === item.id || (!tiers.some((tier) => tier.id === tierId) && item === selectedTier);
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        className={`shop-option shop-tier${active ? " active" : ""}`}
+                        onClick={() => setTierId(item.id)}
+                      >
+                        <span className="shop-tier-row">
+                          <span>
+                            <strong>
+                              {item.name}
+                              {item.tag ? <em>{item.tag}</em> : null}
+                            </strong>
+                            <small className="shop-tier-size">
+                              {item.phase} · {item.caps} capsules
+                            </small>
+                            {item.dosage ? <small>{item.dosage}</small> : null}
+                          </span>
+                          <span className="shop-price">
+                            {pricing.promo ? <i className="shop-save">{peso(bonusValue(pricing))} bonus value</i> : null}
+                            <b className="shop-tier-rate">
+                              {peso(promoPerCap(item, pricing))}
+                              <i> / capsule</i>
+                            </b>
+                            <span className="shop-price-now">{peso(pricing.price)} total</span>
+                            {pricing.promo ? (
+                              <span className="shop-price-compare">Standard {peso(item.perCap)} / capsule · Program rate</span>
+                            ) : null}
+                          </span>
+                        </span>
+                        {item.includes.length || item.includesNote ? (
+                          <span className="shop-tier-more">
+                            {item.includes.length ? (
+                              <span className="shop-tier-incl">
+                                <span className="shop-tier-incl-h">What&apos;s included</span>
+                                {item.includes.map((line) => (
+                                  <span className="shop-tier-li" key={line}>
+                                    <CheckIcon />
+                                    {line}
+                                  </span>
+                                ))}
+                              </span>
+                            ) : null}
+                            {item.includesNote ? <small className="shop-tier-last">{item.includesNote}</small> : null}
+                          </span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
                 </div>
               </>
             )}
 
+            {selectedItem && currentPrice ? (
             <button type="button" className="shop-primary" onClick={addCurrentItem}>
               <span>
-                {currentBuyLabel}
-                <small>{peso(currentPrice)}</small>
+                {`Add ${selectedItem.name}`}
+                {/* "₱4,500 SRP → ₱3,999" / "Bonus value of ₱501 until Dec 31, 2026 only" */}
+                <small>
+                  {currentPrice.promo ? `${peso(currentPrice.basePrice)} SRP → ` : null}
+                  <strong>{peso(currentPrice.price)}</strong>
+                </small>
+                {currentPrice.promo ? (
+                  <small className="shop-primary-bonus">
+                    Bonus value of {peso(bonusValue(currentPrice))}
+                    {currentPrice.promo.ends_on ? (
+                      <span> until {formatPromoDate(currentPrice.promo.ends_on)} only</span>
+                    ) : null}
+                  </small>
+                ) : null}
               </span>
               <ArrowRightIcon />
             </button>
+            ) : null}
+            {showTrials ? null : (
+              <>
+                <p className="shop-note shop-tier-proof">FDA-registered · Made in an ISO-certified facility</p>
+                <button type="button" className="shop-facts-link shop-compare-link" onClick={() => setCompare("sheet")}>
+                  Why this price? Compare
+                  <ArrowRightIcon />
+                </button>
+              </>
+            )}
           </div>
+          ) : (
+            <div className="shop-card" aria-busy="true">
+              <p className="shop-note">Loading prices…</p>
+            </div>
+          )}
         </div>
       </section>
+
+      {compare === "sheet" ? (
+        <CompareSheet rateRange={tierRateRange} onClose={() => setCompare(null)} onFull={() => setCompare("full")} />
+      ) : null}
+      {compare === "full" ? <FullCompare rateRange={tierRateRange} onClose={() => setCompare(null)} /> : null}
 
       {drawerOpen ? (
         <div className="shop-drawer-wrap" role="presentation">
@@ -780,6 +901,42 @@ export default function Shoplet() {
         </div>
       ) : null}
     </main>
+  );
+}
+
+/**
+ * What the shop calls a promo's saving: "bonus value", in pesos, never a % or a promo name
+ * (the chairman finds "discount" cheap). Full package price minus the promo's package price.
+ */
+const bonusValue = (pricing: PromoPrice) => pricing.basePrice - pricing.price;
+
+/** "Dec 31, 2026" from a YYYY-MM-DD promo date. */
+const formatPromoDate = (day: string) => `${formatPromoDay(day)}, ${day.slice(0, 4)}`;
+
+/**
+ * A package's price: a "₱19,501 bonus value" badge, the regular price struck through, then
+ * the promo price, highlighted. perCap shows per-capsule prices; bonus values are always per
+ * package. No comparison with other promos (removed on the boss's request).
+ */
+function PriceTag({ product, value, perCap = false }: { product: Product; value: PromoPrice; perCap?: boolean }) {
+  const suffix = perCap ? "/cap" : "";
+  const show = (pricing: PromoPrice) => `${peso(perCap ? promoPerCap(product, pricing) : pricing.price)}${suffix}`;
+  const regular = `${peso(perCap ? product.perCap : product.price)}${suffix}`;
+  if (!value.promo) {
+    return (
+      <b className="shop-price">
+        <span className="shop-price-now">{regular}</span>
+      </b>
+    );
+  }
+  return (
+    <b className="shop-price">
+      <i className="shop-save">{peso(bonusValue(value))} bonus value</i>
+      <span className="shop-price-compare">
+        <s>{regular}</s>
+      </span>
+      <span className="shop-price-now">{show(value)}</span>
+    </b>
   );
 }
 

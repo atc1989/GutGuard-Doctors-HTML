@@ -3,7 +3,8 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Menu, X, Check, Lock } from "lucide-react";
-import { TIERS } from "@/lib/catalog";
+import { promoPerCap, promoPrice } from "@/lib/catalog";
+import { loadShopCatalog } from "@/lib/api";
 
 /* ────────────────────────────────────────────────────────────
    Gutguard — Multi-page site (Home · Science · Shop · Physicians)
@@ -835,7 +836,7 @@ footer{padding:54px 0;border-top:1px solid var(--rule);}
 .bb-price{display:flex;flex-direction:column;gap:2px;margin-left:auto;text-align:right;}
 .bb-amt{font-family:var(--mono);font-weight:600;font-size:22px;color:var(--ink);line-height:1;}
 .bb-unit{font-size:13px;color:var(--ink-3);margin-left:1px;}
-.bb-was{font-family:var(--mono);font-size:12px;color:var(--ink-4);text-decoration:line-through;margin-left:5px;}
+.bb-was{font-family:var(--mono);font-size:12px;color:var(--ink-4);text-decoration:line-through;margin-right:6px;}
 .bb-sub{font-family:var(--mono);font-size:10px;letter-spacing:.03em;color:var(--ink-3);}
 .bb-cta{flex-shrink:0;padding:13px 24px;}
 @media(max-width:620px){
@@ -843,7 +844,7 @@ footer{padding:54px 0;border-top:1px solid var(--rule);}
   .buybar-inner{gap:12px;padding:9px 16px;}
   .bb-price{margin-left:0;text-align:left;flex:1;min-width:0;}
   .bb-amt{font-size:19px;}
-  .bb-was{font-size:11px;margin-left:4px;}
+  .bb-was{font-size:11px;margin-right:4px;}
   .bb-sub{display:block;}
   .bb-cta{margin-left:auto;padding:12px 22px;font-size:14px;}
 }
@@ -1157,7 +1158,6 @@ export function Logo({ h = 26, className = "", style = undefined }) {
 const DISEASE_FACTORY_URL = "/science#mechanism";
 
 /* protocol ladder — per-cap follows TikTok. CONFIRM caps for Start & Grow (scaled from Peak: 400 caps / 90 days). */
-const GROW = TIERS.find((tier) => tier.id === "grow");
 /* signature motion: measurement numbers resolve into view (the "we measure" feel) */
 function CountUp({ to, from = 0, prefix = "", suffix = "", dur = 1300 }) {
   const [val, setVal] = useState(from);
@@ -2106,6 +2106,19 @@ function SectionTabs({ items }) {
 
 function BuyBar({ route }) {
   const [shown, setShown] = useState(false);
+  // Grow as admin last set it, at today's promo price. Fallback list until it loads.
+  // Hidden until the real catalog loads, so the built-in fallback price never flashes.
+  const [grow, setGrow] = useState(null);
+  useEffect(() => {
+    loadShopCatalog().then(({ products, promos }) => {
+      // Hidden or archived in admin: stop advertising it.
+      const product = products.find((item) => item.id === "grow" && item.status === "active");
+      if (!product) return setGrow(null);
+      const live = promoPrice(product.id, product.price, promos, new Date());
+      setGrow({ product, live, perCap: promoPerCap(product, live) });
+    });
+  }, []);
+  const GROW = grow?.product;
   const enabled = route === "/" || route === "/shop";
   useEffect(() => {
     if (!enabled) { setShown(false); return; }
@@ -2141,7 +2154,7 @@ function BuyBar({ route }) {
     return () => { if (aObs) aObs.disconnect(); if (onScroll) window.removeEventListener("scroll", onScroll); eObs.disconnect(); };
   }, [route, enabled]);
 
-  if (!enabled) return null;
+  if (!enabled || !grow) return null;
   return (
     <nav className={"buybar" + (shown ? " show" : "")} aria-label="Purchase SynBIOTIC+">
       <div className="buybar-inner">
@@ -2153,8 +2166,13 @@ function BuyBar({ route }) {
           <span className="bb-meta">{GROW.phase} protocol <span className="bb-tag">Most popular</span></span>
         </div>
         <div className="bb-price">
-          <span className="bb-amt">₱{GROW.perCap} / capsule</span>
-          <span className="bb-sub">{GROW.phase} protocol · ₱{GROW.price.toLocaleString("en-PH")} total</span>
+          <span className="bb-amt">
+            {grow.live.promo ? <s className="bb-was">₱{GROW.perCap}</s> : null}₱{grow.perCap} / capsule
+          </span>
+          <span className="bb-sub">
+            {GROW.phase} protocol · ₱{grow.live.price.toLocaleString("en-PH")} total
+            {grow.live.promo ? ` · ₱${(grow.live.basePrice - grow.live.price).toLocaleString("en-PH")} bonus value` : ""}
+          </span>
         </div>
         <Link className="btn-primary bb-cta" tabIndex={shown ? 0 : -1} href="/shop#flagship">Compare Protocols <Arrow /></Link>
       </div>

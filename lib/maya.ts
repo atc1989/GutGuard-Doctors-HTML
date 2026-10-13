@@ -98,7 +98,8 @@ export class MayaApiError extends Error {
 }
 
 function basicAuth(key: string) {
-  return `Basic ${Buffer.from(`${key}:`).toString("base64")}`;
+  // Trimmed: a key pasted into Vercel with a trailing space or newline is a 401 from Maya.
+  return `Basic ${Buffer.from(`${key.trim()}:`).toString("base64")}`;
 }
 
 async function mayaFetch(path: string, key: string, init?: RequestInit) {

@@ -1,4 +1,5 @@
 import { PRIZES } from "@/lib/constants";
+import { loadCatalog } from "@/lib/catalog";
 import { pickPrizeIndex } from "@/lib/prizes";
 import { isSupabaseConfigured, supabase, supabaseShop, SHOP_SCHEMA } from "@/lib/supabase";
 import { checkImageFile, TESTIMONIAL_BUCKET } from "@/lib/testimonials";
@@ -1986,4 +1987,9 @@ export async function adminReviewTestimonial(
   }
   const data = await res.json();
   return data.story as AdminTestimonial;
+}
+
+/** Products + live promos for the shop. See loadCatalog for the fallback rules. */
+export function loadShopCatalog() {
+  return loadCatalog(supabaseShop);
 }
