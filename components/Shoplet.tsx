@@ -638,22 +638,22 @@ export default function Shoplet() {
               </>
             )}
 
-            {currentPrice.promo ? (
-              <p className="shop-promo-note">
-                {peso(bonusValue(currentPrice))} in bonus value.
-                {currentPrice.promo.ends_on ? (
-                  <span> Until {formatPromoDate(currentPrice.promo.ends_on)} only.</span>
-                ) : null}
-              </p>
-            ) : null}
-
             <button type="button" className="shop-primary" onClick={addCurrentItem}>
               <span>
                 {currentBuyLabel}
+                {/* "₱4,500 SRP → ₱3,999" / "Bonus value of ₱501 until Dec 31, 2026 only" */}
                 <small>
-                  {currentPrice.percent ? <s>{peso(currentPrice.basePrice)}</s> : null}
+                  {currentPrice.promo ? `${peso(currentPrice.basePrice)} SRP → ` : null}
                   <strong>{peso(currentPrice.price)}</strong>
                 </small>
+                {currentPrice.promo ? (
+                  <small className="shop-primary-bonus">
+                    Bonus value of {peso(bonusValue(currentPrice))}
+                    {currentPrice.promo.ends_on ? (
+                      <span> until {formatPromoDate(currentPrice.promo.ends_on)} only</span>
+                    ) : null}
+                  </small>
+                ) : null}
               </span>
               <ArrowRightIcon />
             </button>

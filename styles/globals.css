@@ -3107,16 +3107,16 @@
     white-space: nowrap;
   }
 
+  /* "Bonus value of ₱11,999" / "until Dec 31, 2026 only" - whole lines, never mid-date. */
+  .shop-primary small.shop-primary-bonus span {
+    display: block;
+  }
+
   /* Smaller Add button on phones: label + price only. */
   .shop-primary {
     min-height: 52px;
     margin-top: 14px;
     padding: 12px 16px;
-  }
-
-  /* "₱11,999 in bonus value." / "Until Dec 31, 2026 only." - two whole lines, no orphan. */
-  .shop-promo-note span {
-    display: block;
   }
 
   .shop-option .shop-price-compare {
@@ -3150,13 +3150,17 @@
   text-transform: uppercase;
 }
 
-.shop-promo-note {
-  margin: 12px 2px 0;
-  color: var(--gold);
+/* Add button: "Bonus value of ₱501 until Dec 31, 2026 only" (.shop-primary span is a grid). */
+.shop-primary .shop-primary-bonus {
+  display: block;
+  margin-top: 2px;
+  color: var(--gold, #c9a86a);
   font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+}
+
+.shop-primary .shop-primary-bonus span {
+  display: inline;
 }
 
 .shop-note {
