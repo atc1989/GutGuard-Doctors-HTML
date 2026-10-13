@@ -141,8 +141,11 @@ export default function Shoplet() {
   const priceOf = (product: Product) => promoPrice(product.id, product.price, catalog?.promos ?? [], new Date());
   const trials = shopProducts(products, "trial");
   const tiers = shopProducts(products, "protocol");
-  // No Full Protocol tab on a trial-only link, or when every protocol product is hidden.
+  // No Full Protocol tab on a trial-only link, or when every protocol product is hidden;
+  // no Try First tab when every trial is hidden. Either can be switched off in admin.
   const protocolOff = trialOnly || tiers.length === 0;
+  const trialsOff = trials.length === 0;
+  const showTrials = protocolOff || (mode === "trial" && !trialsOff);
 
   const selectedTrial = trials.find((item) => item.id === trialId) ?? trials[0];
   const selectedTier = tiers.find((item) => item.id === tierId) ?? tiers[tiers.length - 1];
@@ -188,10 +191,9 @@ export default function Shoplet() {
     };
   }, [menuOpen]);
   const totalAmount = getOrderTotal(subtotal, shippingQuote.fee);
-  // ponytail: assumes at least one trial stays active; hiding every product empties the shop.
-  const selectedItem = mode === "trial" || protocolOff ? selectedTrial : selectedTier;
-  const currentBuyLabel = `Add ${selectedItem.name}`;
-  const currentPrice = priceOf(selectedItem);
+  // Undefined only when admin has hidden everything this page could sell - no buy button then.
+  const selectedItem: Product | undefined = showTrials ? selectedTrial : selectedTier;
+  const currentPrice = selectedItem ? priceOf(selectedItem) : null;
 
   useEffect(() => {
     setReferralShopName(readReferralShopName());
@@ -305,6 +307,7 @@ export default function Shoplet() {
 
   function addCurrentItem() {
     const source = selectedItem;
+    if (!source) return;
 
     setBasket((current) => {
       const existing = current.find((item) => item.id === source.id);
@@ -568,18 +571,18 @@ export default function Shoplet() {
           </div>
 
           <div className="shop-card" aria-label="Product options">
-            {protocolOff ? null : (
+            {protocolOff || trialsOff ? null : (
               <div className="shop-segment">
-                <button type="button" className={mode === "trial" ? "active" : ""} onClick={() => setMode("trial")}>
+                <button type="button" className={showTrials ? "active" : ""} onClick={() => setMode("trial")}>
                   Try first
                 </button>
-                <button type="button" className={mode === "protocol" ? "active" : ""} onClick={() => setMode("protocol")}>
+                <button type="button" className={showTrials ? "" : "active"} onClick={() => setMode("protocol")}>
                   Full protocol
                 </button>
               </div>
             )}
 
-            {mode === "trial" || protocolOff ? (
+            {showTrials ? (
               <>
                 <p className="shop-options-label">
                   <span>Start here · low risk</span>
@@ -640,9 +643,10 @@ export default function Shoplet() {
               </>
             )}
 
+            {selectedItem && currentPrice ? (
             <button type="button" className="shop-primary" onClick={addCurrentItem}>
               <span>
-                {currentBuyLabel}
+                {`Add ${selectedItem.name}`}
                 {/* "₱4,500 SRP → ₱3,999" / "Bonus value of ₱501 until Dec 31, 2026 only" */}
                 <small>
                   {currentPrice.promo ? `${peso(currentPrice.basePrice)} SRP → ` : null}
@@ -659,6 +663,7 @@ export default function Shoplet() {
               </span>
               <ArrowRightIcon />
             </button>
+            ) : null}
           </div>
         </div>
       </section>

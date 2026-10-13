@@ -2171,11 +2171,11 @@ function BuyBar({ route }) {
         </div>
         <div className="bb-price">
           <span className="bb-amt">
-            {grow.live.percent ? <s className="bb-was">₱{GROW.perCap}</s> : null}₱{grow.perCap} / capsule
+            {grow.live.promo ? <s className="bb-was">₱{GROW.perCap}</s> : null}₱{grow.perCap} / capsule
           </span>
           <span className="bb-sub">
             {GROW.phase} protocol · ₱{grow.live.price.toLocaleString("en-PH")} total
-            {grow.live.percent ? ` · Save ${grow.live.percent}%` : ""}
+            {grow.live.promo ? ` · ₱${(grow.live.basePrice - grow.live.price).toLocaleString("en-PH")} bonus value` : ""}
           </span>
         </div>
         <Link className="btn-primary bb-cta" tabIndex={shown ? 0 : -1} href="/shop#flagship">Compare Protocols <Arrow /></Link>
