@@ -42,15 +42,16 @@ where d.name = s.name
 
 commit;
 
--- Check: every row should say "same".
+-- Check: every row should say "same". "is not distinct from" so a null (e.g. no end date)
+-- counts as equal - a plain "=" made "Standard discount" read DIFFERENT when it was the same.
 select 'product ' || d.id as row,
-       case when (d.price, d.per_cap_price, d.caps, d.status) = (s.price, s.per_cap_price, s.caps, s.status)
+       case when (d.price, d.per_cap_price, d.caps, d.status, d.name) is not distinct from (s.price, s.per_cap_price, s.caps, s.status, s.name)
             then 'same' else 'DIFFERENT' end as result
 from doctors.products d join sandbox.products s using (id)
 union all
 select 'promo ' || d.name,
-       case when (d.enabled, d.starts_on, d.ends_on, d.discounts, d.prices, d.per_cap)
-               = (s.enabled, s.starts_on, s.ends_on, s.discounts, s.prices, s.per_cap)
+       case when (d.enabled, d.label, d.starts_on, d.ends_on, d.discounts, d.prices, d.per_cap)
+               is not distinct from (s.enabled, s.label, s.starts_on, s.ends_on, s.discounts, s.prices, s.per_cap)
             then 'same' else 'DIFFERENT' end
 from doctors.promos d join sandbox.promos s using (name)
 where d.name in ('Holiday Promo', 'Standard discount')
