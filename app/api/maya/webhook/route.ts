@@ -35,17 +35,22 @@ export async function POST(request: Request) {
     const reference = payment.requestReferenceNumber ?? "";
     if (!reference) return NextResponse.json({ error: "Payment has no reference number" }, { status: 422 });
 
-    // Retries carry a "-2" style suffix; the order code is the part before it.
-    const orderCode = reference.replace(/-\d+$/, "");
-
+    // The first attempt's reference is the order code itself; retries add a "-2" style
+    // suffix. Try the exact code first: an order code can itself end in "-<digits>"
+    // (e.g. GG-20261013-84116767), and stripping that would look up the wrong order.
     const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase
-      .from("shop_orders")
-      .select("id, status, payment_status, maya_payment_id, maya_payment_status")
-      .eq("order_code", orderCode)
-      .single();
+    const findOrder = (code: string) =>
+      supabase
+        .from("shop_orders")
+        .select("id, status, payment_status, maya_payment_id, maya_payment_status")
+        .eq("order_code", code)
+        .maybeSingle();
+    let { data, error } = await findOrder(reference);
+    if (!error && !data && /-\d+$/.test(reference)) ({ data, error } = await findOrder(reference.replace(/-\d+$/, "")));
 
-    if (error || !data) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    // A database error is a 500 so Maya retries; an unknown order stays a 404 as before.
+    if (error) throw new Error("Could not look up the order");
+    if (!data) return NextResponse.json({ error: "Order not found" }, { status: 404 });
 
     const result = await applyPaymentToOrder(supabase, data, payment);
     return NextResponse.json({ ok: true, duplicate: !result.changed });

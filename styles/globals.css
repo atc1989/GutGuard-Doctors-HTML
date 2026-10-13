@@ -3053,6 +3053,30 @@
   opacity: 0.7;
 }
 
+/* Label + pill: the pill wraps below on narrow phones instead of splitting the label. */
+.shop-options-label:has(.shop-lto) {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.shop-options-label:has(.shop-lto) span {
+  white-space: nowrap;
+}
+
+/* "LIMITED TIME OFFER" beside the section label, only while a promo is live on that tab. */
+.shop-options-label .shop-lto {
+  padding: 3px 10px;
+  border-radius: var(--r-pill, 999px);
+  background: var(--blue);
+  color: var(--bone);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .shop-price {
   display: grid;
   justify-items: end;
