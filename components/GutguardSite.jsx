@@ -1096,6 +1096,9 @@ footer{padding:54px 0;border-top:1px solid var(--rule);}
   .gg:has(.buybar.show){padding-bottom:calc(78px + env(safe-area-inset-bottom));}
   .buybar-inner{min-height:74px;gap:9px;padding-inline:12px}.bb-thumb{display:none}.bb-info{display:flex;flex:1;min-width:0}.bb-name{font-size:15px}.bb-meta{font-size:10px}.bb-tag{display:none}
   .bb-price{margin-left:0;min-width:auto;text-align:right}.bb-amt{font-size:17px}.bb-sub{font-size:9px;white-space:nowrap}.bb-cta{padding:10px 13px;font-size:12px;min-height:44px}.bb-cta .arr{display:none}
+  .bb-bonus{display:block;color:var(--gold-text)}.bb-dot{display:none}
+  /* Phones: no room for the name column - it squeezed to "S…". The price line says "60-day protocol". */
+  .buybar .bb-info{display:none}.buybar .bb-price{flex:1;min-width:0;text-align:left}
 }
 @media(max-height:520px) and (orientation:landscape){
   .buybar-inner{min-height:58px;padding-block:5px}.bb-thumb{display:none}.bb-meta{display:none}.bb-cta{min-height:44px}
@@ -2171,7 +2174,12 @@ function BuyBar({ route }) {
           </span>
           <span className="bb-sub">
             {GROW.phase} protocol · ₱{grow.live.price.toLocaleString("en-PH")} total
-            {grow.live.promo ? ` · ₱${(grow.live.basePrice - grow.live.price).toLocaleString("en-PH")} bonus value` : ""}
+            {/* Own line on phones, or the bar is wider than the screen and pushes the button off it. */}
+            {grow.live.promo ? (
+              <span className="bb-bonus">
+                <span className="bb-dot"> · </span>₱{(grow.live.basePrice - grow.live.price).toLocaleString("en-PH")} bonus value
+              </span>
+            ) : null}
           </span>
         </div>
         <Link className="btn-primary bb-cta" tabIndex={shown ? 0 : -1} href="/shop#flagship">Compare Protocols <Arrow /></Link>
