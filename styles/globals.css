@@ -8467,7 +8467,10 @@
 .shop-tier-proof{text-align:center}
 .shop-compare-link{margin:2px auto 0;color:var(--blue)}
 .shop-compare-link:hover{color:var(--blue-press)}
-@media (max-width:420px){
+/* Stack the package cards on every phone. The mockup stacked at 420px, but large iPhones are
+   428-430px: side by side, the name column squeezed to ~120px and the no-wrap
+   "Standard ₱150 / capsule · Program rate" ran into "4–6 capsules a day". */
+@media (max-width:560px){
   .shop-tier-row{flex-direction:column;gap:10px}
   .shop-tier .shop-price{justify-items:start;text-align:left}
   .shop-tier .shop-price-compare{white-space:normal}
