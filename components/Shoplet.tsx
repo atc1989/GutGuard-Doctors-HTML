@@ -631,7 +631,7 @@ export default function Shoplet() {
                   <span>When you&apos;re ready</span>
                   {tiers.some((item) => priceOf(item).promo) ? <em className="shop-lto">Limited time offer</em> : null}
                 </p>
-                {/* Package cards from the boss's Full Protocol mockup (13 Oct 2026), plus the bonus value badge. */}
+                {/* Package cards from the boss's Full Protocol mockup (13 Oct 2026). */}
                 <div className="shop-options shop-tiers" role="radiogroup" aria-label="Full protocol packages">
                   {tiers.map((item) => {
                     const pricing = priceOf(item);
@@ -657,7 +657,6 @@ export default function Shoplet() {
                             {item.dosage ? <small>{item.dosage}</small> : null}
                           </span>
                           <span className="shop-price">
-                            {pricing.promo ? <i className="shop-save">{peso(bonusValue(pricing))} bonus value</i> : null}
                             <b className="shop-tier-rate">
                               {peso(promoPerCap(item, pricing))}
                               <i> / capsule</i>
@@ -695,18 +694,15 @@ export default function Shoplet() {
             <button type="button" className="shop-primary" onClick={addCurrentItem}>
               <span>
                 {`Add ${selectedItem.name}`}
-                {/* "₱4,500 SRP → ₱3,999" / "Bonus value of ₱501 until Dec 31, 2026 only" */}
+                {/* "₱4,500 SRP → ₱3,999" / "Until Dec 31, 2026 only" (no "bonus value" - boss, 15 Oct) */}
                 <small>
                   {currentPrice.promo ? `${peso(currentPrice.basePrice)} SRP → ` : null}
                   <strong>{peso(currentPrice.price)}</strong>
                 </small>
                 {currentPrice.promo ? (
-                  <small className="shop-primary-bonus">
-                    Bonus value of {peso(bonusValue(currentPrice))}
-                    {currentPrice.promo.ends_on ? (
-                      <span> until {formatPromoDate(currentPrice.promo.ends_on)} only</span>
-                    ) : null}
-                  </small>
+                  currentPrice.promo.ends_on ? (
+                    <small className="shop-primary-bonus">Until {formatPromoDate(currentPrice.promo.ends_on)} only</small>
+                  ) : null
                 ) : null}
               </span>
               <ArrowRightIcon />
@@ -904,19 +900,12 @@ export default function Shoplet() {
   );
 }
 
-/**
- * What the shop calls a promo's saving: "bonus value", in pesos, never a % or a promo name
- * (the chairman finds "discount" cheap). Full package price minus the promo's package price.
- */
-const bonusValue = (pricing: PromoPrice) => pricing.basePrice - pricing.price;
-
 /** "Dec 31, 2026" from a YYYY-MM-DD promo date. */
 const formatPromoDate = (day: string) => `${formatPromoDay(day)}, ${day.slice(0, 4)}`;
 
 /**
- * A package's price: a "₱19,501 bonus value" badge, the regular price struck through, then
- * the promo price, highlighted. perCap shows per-capsule prices; bonus values are always per
- * package. No comparison with other promos (removed on the boss's request).
+ * A package's price: the regular price struck through, then the promo price, highlighted.
+ * perCap shows per-capsule prices. No %, promo names or "bonus value" (boss's requests).
  */
 function PriceTag({ product, value, perCap = false }: { product: Product; value: PromoPrice; perCap?: boolean }) {
   const suffix = perCap ? "/cap" : "";
@@ -931,7 +920,6 @@ function PriceTag({ product, value, perCap = false }: { product: Product; value:
   }
   return (
     <b className="shop-price">
-      <i className="shop-save">{peso(bonusValue(value))} bonus value</i>
       <span className="shop-price-compare">
         <s>{regular}</s>
       </span>
