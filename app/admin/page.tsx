@@ -19,6 +19,7 @@ import {
   Users,
   Video,
 } from "lucide-react";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 
 type OverviewMetrics = {
   doctorsCount: number | null;
@@ -191,28 +192,21 @@ export default function AdminOverviewPage() {
 
   return (
     <div className="admin-overview-container">
-      {/* Hero Welcome Banner */}
-      <section className="admin-overview-hero">
-        <div>
-          <p className="admin-overview-date">{todayStr}</p>
-          <h1 className="admin-overview-title">Operations Dashboard</h1>
-          <p className="admin-overview-sub">
-            Welcome to the GutGuard Operations CRM. Centralized management for partners, shop orders, catalog, and marketing automation.
-          </p>
-        </div>
-
-        <div className="admin-overview-hero-actions">
-          <a
-            href="/shop"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="admin-overview-action-btn"
-          >
-            <ExternalLink size={16} />
-            <span>Open Storefront</span>
-          </a>
-        </div>
-      </section>
+      <AdminPageHeader
+        kicker={todayStr}
+        title="Operations Dashboard"
+        description="Welcome to the GutGuard Operations CRM. Centralized management for partners, shop orders, catalog, and marketing automation."
+      >
+        <a
+          href="/shop"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="admin-overview-action-btn"
+        >
+          <ExternalLink size={16} />
+          <span>Open Storefront</span>
+        </a>
+      </AdminPageHeader>
 
       {/* Primary KPI Metrics Grid */}
       <section className="admin-overview-metrics">

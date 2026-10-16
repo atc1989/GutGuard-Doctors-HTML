@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import Header from "@/components/Header";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import TestimonialVideo from "@/components/TestimonialVideo";
 import { adminListTestimonials, adminLogin, adminReviewTestimonial, checkAdminSession } from "@/lib/api";
 import {
@@ -11,9 +11,8 @@ import {
 } from "@/lib/testimonials";
 
 export default function AdminTestimonialsPage() {
-  const [password, setPassword] = useState("");
   const [stories, setStories] = useState<AdminTestimonial[]>([]);
-  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +21,7 @@ export default function AdminTestimonialsPage() {
   useEffect(() => {
     checkAdminSession().then((authenticated) => {
       if (authenticated) {
-        setIsUnlocked(true);
+        setLoaded(true);
         loadStories();
       }
     });
@@ -36,17 +35,15 @@ export default function AdminTestimonialsPage() {
     [stories],
   );
 
-  const hasPassword = password.trim().length > 0;
 
   async function loadStories() {
     setIsLoading(true);
     setError(null);
     try {
       setStories(await adminListTestimonials());
-      setIsUnlocked(true);
+      setLoaded(true);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load stories.");
-      setIsUnlocked(false);
     } finally {
       setIsLoading(false);
     }
@@ -57,14 +54,9 @@ export default function AdminTestimonialsPage() {
     setIsLoading(true);
     setError(null);
     try {
-      if (password) {
-        await adminLogin(password);
-        setPassword("");
-      }
       await loadStories();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load stories.");
-      setIsUnlocked(false);
     } finally {
       setIsLoading(false);
     }
@@ -75,7 +67,7 @@ export default function AdminTestimonialsPage() {
     setError(null);
     setNotice(null);
     try {
-      const saved = await adminReviewTestimonial("", { id: story.id, status, featured });
+      const saved = await adminReviewTestimonial({ id: story.id, status, featured });
       // Featuring clears the flag on every other row, so refetch rather than patch in place.
       if (featured) await loadStories();
       else setStories((current) => current.map((row) => (row.id === saved.id ? saved : row)));
@@ -88,54 +80,19 @@ export default function AdminTestimonialsPage() {
   }
 
   return (
-    <main className="admin-wheel-shell admin-shop-orders-shell">
-      <Header dateLabel="Member Stories" />
+    <div className="admin-wheel-shell admin-shop-orders-shell">
+      <AdminPageHeader kicker="Moderation" title="Testimonials" description="Member stories awaiting review, and the ones already published." />
 
-      <section className="admin-wheel-hero">
-        <div>
-          <p className="admin-wheel-kicker">GutGuard Stories</p>
-          <h1>
-            Moderation
-            <br />
-            <em>Admin</em>
-          </h1>
-        </div>
-        <div className="admin-wheel-summary" aria-live="polite">
-          <span>{isUnlocked ? "visible" : "locked"}</span>
-          <strong>{metrics.total}</strong>
-          <span>{metrics.pending} pending</span>
-        </div>
-      </section>
-
-      <form className="admin-wheel-auth admin-tiktok-auth" onSubmit={load}>
-        <label htmlFor="admin-password">Admin password</label>
+      <form className="admin-wheel-auth" onSubmit={load}>
         <div className="admin-wheel-auth-row">
-          <input
-            className="admin-hidden-username"
-            type="text"
-            value="gutguard-admin"
-            readOnly
-            aria-hidden="true"
-            tabIndex={-1}
-          />
-          <input
-            id="admin-password"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            placeholder="Enter password"
-            onChange={(event) => setPassword(event.target.value)}
-          />
-          <button type="submit" disabled={isLoading || !hasPassword}>
-            {isLoading ? "Loading" : isUnlocked ? "Refresh" : "Unlock"}
-          </button>
+          <button type="submit" disabled={isLoading}>{isLoading ? "Loading" : "Refresh"}</button>
         </div>
       </form>
 
       {notice ? <div className="admin-wheel-alert">{notice}</div> : null}
       {error ? <div className="admin-wheel-alert error">{error}</div> : null}
 
-      {isUnlocked ? (
+      {loaded ? (
         <section className="admin-wheel-panel">
           <div className="admin-wheel-panel-head">
             <div>
@@ -219,6 +176,6 @@ export default function AdminTestimonialsPage() {
           )}
         </section>
       ) : null}
-    </main>
+    </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import Header from "@/components/Header";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import {
   addTikTokExternalOrderReference,
   adminLogin,
@@ -46,14 +46,13 @@ const TABS: Array<{ id: TikTokTab; label: string }> = [
 export default function AdminTikTokPage() {
   const defaultRange = useMemo(() => getDefaultDateRange(), []);
   const [activeTab, setActiveTab] = useState<TikTokTab>("list");
-  const [password, setPassword] = useState("");
-  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     checkAdminSession().then((authenticated) => {
       if (authenticated) {
-        setIsUnlocked(true);
+        setLoaded(true);
       }
     });
   }, []);
@@ -106,15 +105,6 @@ export default function AdminTikTokPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (password) {
-      try {
-        await adminLogin(password);
-        setPassword("");
-      } catch (err) {
-        setListError(err instanceof Error ? err.message : "Invalid admin password.");
-        return;
-      }
-    }
     await fetchOrders();
   }
 
@@ -133,9 +123,9 @@ export default function AdminTikTokPage() {
         pageToken: pageToken.trim() || undefined,
         ...overrides,
       };
-      const response = await getTikTokOrders("", filters);
+      const response = await getTikTokOrders(filters);
       setListResult(response);
-      setIsUnlocked(true);
+      setLoaded(true);
       setPageToken(filters.pageToken ?? "");
       setNotice(`Loaded ${response.orders.length} TikTok order${response.orders.length === 1 ? "" : "s"}.`);
     } catch (caught) {
@@ -172,12 +162,12 @@ export default function AdminTikTokPage() {
     setNotice(null);
 
     try {
-      const response = await getTikTokOrderDetail(password, cleanOrderId);
+      const response = await getTikTokOrderDetail(cleanOrderId);
       if (!response.order?.summary) {
         throw new Error("Order detail response did not include order data. The Edge Function may need redeploying.");
       }
       setDetailResult(response);
-      setIsUnlocked(true);
+      setLoaded(true);
       setNotice(`Loaded detail for order ${cleanOrderId}.`);
     } catch (caught) {
       setDetailError(caught instanceof Error ? caught.message : "TikTok order detail request failed.");
@@ -198,12 +188,12 @@ export default function AdminTikTokPage() {
     setNotice(null);
 
     try {
-      const response = await getTikTokPriceDetail(password, cleanOrderId);
+      const response = await getTikTokPriceDetail(cleanOrderId);
       if (!response.price) {
         throw new Error("Price detail response did not include price data. The Edge Function may need redeploying.");
       }
       setPriceResult(response);
-      setIsUnlocked(true);
+      setLoaded(true);
       setNotice(`Loaded price detail for order ${cleanOrderId}.`);
     } catch (caught) {
       setPriceError(caught instanceof Error ? caught.message : "TikTok price detail request failed.");
@@ -220,7 +210,7 @@ export default function AdminTikTokPage() {
       return;
     }
     if (!window.confirm("Add this external reference to the TikTok order?")) return;
-    await runReferenceRequest("Added reference", () => addTikTokExternalOrderReference(password, cleanOrderId, cleanReference));
+    await runReferenceRequest("Added reference", () => addTikTokExternalOrderReference(cleanOrderId, cleanReference));
   }
 
   async function getReferences() {
@@ -229,7 +219,7 @@ export default function AdminTikTokPage() {
       setReferenceError("Enter an order ID.");
       return;
     }
-    await runReferenceRequest("Fetched references", () => getTikTokExternalOrderReferences(password, cleanOrderId));
+    await runReferenceRequest("Fetched references", () => getTikTokExternalOrderReferences(cleanOrderId));
   }
 
   async function searchByReference() {
@@ -238,7 +228,7 @@ export default function AdminTikTokPage() {
       setReferenceError("Enter an external reference.");
       return;
     }
-    await runReferenceRequest("Searched by reference", () => searchTikTokOrderByExternalReference(password, cleanReference));
+    await runReferenceRequest("Searched by reference", () => searchTikTokOrderByExternalReference(cleanReference));
   }
 
   async function runReferenceRequest(label: string, request: () => Promise<TikTokReferenceResponse>) {
@@ -253,7 +243,7 @@ export default function AdminTikTokPage() {
       }
       setReferenceResult(response);
       setReferenceMode(label);
-      setIsUnlocked(true);
+      setLoaded(true);
       setNotice(`${label} successfully.`);
     } catch (caught) {
       setReferenceError(caught instanceof Error ? caught.message : "TikTok reference request failed.");
@@ -273,14 +263,14 @@ export default function AdminTikTokPage() {
       if (consoleMethod !== "GET" && !consoleMutationConfirmed) {
         throw new Error("Confirm the mutation warning before sending a POST raw API request.");
       }
-      const response = await sendTikTokRawApiRequest(password, {
+      const response = await sendTikTokRawApiRequest({
         method: consoleMethod,
         path: consolePath.trim(),
         query,
         body,
       });
       setConsoleResult(response);
-      setIsUnlocked(true);
+      setLoaded(true);
       setNotice("Raw API request completed.");
     } catch (caught) {
       setConsoleError(caught instanceof Error ? caught.message : "Raw API request failed.");
@@ -300,7 +290,6 @@ export default function AdminTikTokPage() {
     }
   }
 
-  const hasPassword = password.trim().length > 0;
   const detailOrder = detailResult?.order;
   const priceDetail = priceResult?.price;
   const fallbackPriceLineItems =
@@ -318,49 +307,12 @@ export default function AdminTikTokPage() {
   const referenceRows = Array.isArray(referenceResult?.references) ? referenceResult.references : [];
 
   return (
-    <main className="admin-wheel-shell admin-tiktok-shell">
-      <Header dateLabel="TikTok Admin" />
+    <div className="admin-wheel-shell admin-tiktok-shell">
+      <AdminPageHeader kicker="TikTok Shop API" title="TikTok Shop" description="Order lookup, price detail and external reference tools." />
 
-      <section className="admin-wheel-hero">
-        <div>
-          <p className="admin-wheel-kicker">TikTok Shop API</p>
-          <h1>
-            Orders
-            <br />
-            <em>Admin</em>
-          </h1>
-        </div>
-        <div className="admin-wheel-summary" aria-live="polite">
-          <span>{isUnlocked ? `${orders.length} visible` : "locked"}</span>
-          <strong>{listResult?.totalCount ?? orders.length}</strong>
-          <span>{listResult?.totalCount === null ? "returned orders" : "total count"}</span>
-        </div>
-      </section>
-
-      <form className="admin-wheel-auth admin-tiktok-auth" onSubmit={handleSubmit}>
-        <label htmlFor="admin-password">Admin password</label>
+      <form className="admin-wheel-auth" onSubmit={handleSubmit}>
         <div className="admin-wheel-auth-row">
-          <input
-            className="admin-hidden-username"
-            type="text"
-            name="username"
-            autoComplete="username"
-            value="gutguard-admin"
-            readOnly
-            aria-hidden="true"
-            tabIndex={-1}
-          />
-          <input
-            id="admin-password"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            placeholder="Enter password"
-            onChange={(event) => setPassword(event.target.value)}
-          />
-          <button type="submit" disabled={listLoading || !hasPassword}>
-            {listLoading ? "Loading" : isUnlocked ? "Refresh orders" : "Unlock"}
-          </button>
+          <button type="submit" disabled={listLoading}>{listLoading ? "Loading" : "Refresh orders"}</button>
         </div>
       </form>
 
@@ -388,7 +340,7 @@ export default function AdminTikTokPage() {
                 <p className="admin-wheel-kicker">Order Search</p>
                 <h2>Filters</h2>
               </div>
-              <p>Credentials stay in Supabase secrets. This page only sends filters and the admin password.</p>
+              <p>Credentials stay in Supabase secrets. This page only sends filters.</p>
             </div>
 
             <div className="admin-tiktok-filter-grid">
@@ -434,7 +386,7 @@ export default function AdminTikTokPage() {
             </div>
 
             <div className="admin-tiktok-actions">
-              <button type="button" onClick={() => fetchOrders({ pageToken: undefined })} disabled={listLoading || !hasPassword}>
+              <button type="button" onClick={() => fetchOrders({ pageToken: undefined })} disabled={listLoading}>
                 {listLoading ? "Loading" : "Fetch orders"}
               </button>
               <button type="button" onClick={() => setPageToken("")} disabled={listLoading || !pageToken}>
@@ -455,7 +407,7 @@ export default function AdminTikTokPage() {
               <p>{listResult?.nextPageToken ? `Next token available: ${shorten(listResult.nextPageToken)}` : "No next page token returned."}</p>
             </div>
 
-            {isUnlocked && orders.length > 0 ? (
+            {loaded && orders.length > 0 ? (
               <div className="admin-tiktok-table-wrap">
                 <table className="admin-tiktok-table">
                   <thead>
@@ -506,7 +458,7 @@ export default function AdminTikTokPage() {
               </div>
             ) : (
               <section className="admin-wheel-empty">
-                <p>{isUnlocked ? "No TikTok orders returned for the selected filters." : "Enter the admin password to load TikTok Shop orders."}</p>
+                <p>"No TikTok orders returned for the selected filters."</p>
               </section>
             )}
           </section>
@@ -533,7 +485,7 @@ export default function AdminTikTokPage() {
               Order ID
               <input value={selectedOrderId} onChange={(event) => setSelectedOrderId(event.target.value)} />
             </label>
-            <button type="button" onClick={() => fetchDetail()} disabled={detailLoading || !hasPassword}>
+            <button type="button" onClick={() => fetchDetail()} disabled={detailLoading}>
               {detailLoading ? "Loading" : "Fetch detail"}
             </button>
           </div>
@@ -597,7 +549,7 @@ export default function AdminTikTokPage() {
               Order ID
               <input value={priceOrderId} onChange={(event) => setPriceOrderId(event.target.value)} />
             </label>
-            <button type="button" onClick={() => fetchPrice()} disabled={priceLoading || !hasPassword}>
+            <button type="button" onClick={() => fetchPrice()} disabled={priceLoading}>
               {priceLoading ? "Loading" : "Fetch price detail"}
             </button>
           </div>
@@ -653,13 +605,13 @@ export default function AdminTikTokPage() {
               External reference
               <input value={externalReference} onChange={(event) => setExternalReference(event.target.value)} />
             </label>
-            <button type="button" onClick={addReference} disabled={referenceLoading || !hasPassword}>
+            <button type="button" onClick={addReference} disabled={referenceLoading}>
               Add reference
             </button>
-            <button type="button" onClick={getReferences} disabled={referenceLoading || !hasPassword}>
+            <button type="button" onClick={getReferences} disabled={referenceLoading}>
               Get references
             </button>
-            <button type="button" onClick={searchByReference} disabled={referenceLoading || !hasPassword}>
+            <button type="button" onClick={searchByReference} disabled={referenceLoading}>
               Search order
             </button>
           </div>
@@ -724,7 +676,7 @@ export default function AdminTikTokPage() {
             I understand this may update TikTok Shop data.
           </label>
           <div className="admin-tiktok-actions">
-            <button type="button" onClick={sendRawRequest} disabled={consoleLoading || !hasPassword}>
+            <button type="button" onClick={sendRawRequest} disabled={consoleLoading}>
               {consoleLoading ? "Sending" : "Send raw request"}
             </button>
           </div>
@@ -740,7 +692,7 @@ export default function AdminTikTokPage() {
           ) : null}
         </section>
       ) : null}
-    </main>
+    </div>
   );
 }
 

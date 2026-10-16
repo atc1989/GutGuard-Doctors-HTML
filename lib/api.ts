@@ -759,7 +759,7 @@ export async function checkAdminSession(): Promise<boolean> {
   }
 }
 
-export async function adminListWheelPrizes(_adminPassword?: string): Promise<WheelPrize[]> {
+export async function adminListWheelPrizes(): Promise<WheelPrize[]> {
   const res = await fetch("/api/admin/wheel/prizes");
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -770,7 +770,6 @@ export async function adminListWheelPrizes(_adminPassword?: string): Promise<Whe
 }
 
 export async function adminSaveWheelPrize(
-  _adminPassword?: string,
   prize?: WheelPrizeInput,
 ): Promise<WheelPrize> {
   const res = await fetch("/api/admin/wheel/prizes", {
@@ -786,28 +785,26 @@ export async function adminSaveWheelPrize(
   return mapWheelPrizeRow((Array.isArray(data.prize) ? data.prize[0] : data.prize) as PrizeRow);
 }
 
-export async function getWheelPrizes(adminPassword?: string): Promise<AdminWheelPrize[]> {
-  const prizes = await adminListWheelPrizes(adminPassword);
+export async function getWheelPrizes(): Promise<AdminWheelPrize[]> {
+  const prizes = await adminListWheelPrizes();
   return prizes.map(mapAdminWheelPrize);
 }
 
 export async function saveWheelPrize(
-  adminPassword: string,
   prize: AdminWheelPrize,
 ): Promise<AdminWheelPrize> {
-  const saved = await adminSaveWheelPrize(adminPassword, mapWheelPrizeInput(prize));
+  const saved = await adminSaveWheelPrize(mapWheelPrizeInput(prize));
   return mapAdminWheelPrize(saved);
 }
 
 export async function createWheelPrize(
-  adminPassword: string,
   prize: Omit<AdminWheelPrize, "id">,
 ): Promise<AdminWheelPrize> {
-  const saved = await adminSaveWheelPrize(adminPassword, mapWheelPrizeInput(prize));
+  const saved = await adminSaveWheelPrize(mapWheelPrizeInput(prize));
   return mapAdminWheelPrize(saved);
 }
 
-export async function getDoctorRegistrations(_adminPassword?: string): Promise<AdminDoctorRegistration[]> {
+export async function getDoctorRegistrations(): Promise<AdminDoctorRegistration[]> {
   const res = await fetch("/api/admin/doctors");
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -823,7 +820,6 @@ export async function getDoctorRegistrations(_adminPassword?: string): Promise<A
  * window, since it replaces any partner session already held by this browser profile).
  */
 export async function adminImpersonateDoctor(
-  _adminPassword?: string,
   email?: string,
 ): Promise<{ actionLink: string; fullName: string }> {
   const res = await fetch("/api/admin/impersonate", {
@@ -839,7 +835,6 @@ export async function adminImpersonateDoctor(
 }
 
 export async function updateDoctorRegistration(
-  _adminPassword: string,
   doctor: AdminDoctorRegistrationUpdate,
 ): Promise<AdminDoctorRegistration> {
   const res = await fetch("/api/admin/doctors", {
@@ -856,7 +851,6 @@ export async function updateDoctorRegistration(
 }
 
 export async function setDoctorShopProtocol(
-  _adminPassword: string,
   doctorId: string,
   show: boolean,
 ): Promise<boolean> {
@@ -870,7 +864,7 @@ export async function setDoctorShopProtocol(
   return data.shop_show_protocol === true;
 }
 
-export async function getNewsletterSendHistory(_adminPassword?: string): Promise<NewsletterSendHistory[]> {
+export async function getNewsletterSendHistory(): Promise<NewsletterSendHistory[]> {
   const res = await fetch("/api/admin/newsletter/history");
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -881,7 +875,6 @@ export async function getNewsletterSendHistory(_adminPassword?: string): Promise
 }
 
 export async function sendNewsletter(
-  _adminPassword: string,
   doctorIds: string[],
   subject: string,
   html: string,
@@ -898,7 +891,7 @@ export async function sendNewsletter(
   return (await res.json()) as NewsletterResponse;
 }
 
-export async function getSmsBlastHistory(_adminPassword?: string): Promise<SmsSendHistory[]> {
+export async function getSmsBlastHistory(): Promise<SmsSendHistory[]> {
   const res = await fetch("/api/admin/sms/history");
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -909,7 +902,6 @@ export async function getSmsBlastHistory(_adminPassword?: string): Promise<SmsSe
 }
 
 export async function sendSmsBlast(
-  _adminPassword: string,
   doctorIds: string[],
   title: string,
   message: string,
@@ -1390,7 +1382,7 @@ function normalizePartnerOrder(entry: unknown): PartnerOrder {
   };
 }
 
-export async function adminListShopOrders(_adminPassword?: string): Promise<ShopOrder[]> {
+export async function adminListShopOrders(): Promise<ShopOrder[]> {
   const res = await fetch("/api/admin/shop-orders");
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -1400,7 +1392,7 @@ export async function adminListShopOrders(_adminPassword?: string): Promise<Shop
   return ((data.orders ?? []) as unknown[]).map(normalizeShopOrder);
 }
 
-export async function adminGetShopOrder(_adminPassword?: string, orderId?: string): Promise<ShopOrder> {
+export async function adminGetShopOrder(orderId?: string): Promise<ShopOrder> {
   const res = await fetch(`/api/admin/shop-orders?orderId=${encodeURIComponent(orderId ?? "")}`);
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -1411,7 +1403,6 @@ export async function adminGetShopOrder(_adminPassword?: string, orderId?: strin
 }
 
 export async function adminUpdateShopOrder(
-  _adminPassword: string,
   update: ShopOrderAdminUpdate,
 ): Promise<ShopOrder> {
   const res = await fetch("/api/admin/shop-orders", {
@@ -1430,55 +1421,48 @@ export async function adminUpdateShopOrder(
 // ─── Email Sequence ────────────────────────────────────────────────────────
 
 export async function getTikTokOrders(
-  adminPassword: string,
   filters: TikTokOrdersFilters,
 ): Promise<TikTokOrdersResponse> {
-  return callTikTokAdminApi<TikTokOrdersResponse>(adminPassword, "get-order-list", filters);
+  return callTikTokAdminApi<TikTokOrdersResponse>("get-order-list", filters);
 }
 
 export async function getTikTokOrderDetail(
-  adminPassword: string,
   orderId: string,
 ): Promise<TikTokOrderDetailResponse> {
-  return callTikTokAdminApi<TikTokOrderDetailResponse>(adminPassword, "get-order-detail", { orderId });
+  return callTikTokAdminApi<TikTokOrderDetailResponse>("get-order-detail", { orderId });
 }
 
 export async function getTikTokPriceDetail(
-  adminPassword: string,
   orderId: string,
 ): Promise<TikTokPriceDetailResponse> {
-  return callTikTokAdminApi<TikTokPriceDetailResponse>(adminPassword, "get-price-detail", { orderId });
+  return callTikTokAdminApi<TikTokPriceDetailResponse>("get-price-detail", { orderId });
 }
 
 export async function addTikTokExternalOrderReference(
-  adminPassword: string,
   orderId: string,
   externalOrderReference: string,
 ): Promise<TikTokReferenceResponse> {
-  return callTikTokAdminApi<TikTokReferenceResponse>(adminPassword, "add-external-order-reference", {
+  return callTikTokAdminApi<TikTokReferenceResponse>("add-external-order-reference", {
     orderId,
     externalOrderReference,
   });
 }
 
 export async function getTikTokExternalOrderReferences(
-  adminPassword: string,
   orderId: string,
 ): Promise<TikTokReferenceResponse> {
-  return callTikTokAdminApi<TikTokReferenceResponse>(adminPassword, "get-external-order-references", { orderId });
+  return callTikTokAdminApi<TikTokReferenceResponse>("get-external-order-references", { orderId });
 }
 
 export async function searchTikTokOrderByExternalReference(
-  adminPassword: string,
   externalOrderReference: string,
 ): Promise<TikTokReferenceResponse> {
-  return callTikTokAdminApi<TikTokReferenceResponse>(adminPassword, "search-order-by-external-reference", {
+  return callTikTokAdminApi<TikTokReferenceResponse>("search-order-by-external-reference", {
     externalOrderReference,
   });
 }
 
 export async function sendTikTokRawApiRequest(
-  adminPassword: string,
   payload: {
     method: "GET" | "POST";
     path: string;
@@ -1486,11 +1470,10 @@ export async function sendTikTokRawApiRequest(
     body?: Record<string, unknown>;
   },
 ): Promise<TikTokRawApiResponse> {
-  return callTikTokAdminApi<TikTokRawApiResponse>(adminPassword, "raw-api-request", payload);
+  return callTikTokAdminApi<TikTokRawApiResponse>("raw-api-request", payload);
 }
 
 export async function callTikTokAdminApi<TResponse>(
-  _adminPassword: string,
   action: TikTokAdminAction,
   payload?: Record<string, unknown>,
 ): Promise<TResponse> {
@@ -1533,7 +1516,7 @@ export type SequenceProgress = {
   email_sequence_sends: { sent_at: string; clicked_at: string | null; status: string; step_id: string }[];
 };
 
-export async function getSequenceSteps(_adminPassword?: string): Promise<SequenceStep[]> {
+export async function getSequenceSteps(): Promise<SequenceStep[]> {
   const res = await fetch("/api/admin/sequence?type=steps");
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -1544,7 +1527,6 @@ export async function getSequenceSteps(_adminPassword?: string): Promise<Sequenc
 }
 
 export async function upsertSequenceStep(
-  _adminPassword: string,
   step: { id?: string; stepNumber: number; subject: string; htmlBody: string; attachments?: SequenceAttachment[] },
 ): Promise<SequenceStep> {
   const res = await fetch("/api/admin/sequence", {
@@ -1560,7 +1542,7 @@ export async function upsertSequenceStep(
   return data.step as SequenceStep;
 }
 
-export async function deleteSequenceStep(_adminPassword: string, stepId: string): Promise<void> {
+export async function deleteSequenceStep(stepId: string): Promise<void> {
   const res = await fetch("/api/admin/sequence", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -1572,7 +1554,7 @@ export async function deleteSequenceStep(_adminPassword: string, stepId: string)
   }
 }
 
-export async function reorderSequenceSteps(_adminPassword: string, stepIds: string[]): Promise<void> {
+export async function reorderSequenceSteps(stepIds: string[]): Promise<void> {
   const res = await fetch("/api/admin/sequence", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -1585,7 +1567,6 @@ export async function reorderSequenceSteps(_adminPassword: string, stepIds: stri
 }
 
 export async function getSequenceProgress(
-  _adminPassword?: string,
 ): Promise<{ progress: SequenceProgress[]; totalSteps: number }> {
   const res = await fetch("/api/admin/sequence?type=progress");
   if (!res.ok) {
@@ -1638,7 +1619,7 @@ export async function resendSequenceStep(doctorId: string, stepNumber: number): 
 
 // ─── Registration Email Settings ───────────────────────────────────────────
 
-export async function getRegistrationEmailSettings(_adminPassword?: string): Promise<RegistrationEmailSettings> {
+export async function getRegistrationEmailSettings(): Promise<RegistrationEmailSettings> {
   const res = await fetch("/api/admin/registration-email");
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -1649,7 +1630,6 @@ export async function getRegistrationEmailSettings(_adminPassword?: string): Pro
 }
 
 export async function saveRegistrationEmailSettings(
-  _adminPassword: string,
   settings: RegistrationEmailSettings,
 ): Promise<RegistrationEmailSettings> {
   const res = await fetch("/api/admin/registration-email", {
@@ -1666,7 +1646,6 @@ export async function saveRegistrationEmailSettings(
 }
 
 export async function sendRegistrationEmailTest(
-  _adminPassword: string,
   testEmail: string,
 ): Promise<RegistrationEmailTestResponse> {
   const res = await fetch("/api/admin/registration-email", {
@@ -1692,15 +1671,15 @@ async function referralEmailRequest(body: Record<string, unknown>) {
   return data;
 }
 
-export async function getPartnerReferralEmailSettings(_adminPassword?: string): Promise<RegistrationEmailSettings> {
+export async function getPartnerReferralEmailSettings(): Promise<RegistrationEmailSettings> {
   return (await referralEmailRequest({ action: "get" })).settings as RegistrationEmailSettings;
 }
 
-export async function savePartnerReferralEmailSettings(_adminPassword: string, settings: RegistrationEmailSettings): Promise<RegistrationEmailSettings> {
+export async function savePartnerReferralEmailSettings(settings: RegistrationEmailSettings): Promise<RegistrationEmailSettings> {
   return (await referralEmailRequest({ action: "save", settings })).settings as RegistrationEmailSettings;
 }
 
-export async function sendPartnerReferralEmailTest(_adminPassword: string, testEmail: string): Promise<RegistrationEmailTestResponse> {
+export async function sendPartnerReferralEmailTest(testEmail: string): Promise<RegistrationEmailTestResponse> {
   return (await referralEmailRequest({ action: "test", testEmail })) as RegistrationEmailTestResponse;
 }
 
@@ -1957,7 +1936,6 @@ export async function listTestimonials(limit = 60): Promise<PublicTestimonial[]>
 }
 
 export async function adminListTestimonials(
-  _adminPassword?: string,
   status?: TestimonialStatus,
 ): Promise<AdminTestimonial[]> {
   const url = status
@@ -1973,7 +1951,6 @@ export async function adminListTestimonials(
 }
 
 export async function adminReviewTestimonial(
-  _adminPassword: string,
   input: { id: string; status: TestimonialStatus; featured?: boolean; reviewNote?: string },
 ): Promise<AdminTestimonial> {
   const res = await fetch("/api/admin/testimonials", {

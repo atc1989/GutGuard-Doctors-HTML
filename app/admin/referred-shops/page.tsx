@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import Header from "@/components/Header";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { adminLogin, checkAdminSession } from "@/lib/api";
 import type { AdminShop } from "@/app/api/admin/referred-shops/route";
 
@@ -34,8 +34,7 @@ function toCsv(shops: AdminShop[]) {
 }
 
 export default function AdminReferredShopsPage() {
-  const [password, setPassword] = useState("");
-  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [shops, setShops] = useState<AdminShop[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -45,10 +44,10 @@ export default function AdminReferredShopsPage() {
   const [sort, setSort] = useState<Sort>("newest");
   const [grouped, setGrouped] = useState(false);
 
+  // AdminShell only renders this page once the admin session is valid.
   useEffect(() => {
-    checkAdminSession().then((authenticated) => {
-      if (authenticated) load();
-    });
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function load() {
@@ -59,26 +58,14 @@ export default function AdminReferredShopsPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Could not load shops.");
       setShops(data.shops);
-      setIsUnlocked(true);
+      setLoaded(true);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load shops.");
-      setIsUnlocked(false);
     } finally {
       setIsLoading(false);
     }
   }
 
-  async function unlock(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    try {
-      await adminLogin(password);
-      setPassword("");
-      await load();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not unlock.");
-    }
-  }
 
   const referrers = useMemo(() => {
     const names = new Map<string, string>();
@@ -182,55 +169,13 @@ export default function AdminReferredShopsPage() {
   );
 
   return (
-    <main className="admin-wheel-shell admin-shop-orders-shell">
-      <Header dateLabel="Referred Shops" />
+    <div className="admin-wheel-shell admin-shop-orders-shell">
+      <AdminPageHeader kicker="Partner network" title="Referred Clinics" description="Clinics referred by partners, and who referred them." />
 
-      <section className="admin-wheel-hero">
-        <div>
-          <p className="admin-wheel-kicker">GutGuard Partners</p>
-          <h1>
-            Shops
-            <br />
-            <em>Admin</em>
-          </h1>
-        </div>
-        <div className="admin-wheel-summary" aria-live="polite">
-          <span>{isUnlocked ? "visible" : "locked"}</span>
-          <strong>{shops.length}</strong>
-          <span>{referredCount} referred</span>
-        </div>
-      </section>
-
-      {isUnlocked ? null : (
-        <form className="admin-wheel-auth admin-tiktok-auth" onSubmit={unlock}>
-          <label htmlFor="admin-password">Admin password</label>
-          <div className="admin-wheel-auth-row">
-            <input
-              className="admin-hidden-username"
-              type="text"
-              value="gutguard-admin"
-              readOnly
-              aria-hidden="true"
-              tabIndex={-1}
-            />
-            <input
-              id="admin-password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              placeholder="Enter password"
-              onChange={(event) => setPassword(event.target.value)}
-            />
-            <button type="submit" disabled={isLoading || !password.trim()}>
-              {isLoading ? "Loading" : "Unlock"}
-            </button>
-          </div>
-        </form>
-      )}
 
       {error ? <div className="admin-wheel-alert error">{error}</div> : null}
 
-      {isUnlocked ? (
+      {loaded ? (
         <section className="admin-wheel-panel">
           <div className="admin-wheel-panel-head">
             <div>
@@ -317,6 +262,6 @@ export default function AdminReferredShopsPage() {
           )}
         </section>
       ) : null}
-    </main>
+    </div>
   );
 }

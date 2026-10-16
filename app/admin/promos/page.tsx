@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import Header from "@/components/Header";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { adminLogin, checkAdminSession } from "@/lib/api";
 import {
   discountedPrice,
@@ -43,8 +43,7 @@ async function request<T>(method: string, body?: unknown, query = ""): Promise<T
 }
 
 export default function AdminPromosPage() {
-  const [password, setPassword] = useState("");
-  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [promos, setPromos] = useState<Promo[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -57,10 +56,10 @@ export default function AdminPromosPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // AdminShell only renders this page once the admin session is valid.
   useEffect(() => {
-    checkAdminSession().then((authenticated) => {
-      if (authenticated) loadPromos();
-    });
+    loadPromos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function loadPromos() {
@@ -70,26 +69,14 @@ export default function AdminPromosPage() {
       const data = await request<{ promos: Promo[]; products: Product[] }>("GET");
       setPromos(data.promos);
       setProducts(data.products);
-      setIsUnlocked(true);
+      setLoaded(true);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load promos.");
-      setIsUnlocked(false);
     } finally {
       setIsLoading(false);
     }
   }
 
-  async function unlock(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    try {
-      await adminLogin(password);
-      setPassword("");
-      await loadPromos();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not unlock.");
-    }
-  }
 
   async function save(promo: Promo, message: string) {
     setIsSaving(true);
@@ -159,56 +146,14 @@ export default function AdminPromosPage() {
   const live = promos.filter((promo) => promoStatus(promo, now) === "Live").length;
 
   return (
-    <main className="admin-wheel-shell admin-shop-orders-shell">
-      <Header dateLabel="Shop Promos" />
+    <div className="admin-wheel-shell admin-shop-orders-shell">
+      <AdminPageHeader kicker="GutGuard shop" title="Promotions" description="Scheduled price promotions and the packages they apply to." />
 
-      <section className="admin-wheel-hero">
-        <div>
-          <p className="admin-wheel-kicker">GutGuard Shop</p>
-          <h1>
-            Promos
-            <br />
-            <em>Admin</em>
-          </h1>
-        </div>
-        <div className="admin-wheel-summary" aria-live="polite">
-          <span>{isUnlocked ? "visible" : "locked"}</span>
-          <strong>{promos.length}</strong>
-          <span>{live} live</span>
-        </div>
-      </section>
-
-      {isUnlocked ? null : (
-        <form className="admin-wheel-auth admin-tiktok-auth" onSubmit={unlock}>
-          <label htmlFor="admin-password">Admin password</label>
-          <div className="admin-wheel-auth-row">
-            <input
-              className="admin-hidden-username"
-              type="text"
-              value="gutguard-admin"
-              readOnly
-              aria-hidden="true"
-              tabIndex={-1}
-            />
-            <input
-              id="admin-password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              placeholder="Enter password"
-              onChange={(event) => setPassword(event.target.value)}
-            />
-            <button type="submit" disabled={isLoading || !password.trim()}>
-              {isLoading ? "Loading" : "Unlock"}
-            </button>
-          </div>
-        </form>
-      )}
 
       {notice ? <div className="admin-wheel-alert">{notice}</div> : null}
       {error ? <div className="admin-wheel-alert error">{error}</div> : null}
 
-      {isUnlocked ? (
+      {loaded ? (
         <section className="admin-wheel-panel">
           <div className="admin-wheel-panel-head">
             <div>
@@ -423,6 +368,6 @@ export default function AdminPromosPage() {
           )}
         </section>
       ) : null}
-    </main>
+    </div>
   );
 }
