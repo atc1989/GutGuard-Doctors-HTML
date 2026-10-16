@@ -2,7 +2,6 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
-import { adminLogin, checkAdminSession } from "@/lib/api";
 import {
   isPromoLive,
   promoPerCap,
@@ -122,8 +121,15 @@ export default function AdminProductsPage() {
 
   return (
     <div className="admin-wheel-shell admin-shop-orders-shell">
-      <AdminPageHeader kicker="GutGuard shop" title="Product Catalog" description="Prices, per-capsule copy and shop visibility for every product." />
-
+      <AdminPageHeader
+        kicker="GutGuard shop"
+        title="Product Catalog"
+        description="Prices, per-capsule copy and shop visibility for every product."
+      >
+        <button type="button" className="admin-overview-action-btn" onClick={load} disabled={isLoading}>
+          {isLoading ? "Loading" : "Refresh"}
+        </button>
+      </AdminPageHeader>
 
       {notice ? <div className="admin-wheel-alert">{notice}</div> : null}
       {error ? <div className="admin-wheel-alert error">{error}</div> : null}

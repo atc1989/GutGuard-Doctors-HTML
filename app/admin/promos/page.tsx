@@ -2,7 +2,6 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
-import { adminLogin, checkAdminSession } from "@/lib/api";
 import {
   discountedPrice,
   formatPromoDay,
@@ -147,8 +146,15 @@ export default function AdminPromosPage() {
 
   return (
     <div className="admin-wheel-shell admin-shop-orders-shell">
-      <AdminPageHeader kicker="GutGuard shop" title="Promotions" description="Scheduled price promotions and the packages they apply to." />
-
+      <AdminPageHeader
+        kicker="GutGuard shop"
+        title="Promotions"
+        description="Scheduled price promotions and the packages they apply to."
+      >
+        <button type="button" className="admin-overview-action-btn" onClick={loadPromos} disabled={isLoading}>
+          {isLoading ? "Loading" : "Refresh"}
+        </button>
+      </AdminPageHeader>
 
       {notice ? <div className="admin-wheel-alert">{notice}</div> : null}
       {error ? <div className="admin-wheel-alert error">{error}</div> : null}

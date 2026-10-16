@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import TestimonialVideo from "@/components/TestimonialVideo";
-import { adminListTestimonials, adminLogin, adminReviewTestimonial, checkAdminSession } from "@/lib/api";
+import { adminListTestimonials, adminReviewTestimonial, checkAdminSession } from "@/lib/api";
 import {
   testimonialPhotoUrl,
   type AdminTestimonial,

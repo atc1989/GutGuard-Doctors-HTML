@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
-import { adminLogin, checkAdminSession } from "@/lib/api";
 import type { AdminShop } from "@/app/api/admin/referred-shops/route";
 
 const peso = (value: number) =>
@@ -170,8 +169,15 @@ export default function AdminReferredShopsPage() {
 
   return (
     <div className="admin-wheel-shell admin-shop-orders-shell">
-      <AdminPageHeader kicker="Partner network" title="Referred Clinics" description="Clinics referred by partners, and who referred them." />
-
+      <AdminPageHeader
+        kicker="Partner network"
+        title="Referred Clinics"
+        description="Clinics referred by partners, and who referred them."
+      >
+        <button type="button" className="admin-overview-action-btn" onClick={load} disabled={isLoading}>
+          {isLoading ? "Loading" : "Refresh"}
+        </button>
+      </AdminPageHeader>
 
       {error ? <div className="admin-wheel-alert error">{error}</div> : null}
 

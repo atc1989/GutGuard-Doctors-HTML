@@ -62,7 +62,7 @@ export default function AdminOverviewPage() {
         const orders = ordersRes.status === "fulfilled" && ordersRes.value ? ordersRes.value.orders ?? ordersRes.value : [];
         const products = productsRes.status === "fulfilled" && productsRes.value ? productsRes.value.products ?? productsRes.value : [];
         const promos = promosRes.status === "fulfilled" && promosRes.value ? promosRes.value.promos ?? promosRes.value : [];
-        const testimonials = testimonialsRes.status === "fulfilled" && testimonialsRes.value ? testimonialsRes.value.testimonials ?? testimonialsRes.value : [];
+        const testimonials = testimonialsRes.status === "fulfilled" && testimonialsRes.value ? testimonialsRes.value.stories ?? testimonialsRes.value : [];
         const shops = shopsRes.status === "fulfilled" && shopsRes.value ? shopsRes.value.shops ?? shopsRes.value : [];
 
         const pendingTestimonials = Array.isArray(testimonials)
