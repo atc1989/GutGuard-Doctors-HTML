@@ -598,7 +598,6 @@ export default function Shoplet() {
               <>
                 <p className="shop-options-label">
                   <span>Start here · low risk</span>
-                  {trials.some((item) => priceOf(item).promo) ? <em className="shop-lto">Limited time offer</em> : null}
                 </p>
                 <div className="shop-options trial">
                   {trials.map((item) => (
@@ -629,7 +628,6 @@ export default function Shoplet() {
               <>
                 <p className="shop-options-label">
                   <span>When you&apos;re ready</span>
-                  {tiers.some((item) => priceOf(item).promo) ? <em className="shop-lto">Limited time offer</em> : null}
                 </p>
                 {/* Package cards from the boss's Full Protocol mockup (13 Oct 2026). */}
                 <div className="shop-options shop-tiers" role="radiogroup" aria-label="Full protocol packages">
@@ -661,7 +659,10 @@ export default function Shoplet() {
                               {peso(promoPerCap(item, pricing))}
                               <i> / capsule</i>
                             </b>
-                            <span className="shop-price-now">{peso(pricing.price)} total</span>
+                            <span className="shop-price-row">
+                              <span className="shop-price-now">{peso(pricing.price)} total</span>
+                              {pricing.promo ? <LimitedOffer /> : null}
+                            </span>
                             {pricing.promo ? (
                               <span className="shop-price-compare">Standard {peso(item.perCap)} / capsule · Program rate</span>
                             ) : null}
@@ -923,10 +924,16 @@ function PriceTag({ product, value, perCap = false }: { product: Product; value:
       <span className="shop-price-compare">
         <s>{regular}</s>
       </span>
-      <span className="shop-price-now">{show(value)}</span>
+      <span className="shop-price-row">
+        <span className="shop-price-now">{show(value)}</span>
+        <LimitedOffer />
+      </span>
     </b>
   );
 }
+
+/** "LIMITED TIME OFFER" beside the promo price, on each pack that has a live promo (not the whole tab). */
+const LimitedOffer = () => <em className="shop-lto">Limited time offer</em>;
 
 function CartLines({
   basket,
