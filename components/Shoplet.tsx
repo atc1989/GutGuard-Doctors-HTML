@@ -924,9 +924,10 @@ function PriceTag({ product, value, perCap = false }: { product: Product; value:
       <span className="shop-price-compare">
         <s>{regular}</s>
       </span>
+      {/* Pill on the left, price on the right like the packs without a promo (Naj, 16 Oct). */}
       <span className="shop-price-row">
-        <span className="shop-price-now">{show(value)}</span>
         <LimitedOffer />
+        <span className="shop-price-now">{show(value)}</span>
       </span>
     </b>
   );

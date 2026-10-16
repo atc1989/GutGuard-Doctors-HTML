@@ -3096,6 +3096,11 @@
   opacity: 0.7;
 }
 
+/* Try first: the struck-through price lines up with the price under it. */
+.shop-option.has-image .shop-price-compare s {
+  margin-right: 0;
+}
+
 /* Phones: rows with a promo stack (name on top, badge + prices below) so nothing wraps mid-line. */
 @media (max-width: 520px) {
   /* Only rows with a promo stack; plain rows keep the price on the right. */
@@ -3126,6 +3131,17 @@
 
   .shop-option.has-promo .shop-price-row {
     justify-content: flex-start;
+  }
+
+  /* Try first: pill on the left, price (and the struck-through one) on the right, like plain packs. */
+  .shop-option.has-image.has-promo .shop-price-row {
+    justify-self: stretch;
+    justify-content: space-between;
+  }
+
+  .shop-option.has-image.has-promo .shop-price-compare {
+    justify-self: stretch;
+    justify-content: flex-end;
   }
 
   .shop-option.has-promo > .shop-price {
