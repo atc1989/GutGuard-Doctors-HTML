@@ -1,6 +1,7 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import AdminOrders from "@/components/AdminOrders";
 import Header from "@/components/Header";
@@ -317,8 +318,26 @@ function getDoctorQrElementId(doctorId: string, mode: DoctorQrMode) {
   return `doctor-qr-${doctorId}-${mode}`;
 }
 
-export default function AdminWheelPage() {
-  const [activeTab, setActiveTab] = useState<"wheel" | "doctors" | "orders" | "newsletter" | "sms" | "registrationEmail" | "sequence">("wheel");
+export type AdminWheelTab = "wheel" | "doctors" | "orders" | "newsletter" | "sms" | "registrationEmail" | "sequence";
+
+export type AdminWheelPageProps = {
+  defaultTab?: AdminWheelTab;
+};
+
+function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
+  const searchParams = useSearchParams();
+  const queryTab = searchParams.get("tab") as AdminWheelTab | null;
+  const validTabs: AdminWheelTab[] = ["wheel", "doctors", "orders", "newsletter", "sms", "registrationEmail", "sequence"];
+  const initialTab = defaultTab || (queryTab && validTabs.includes(queryTab) ? queryTab : "wheel");
+  const [activeTab, setActiveTab] = useState<AdminWheelTab>(initialTab);
+
+  useEffect(() => {
+    if (defaultTab) {
+      setActiveTab(defaultTab);
+    } else if (queryTab && validTabs.includes(queryTab)) {
+      setActiveTab(queryTab);
+    }
+  }, [defaultTab, queryTab]);
   const [password, setPassword] = useState("");
   const [prizes, setPrizes] = useState<AdminWheelPrize[]>([]);
   const [doctors, setDoctors] = useState<AdminDoctorRegistration[]>([]);
@@ -3691,4 +3710,12 @@ function escapeHtml(value: string) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+export default function AdminWheelPage(props: AdminWheelPageProps = {}) {
+  return (
+    <Suspense fallback={<div className="admin-wheel-shell" style={{ padding: 40 }}><p>Loading operations...</p></div>}>
+      <AdminWheelPageContent {...props} />
+    </Suspense>
+  );
 }
