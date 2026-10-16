@@ -3053,18 +3053,17 @@
   opacity: 0.7;
 }
 
-/* Label + pill: the pill wraps below on narrow phones instead of splitting the label. */
-.shop-options-label:has(.shop-lto) {
+/* Promo price + "LIMITED TIME OFFER" on one line; the pill drops under the price if there is no room. */
+.shop-option .shop-price-row {
+  display: flex;
   flex-wrap: wrap;
-  row-gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px 8px;
 }
 
-.shop-options-label:has(.shop-lto) span {
-  white-space: nowrap;
-}
-
-/* "LIMITED TIME OFFER" beside the section label, only while a promo is live on that tab. */
-.shop-options-label .shop-lto {
+/* "LIMITED TIME OFFER" beside the price of each pack with a live promo. */
+.shop-option .shop-lto {
   padding: 3px 10px;
   border-radius: var(--r-pill, 999px);
   background: var(--blue);
@@ -3123,6 +3122,13 @@
     flex: 1 1 100%;
     justify-items: start;
     text-align: left;
+  }
+
+  .shop-option.has-promo .shop-price-row {
+    justify-content: flex-start;
+  }
+
+  .shop-option.has-promo > .shop-price {
     padding-top: 10px;
     border-top: 1px solid var(--rule-soft, rgba(0, 0, 0, 0.08));
   }
@@ -8473,6 +8479,7 @@
 @media (max-width:560px){
   .shop-tier-row{flex-direction:column;gap:10px}
   .shop-tier .shop-price{justify-items:start;text-align:left}
+  .shop-tier .shop-price-row{justify-content:flex-start}
   .shop-tier .shop-price-compare{white-space:normal}
 }
 /* Compare sheet and full view. Table rules follow .shop-facts (Supplement Facts panel). */
