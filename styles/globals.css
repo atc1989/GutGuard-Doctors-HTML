@@ -5831,10 +5831,6 @@
     font-size: 13px;
     font-weight: 700;
   }
-
-  .partner-poster-modal {
-    display: none !important;
-  }
 }
 
 /* ─── Member stories ────────────────────────────────────────────────────────
@@ -8124,6 +8120,11 @@
 @media print {
   .pp-topbar, .pp-side, .pp-bottom, .pp-screen { display: none !important; }
   .pp-main { padding: 0; }
+
+  /* The poster is the whole print job: drop the dashboard it sits under, or it
+     prints as a first page. Scoped with :has() so pages without a poster
+     (every other partner page) still print their own content. */
+  .pp-main:has(.partner-print) > *:not(.partner-print) { display: none !important; }
 }
 
 /* Admin promos */
