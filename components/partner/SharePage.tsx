@@ -410,7 +410,7 @@ export default function SharePage() {
               <PosterLogo />
               <strong>{posterTitle(qrMode)}</strong>
               <div className="partner-poster-qr"><QRCodeSVG value={link} size={QR_RENDER_PX} level="M" marginSize={4} style={{ width: "100%", height: "auto" }} /></div>
-              <span>{dashboard.partner.full_name}</span><small>{link}</small>
+              <small>{link}</small>
             </div>
             <div className="partner-poster-actions">
               <button
@@ -442,7 +442,6 @@ export default function SharePage() {
           <PosterLogo />
           <strong>{posterTitle(qrMode)}</strong>
           <QRCodeSVG value={link} size={QR_RENDER_PX} level="M" marginSize={4} />
-          <span>{dashboard.partner.full_name}</span>
           <small>{link}</small>
         </div>
       )}
