@@ -5318,11 +5318,6 @@
   font-weight: 400;
 }
 
-.partner-poster-preview > span {
-  font-size: 18px;
-  font-weight: 900;
-}
-
 .partner-poster-preview > small {
   max-width: 100%;
   overflow-wrap: anywhere;
@@ -5829,11 +5824,6 @@
     font-family: var(--serif, Georgia, serif);
     font-size: 34px;
     font-weight: 400;
-  }
-
-  .partner-print span {
-    font-size: 20px;
-    font-weight: 900;
   }
 
   .partner-print small {
