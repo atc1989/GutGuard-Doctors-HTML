@@ -232,12 +232,7 @@ function getDoctorQrUrl(doctor: AdminDoctorRegistration, mode: DoctorQrMode) {
 
   const key = partnerLinkKey(doctor.id);
   if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${key}`;
-  if (mode === "referral") {
-    if (doctor.routing_slug) {
-      return `${PUBLIC_MARKETING_ORIGIN}/${doctor.routing_slug.toUpperCase()}`;
-    }
-    return `${PUBLIC_SITE_ORIGIN}/physicians/register?ref=${key}`;
-  }
+  if (mode === "referral") return `${PUBLIC_MARKETING_ORIGIN}/${key.toUpperCase()}`;
   if (doctor.routing_slug === "dr-grace-saraza") return `${SHOP_ORIGIN}/beehive`;
   return `${SHOP_ORIGIN}/r/${key}`;
 }
