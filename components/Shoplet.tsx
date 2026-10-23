@@ -800,7 +800,7 @@ export default function Shoplet() {
                       <Field id="address" label="Street address" value={form.address} error={errors.address} onChange={setField} wide />
                       <SelectField
                             id="province"
-                            label="Province/Capital"
+                            label="Capital or Province"
                             value={form.provinceCode}
                             error={errors.province}
                             disabled={isLoadingProvinces}
