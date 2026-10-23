@@ -36,7 +36,6 @@ export async function GET(request: NextRequest, context: { params: Promise<{ slu
     return NextResponse.redirect(new URL(`/${invitation.link_key.toUpperCase()}`, request.url), 307);
   }
 
-  destination.searchParams.set("ref", invitation.routing_slug);
   const response = NextResponse.redirect(destination, 307);
   response.cookies.set(COOKIE, invitation.routing_slug, { httpOnly: true, secure: true, sameSite: "lax", maxAge: MAX_AGE, path: "/physicians/register" });
   return response;
