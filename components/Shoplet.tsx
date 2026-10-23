@@ -297,7 +297,7 @@ export default function Shoplet() {
     if (!form.cityMunicipalityCode) return;
     let ignore = false;
     setIsLoadingBarangays(true);
-    fetchBarangays(form.cityMunicipalityCode)
+    fetchBarangays(form.provinceCode, form.cityMunicipalityCode)
       .then((items) => {
         if (!ignore) {
           setBarangays(items);
@@ -313,7 +313,7 @@ export default function Shoplet() {
     return () => {
       ignore = true;
     };
-  }, [form.cityMunicipalityCode]);
+  }, [form.provinceCode, form.cityMunicipalityCode]);
 
   function addCurrentItem() {
     const source = selectedItem;
@@ -924,9 +924,10 @@ function PriceTag({ product, value, perCap = false }: { product: Product; value:
       <span className="shop-price-compare">
         <s>{regular}</s>
       </span>
+      {/* Pill on the left, price on the right like the packs without a promo (Naj, 16 Oct). */}
       <span className="shop-price-row">
-        <span className="shop-price-now">{show(value)}</span>
         <LimitedOffer />
+        <span className="shop-price-now">{show(value)}</span>
       </span>
     </b>
   );

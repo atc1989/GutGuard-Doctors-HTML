@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { loadCatalog, recomputeSubtotal, type Product, type Promo } from "@/lib/catalog";
 import { createMayaCheckout, isMayaConfigured, toMayaAmount } from "@/lib/maya";
-import { isValidShippingFee } from "@/lib/shipping";
+import { verifyOrderAddress } from "@/lib/order-address";
+import { expectedShippingFee } from "@/lib/shipping";
 import { getSupabaseAdmin, isSupabaseAdminConfigured } from "@/lib/supabase-admin";
 import type { ShopOrderItem } from "@/lib/api";
 
@@ -21,6 +22,10 @@ type OrderRow = {
   address: string;
   city: string;
   province: string;
+  province_code: string | null;
+  city_municipality_code: string | null;
+  barangay: string | null;
+  barangay_code: string | null;
   zip: string;
   shipping_fee: number | string;
   subtotal: number | string;
@@ -48,7 +53,7 @@ export async function POST(request: Request) {
   const { data, error } = await supabase
     .from("shop_orders")
     .select(
-      "id, order_code, status, payment_status, customer_name, first_name, last_name, email, mobile, address, city, province, zip, shipping_fee, subtotal, total_amount, items, payment_attempts, created_at",
+      "id, order_code, status, payment_status, customer_name, first_name, last_name, email, mobile, address, city, province, province_code, city_municipality_code, barangay, barangay_code, zip, shipping_fee, subtotal, total_amount, items, payment_attempts, created_at",
     )
     .eq("id", orderId)
     .single();
@@ -65,6 +70,16 @@ export async function POST(request: Request) {
 
   // Same reads and fallbacks as the shop, so both agree on every price.
   const { products, promos } = await loadCatalog(supabase);
+
+  // Shipping is priced from the province code, so the address must be that real place.
+  const addressProblem = await verifyOrderAddress(order);
+  if (addressProblem) {
+    console.warn(`Order ${order.order_code} address rejected: ${addressProblem}`);
+    return NextResponse.json(
+      { error: "Your delivery address could not be verified. Please re-enter it and place the order again." },
+      { status: 409 },
+    );
+  }
 
   const amounts = verifyAmounts(order, products, promos);
   if (!amounts) {
@@ -140,16 +155,16 @@ export async function POST(request: Request) {
 
 /**
  * The browser wrote subtotal/shipping/total into the row, so none of it is trusted here.
- * Line prices are re-derived from the server catalog and the shipping fee is bounded by
- * the published rate table before any amount is sent to Maya.
+ * Line prices are re-derived from the server catalog and the shipping fee is re-quoted
+ * from the province code and those checked items before any amount is sent to Maya.
  */
 function verifyAmounts(order: OrderRow, products: Product[], promos: Promo[]) {
   // Order time or now: a promo that ended between placing and paying still honours the order.
   const subtotal = recomputeSubtotal(order.items, products, promos, [new Date(order.created_at), new Date()]);
   if (subtotal === null) return null;
 
-  const shippingFee = Number(order.shipping_fee) || 0;
-  if (!isValidShippingFee(shippingFee)) return null;
+  const shippingFee = expectedShippingFee(order.items, { province: order.province, provinceCode: order.province_code });
+  if (shippingFee === null || Number(order.shipping_fee) !== shippingFee) return null;
 
   const total = subtotal + shippingFee;
   if (total <= 0) return null;

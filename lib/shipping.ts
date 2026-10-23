@@ -57,7 +57,7 @@ const SHIPPING_LABELS: Record<ShippingArea, string> = {
 };
 
 const VISAYAS_REGION_CODES = new Set(["060000000", "070000000", "080000000", "170000000"]);
-const MINDANAO_REGION_CODES = new Set(["090000000", "100000000", "110000000", "120000000", "130000000", "140000000", "150000000", "160000000", "190000000"]);
+const MINDANAO_REGION_CODES = new Set(["090000000", "100000000", "110000000", "120000000", "150000000", "160000000", "190000000"]);
 const ISLAND_PROVINCE_KEYWORDS = ["batanes", "palawan", "siquijor", "dinagat", "camiguin", "sulu", "tawi-tawi", "basilan"];
 
 export function calculateShopSubtotal(items: ShopOrderItem[]) {
@@ -98,15 +98,27 @@ export function getOrderTotal(subtotal: number, shippingFee: number) {
 }
 
 /**
- * Server-side sanity bound on a stored shipping fee. The exact fee depends on the
- * PSGC region code, which the order row does not keep - checking membership in the
- * rate table is enough to stop a tampered total without re-deriving geography.
- * 0 is only valid for legacy rows created before the address lists were mandatory;
- * a new order always carries a province and therefore a real rate.
+ * Rates are keyed on the region, and PSGC codes carry it in their first two digits
+ * ("1102400000" -> region 11 -> "110000000"). Checkout and the server both derive it here,
+ * so they always agree on the area.
  */
-export function isValidShippingFee(fee: number) {
-  if (fee === 0) return true;
-  return Object.values(RATE_TABLE).some((brackets) => brackets.some(([, rate]) => rate === fee));
+export function psgcRegionCode(psgcCode: string) {
+  const clean = psgcCode.trim();
+  return /^\d{10}$/.test(clean) ? `${clean.slice(0, 2)}0000000` : "";
+}
+
+/**
+ * The fee a stored order must carry, re-quoted from its PSGC province code and items - the
+ * browser's figure is never trusted. Every order since the address lists became mandatory
+ * (Aug 2026) has a province code, so one without it cannot be priced and gets null, as does
+ * an order over the weight limit. Check the items against the catalog first: their capsule
+ * counts set the weight.
+ */
+export function expectedShippingFee(items: ShopOrderItem[], order: { province: string; provinceCode: string | null }) {
+  const regionCode = psgcRegionCode(order.provinceCode ?? "");
+  if (!regionCode || !order.province.trim()) return null;
+  const quote = quoteShipping(items, { province: order.province, regionCode });
+  return quote.error || quote.fee <= 0 ? null : quote.fee;
 }
 
 function getShippingFee(area: ShippingArea, weightGrams: number) {

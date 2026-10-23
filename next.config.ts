@@ -26,6 +26,10 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
+  // The payment route checks addresses against the PSGC snapshot on disk (lib/order-address.ts).
+  outputFileTracingIncludes: {
+    "/api/maya/checkout": ["./public/psgc/**/*.json"],
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
