@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON lib/catalog.test.mjs && node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON lib/validation.test.mjs && node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON lib/testimonials.test.mjs && node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON lib/admin-token.test.mjs"
+    "test": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON lib/catalog.test.mjs && node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON lib/validation.test.mjs && node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON lib/testimonials.test.mjs && node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON lib/admin-token.test.mjs && node lib/psgc-data.test.mjs",
+    "psgc:build": "node scripts/build-psgc.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.2",

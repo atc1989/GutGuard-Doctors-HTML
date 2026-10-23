@@ -297,7 +297,7 @@ export default function Shoplet() {
     if (!form.cityMunicipalityCode) return;
     let ignore = false;
     setIsLoadingBarangays(true);
-    fetchBarangays(form.cityMunicipalityCode)
+    fetchBarangays(form.provinceCode, form.cityMunicipalityCode)
       .then((items) => {
         if (!ignore) {
           setBarangays(items);
@@ -313,7 +313,7 @@ export default function Shoplet() {
     return () => {
       ignore = true;
     };
-  }, [form.cityMunicipalityCode]);
+  }, [form.provinceCode, form.cityMunicipalityCode]);
 
   function addCurrentItem() {
     const source = selectedItem;
