@@ -6,7 +6,7 @@
 - [ ] Release sandbox to main: see `RELEASE.md` for DB steps that must run before deploy
 
 ## ⛔ Constraints & Rules
-- Follow `.antigravity/rules.md` | Under 20 lines
+- Follow `AGENTS.md` team rules and `.antigravity/rules.md` | Under 20 lines
 - Prod DB = Supabase "GutGuard Life Style"; `doctors` = prod schema, `sandbox` = QA mirror (shares partners)
 
 ## 🛠️ Decisions & Architecture

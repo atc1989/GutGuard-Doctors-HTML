@@ -634,7 +634,14 @@ export async function getPartnerInvitation(slug: string): Promise<PartnerInvitat
 
   const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | null;
   const routing_slug = String(row?.routing_slug ?? "").trim();
-  const full_name = String(row?.full_name ?? "").trim();
+  // The registration page shows the referrer to whoever scanned their code: initials only
+  // ("Frederick D. Francisco" -> "F.D.F."), not their full name.
+  const initials = String(row?.full_name ?? "")
+    .split(/\s+/)
+    .map((word) => word.match(/\p{L}/u)?.[0] ?? "")
+    .join("")
+    .toUpperCase();
+  const full_name = initials.replace(/./g, "$&.");
   if (!routing_slug) return null;
 
   return { routing_slug, full_name };
