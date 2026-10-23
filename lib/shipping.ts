@@ -57,7 +57,7 @@ const SHIPPING_LABELS: Record<ShippingArea, string> = {
 };
 
 const VISAYAS_REGION_CODES = new Set(["060000000", "070000000", "080000000", "170000000"]);
-const MINDANAO_REGION_CODES = new Set(["090000000", "100000000", "110000000", "120000000", "130000000", "140000000", "150000000", "160000000", "190000000"]);
+const MINDANAO_REGION_CODES = new Set(["090000000", "100000000", "110000000", "120000000", "150000000", "160000000", "190000000"]);
 const ISLAND_PROVINCE_KEYWORDS = ["batanes", "palawan", "siquijor", "dinagat", "camiguin", "sulu", "tawi-tawi", "basilan"];
 
 export function calculateShopSubtotal(items: ShopOrderItem[]) {
