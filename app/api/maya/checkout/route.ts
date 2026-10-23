@@ -163,7 +163,7 @@ function verifyAmounts(order: OrderRow, products: Product[], promos: Promo[]) {
   const subtotal = recomputeSubtotal(order.items, products, promos, [new Date(order.created_at), new Date()]);
   if (subtotal === null) return null;
 
-  const shippingFee = expectedShippingFee(order.items, { province: order.province, provinceCode: order.province_code });
+  const shippingFee = expectedShippingFee(order.items, { provinceCode: order.province_code });
   if (shippingFee === null || Number(order.shipping_fee) !== shippingFee) return null;
 
   const total = subtotal + shippingFee;

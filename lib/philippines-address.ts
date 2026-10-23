@@ -1,5 +1,3 @@
-import { psgcRegionCode } from "@/lib/shipping";
-
 /**
  * Address lists are a snapshot of PSGC served from this site (public/psgc, built by
  * scripts/build-psgc.mjs), so checkout no longer breaks when psgc.cloud is down, rate-limited
@@ -10,14 +8,12 @@ const PSGC_BASE = "/psgc";
 export type ProvinceOption = {
   code: string;
   name: string;
-  regionCode: string;
 };
 
 export type LocalityOption = {
   code: string;
   name: string;
   provinceCode: string;
-  regionCode: string;
   zipCode: string;
 };
 
@@ -37,7 +33,7 @@ const provinceFiles = new Map<string, Promise<ProvinceFile>>();
 
 export async function fetchProvinces(): Promise<ProvinceOption[]> {
   const body = await getJson<{ provinces: Array<{ code: string; name: string }> }>("provinces.json");
-  return body.provinces.map((province) => ({ ...province, regionCode: psgcRegionCode(province.code) }));
+  return body.provinces;
 }
 
 export async function fetchLocalities(provinceCode: string): Promise<LocalityOption[]> {
@@ -46,7 +42,6 @@ export async function fetchLocalities(provinceCode: string): Promise<LocalityOpt
     code: locality.code,
     name: locality.name,
     provinceCode,
-    regionCode: psgcRegionCode(provinceCode),
     zipCode: locality.zipCode,
   }));
 }
