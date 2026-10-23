@@ -1,3 +1,5 @@
+import { psgcRegionCode } from "@/lib/shipping";
+
 const PSGC_API_BASE = "https://psgc.cloud/api";
 
 /**
@@ -7,20 +9,9 @@ const PSGC_API_BASE = "https://psgc.cloud/api";
 const NCR_REGION_PSGC_CODE = "1300000000";
 const NCR_PROVINCE_OPTION_NAME = "Metro Manila (NCR)";
 
-/**
- * psgc.cloud stopped returning region_code, and shipping rates depend on the region.
- * PSGC codes encode it in the first two digits ("1102400000" -> region 11 -> "110000000"),
- * so derive it rather than trusting a field the API may drop again.
- */
-function toRegionCode(psgcCode: string) {
-  const clean = psgcCode.replace(/\D/g, "");
-  return clean.length >= 2 ? `${clean.slice(0, 2)}0000000` : "";
-}
-
 type PsgcApiItem = {
   code?: string;
   name?: string;
-  region_code?: string;
   province_code?: string;
   city_municipality_code?: string;
   is_city?: boolean;
@@ -55,10 +46,10 @@ export async function fetchProvinces(): Promise<ProvinceOption[]> {
     .map((item) => ({
       code: String(item.code ?? ""),
       name: fixMojibake(String(item.name ?? "")),
-      regionCode: String(item.region_code ?? "") || toRegionCode(String(item.code ?? "")),
+      regionCode: psgcRegionCode(String(item.code ?? "")),
     }))
     .filter((item) => item.code && item.name);
-  provinces.push({ code: NCR_REGION_PSGC_CODE, name: NCR_PROVINCE_OPTION_NAME, regionCode: toRegionCode(NCR_REGION_PSGC_CODE) });
+  provinces.push({ code: NCR_REGION_PSGC_CODE, name: NCR_PROVINCE_OPTION_NAME, regionCode: psgcRegionCode(NCR_REGION_PSGC_CODE) });
   return provinces.sort(sortByName);
 }
 
@@ -78,7 +69,7 @@ export async function fetchLocalities(provinceCode: string): Promise<LocalityOpt
       code: String(item.code ?? ""),
       name: fixMojibake(String(item.name ?? "")),
       provinceCode,
-      regionCode: String(item.region_code ?? "") || toRegionCode(provinceCode),
+      regionCode: psgcRegionCode(provinceCode),
       zipCode: item.zip_code ? String(item.zip_code).replace(/\D/g, "").slice(0, 4) : "",
     }))
     .filter((item) => item.code && item.name)
