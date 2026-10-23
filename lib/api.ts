@@ -1144,6 +1144,7 @@ export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Pr
   return {
     partner: {
       id: String(partner.id ?? ""),
+      partner_code: Number(partner.partner_code) || null,
       full_name: String(partner.full_name ?? ""),
       routing_slug: String(partner.routing_slug ?? ""),
       store_type: (partner.store_type ?? "affiliate") as StoreType,
