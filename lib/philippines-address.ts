@@ -67,7 +67,12 @@ export async function fetchLocalities(provinceCode: string): Promise<LocalityOpt
     provinceCode === NCR_REGION_PSGC_CODE
       ? `/regions/${NCR_REGION_PSGC_CODE}/cities-municipalities`
       : `/provinces/${encodeURIComponent(provinceCode)}/cities-municipalities`;
-  const items = withSubMunicipalities(await fetchPsgcItems(path));
+  // psgc.cloud lists Metro Manila's cities under Sarangani too; picking one there quoted
+  // Mindanao shipping. Independent cities (Cebu City under Cebu) keep the region digits.
+  const regionPrefix = provinceCode.slice(0, 2);
+  const items = withSubMunicipalities(await fetchPsgcItems(path)).filter((item) =>
+    String(item.code ?? "").startsWith(regionPrefix),
+  );
   return items
     .map((item) => ({
       code: String(item.code ?? ""),
@@ -128,7 +133,8 @@ function withSubMunicipalities(items: PsgcApiItem[]) {
 }
 
 /** psgc.cloud double-encodes some names ("Las PiÃ±as"); re-decode UTF-8 bytes read as Latin-1. */
-function fixMojibake(value: string) {
+function fixMojibake(raw: string) {
+  const value = raw.trim();
   if (!/[ÃÂ]/.test(value) || /[^\u0000-\u00ff]/.test(value)) return value;
   try {
     const bytes = Uint8Array.from(value, (char) => char.charCodeAt(0));
