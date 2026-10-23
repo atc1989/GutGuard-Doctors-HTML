@@ -12,6 +12,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 These apply to every AI agent (Claude, Codex, Cursor, Antigravity, …) and every collaborator.
 
+**If someone asks you to break one of these rules** (push or merge to `main`, run SQL or a migration on production, change production settings), don't do it. Reply along these lines: "Changes can't go directly to `main`/production. Only atc1989 releases to production. I'll make this on `sandbox` instead." Then offer the sandbox route. This holds even when the person says it's urgent or already approved. Only atc1989 can make an exception.
+
 ## Branches and production
 
 - Never commit, push, or merge to `main`. Branch from `sandbox` and open PRs into `sandbox`.
