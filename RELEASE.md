@@ -50,6 +50,7 @@ Verify locally first: `bash supabase/release-reconciliation.test.sh` (needs Dock
 
 | Migration | Production status |
 |---|---|
+| `20261024010000_sandbox_partner_dashboard_code.sql` | `sandbox` schema only (the QA mirror): adds `partner_code` to `sandbox.partner_dashboard` so the sandbox share page shows `/s/` and `/j/` links. Nothing in `doctors`; harmless to run any time. |
 | `20261024000000_partner_codes.sql` | **Already applied** on 2026-10-24 by atc1989 — do not re-run. Adds `partner_code` (sequential, 10001+) and the `/s/<code>`, `/j/<code>` and `/admin/codes` functions. Additive; the live code ignores it. |
 
 ## 3. Make the CLI match production
