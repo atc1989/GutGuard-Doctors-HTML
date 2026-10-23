@@ -24,7 +24,7 @@ const PAYMENT_STATUSES: ShopPaymentStatus[] = ["pending", "review", "paid", "fai
 /** Only what the referral column needs, so this does not depend on the admin doctor type. */
 type PartnerLike = { id: string; full_name: string; email: string; store_type?: "affiliate" | "lifestyle" | "main" };
 
-export default function AdminOrders({ password, partners }: { password: string; partners: PartnerLike[] }) {
+export default function AdminOrders({ partners }: { partners: PartnerLike[] }) {
   const [orders, setOrders] = useState<ShopOrder[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<ShopOrder | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -65,7 +65,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
 
     setIsImpersonating(true);
     try {
-      const { actionLink, fullName } = await adminImpersonateDoctor(password, email);
+      const { actionLink, fullName } = await adminImpersonateDoctor(email);
       window.open(actionLink, "_blank", "noopener,noreferrer");
       setNotice(`Opened the partner portal as ${fullName || email}.`);
     } catch (caught) {
@@ -81,7 +81,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
     setNotice(null);
 
     try {
-      const response = await adminListShopOrders(password);
+      const response = await adminListShopOrders();
       setOrders(response);
       setNotice(`Loaded ${response.length} website order${response.length === 1 ? "" : "s"}.`);
     } catch (caught) {
@@ -89,9 +89,9 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
     } finally {
       setIsLoading(false);
     }
-  }, [password]);
+  }, []);
 
-  // The tab mounts only after the admin password is accepted, so this needs no unlock of its own.
+  // AdminShell gates /admin on the session cookie, so this needs no unlock of its own.
   useEffect(() => {
     loadOrders();
   }, [loadOrders]);
@@ -135,7 +135,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
     setNotice(null);
 
     try {
-      const saved = await adminUpdateShopOrder(password, {
+      const saved = await adminUpdateShopOrder({
         id: selectedOrder.id,
         status: selectedOrder.status,
         paymentStatus: selectedOrder.payment_status,

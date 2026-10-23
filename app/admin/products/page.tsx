@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import Header from "@/components/Header";
-import { adminLogin, checkAdminSession } from "@/lib/api";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import {
   isPromoLive,
   promoPerCap,
@@ -41,8 +40,7 @@ async function request<T>(url: string, body?: unknown): Promise<T> {
 }
 
 export default function AdminProductsPage() {
-  const [password, setPassword] = useState("");
-  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [promos, setPromos] = useState<Promo[]>([]);
@@ -52,10 +50,10 @@ export default function AdminProductsPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // AdminShell only renders this page once the admin session is valid.
   useEffect(() => {
-    checkAdminSession().then((authenticated) => {
-      if (authenticated) load();
-    });
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function load() {
@@ -69,26 +67,14 @@ export default function AdminProductsPage() {
       setProducts(productData.products);
       setPromos(promoData.promos);
       setDrafts({});
-      setIsUnlocked(true);
+      setLoaded(true);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load products.");
-      setIsUnlocked(false);
     } finally {
       setIsLoading(false);
     }
   }
 
-  async function unlock(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    try {
-      await adminLogin(password);
-      setPassword("");
-      await load();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not unlock.");
-    }
-  }
 
   function edit(product: AdminProduct, patch: Partial<AdminProduct>) {
     setDrafts((current) => ({ ...current, [product.id]: { ...(current[product.id] ?? product), ...patch } }));
@@ -134,56 +120,21 @@ export default function AdminProductsPage() {
   ) as Record<ProductStatus, number>;
 
   return (
-    <main className="admin-wheel-shell admin-shop-orders-shell">
-      <Header dateLabel="Shop Products" />
-
-      <section className="admin-wheel-hero">
-        <div>
-          <p className="admin-wheel-kicker">GutGuard Shop</p>
-          <h1>
-            Products
-            <br />
-            <em>Admin</em>
-          </h1>
-        </div>
-        <div className="admin-wheel-summary" aria-live="polite">
-          <span>{isUnlocked ? "visible" : "locked"}</span>
-          <strong>{counts.active ?? 0}</strong>
-          <span>active in shop</span>
-        </div>
-      </section>
-
-      {isUnlocked ? null : (
-        <form className="admin-wheel-auth admin-tiktok-auth" onSubmit={unlock}>
-          <label htmlFor="admin-password">Admin password</label>
-          <div className="admin-wheel-auth-row">
-            <input
-              className="admin-hidden-username"
-              type="text"
-              value="gutguard-admin"
-              readOnly
-              aria-hidden="true"
-              tabIndex={-1}
-            />
-            <input
-              id="admin-password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              placeholder="Enter password"
-              onChange={(event) => setPassword(event.target.value)}
-            />
-            <button type="submit" disabled={isLoading || !password.trim()}>
-              {isLoading ? "Loading" : "Unlock"}
-            </button>
-          </div>
-        </form>
-      )}
+    <div className="admin-wheel-shell admin-shop-orders-shell">
+      <AdminPageHeader
+        kicker="GutGuard shop"
+        title="Product Catalog"
+        description="Prices, per-capsule copy and shop visibility for every product."
+      >
+        <button type="button" className="admin-overview-action-btn" onClick={load} disabled={isLoading}>
+          {isLoading ? "Loading" : "Refresh"}
+        </button>
+      </AdminPageHeader>
 
       {notice ? <div className="admin-wheel-alert">{notice}</div> : null}
       {error ? <div className="admin-wheel-alert error">{error}</div> : null}
 
-      {isUnlocked ? (
+      {loaded ? (
         <section className="admin-wheel-panel">
           <div className="admin-wheel-panel-head">
             <div>
@@ -404,6 +355,6 @@ export default function AdminProductsPage() {
           {counts[tab] ? null : <p className="admin-wheel-empty">No {tab} products.</p>}
         </section>
       ) : null}
-    </main>
+    </div>
   );
 }

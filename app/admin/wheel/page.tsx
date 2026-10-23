@@ -1,9 +1,10 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import AdminOrders from "@/components/AdminOrders";
-import Header from "@/components/Header";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { DownloadIcon } from "@/components/Icons";
 import { NAME_PREFIXES } from "@/lib/constants";
 import { partnerLinkKey } from "@/lib/referral";
@@ -112,77 +113,6 @@ type RegistrationEmailSettings = {
   fromLabel?: string;
 };
 
-type WheelApi = {
-  checkAdminSession?: () => Promise<boolean>;
-  adminLogin?: (password: string) => Promise<boolean>;
-  getWheelPrizes?: (adminPassword: string) => Promise<AdminWheelPrize[]>;
-  saveWheelPrize?: (adminPassword: string, prize: AdminWheelPrize) => Promise<AdminWheelPrize>;
-  createWheelPrize?: (
-    adminPassword: string,
-    prize: Omit<AdminWheelPrize, "id">,
-  ) => Promise<AdminWheelPrize>;
-  getDoctorRegistrations?: (adminPassword: string) => Promise<AdminDoctorRegistration[]>;
-  adminImpersonateDoctor?: (
-    adminPassword: string,
-    email: string,
-  ) => Promise<{ actionLink: string; fullName: string }>;
-  updateDoctorRegistration?: (
-    adminPassword: string,
-    doctor: Pick<
-      AdminDoctorRegistration,
-      | "id"
-      | "full_name"
-      | "name_prefix"
-      | "email"
-      | "mobile"
-      | "tiktok_username"
-      | "redirect_url"
-      | "specialty"
-      | "practice_location"
-    >,
-  ) => Promise<AdminDoctorRegistration>;
-  setDoctorShopProtocol?: (adminPassword: string, doctorId: string, show: boolean) => Promise<boolean>;
-  getNewsletterSendHistory?: (adminPassword: string) => Promise<NewsletterSendHistory[]>;
-  sendNewsletter?: (
-    adminPassword: string,
-    doctorIds: string[],
-    subject: string,
-    html: string,
-  ) => Promise<{
-    sent: number;
-    failed: number;
-    skipped: number;
-    results: NewsletterSendResult[];
-  }>;
-  getSmsBlastHistory?: (adminPassword: string) => Promise<SmsSendHistory[]>;
-  sendSmsBlast?: (
-    adminPassword: string,
-    doctorIds: string[],
-    title: string,
-    message: string,
-  ) => Promise<{
-    sent: number;
-    failed: number;
-    skipped: number;
-    results: SmsSendResult[];
-  }>;
-  getRegistrationEmailSettings?: (adminPassword: string) => Promise<RegistrationEmailSettings>;
-  saveRegistrationEmailSettings?: (
-    adminPassword: string,
-    settings: RegistrationEmailSettings,
-  ) => Promise<RegistrationEmailSettings>;
-  sendRegistrationEmailTest?: (adminPassword: string, testEmail: string) => Promise<{ sent: boolean; resendId?: string }>;
-  getSequenceSteps?: (adminPassword: string) => Promise<SequenceStep[]>;
-  upsertSequenceStep?: (adminPassword: string, step: { id?: string; stepNumber: number; subject: string; htmlBody: string; attachments?: SequenceAttachment[] }) => Promise<SequenceStep>;
-  deleteSequenceStep?: (adminPassword: string, stepId: string) => Promise<void>;
-  reorderSequenceSteps?: (adminPassword: string, stepIds: string[]) => Promise<void>;
-  getSequenceProgress?: (adminPassword: string) => Promise<{ progress: SequenceProgress[]; totalSteps: number }>;
-  resendSequenceStep?: (
-    doctorId: string,
-    stepNumber: number,
-  ) => Promise<{ sent?: boolean; reason?: string; sendId?: string; step?: number }>;
-};
-
 type SequenceAttachment = {
   filename: string;
   content: string; // base64
@@ -272,9 +202,8 @@ const emptyRegistrationEmailSettings: RegistrationEmailSettings = {
   attachments: [],
 };
 
-async function loadWheelApi(): Promise<WheelApi> {
-  const api = (await import("@/lib/api")) as unknown as WheelApi;
-  return api;
+async function loadWheelApi() {
+  return import("@/lib/api");
 }
 
 function toNumber(value: string) {
@@ -312,9 +241,36 @@ function getDoctorQrElementId(doctorId: string, mode: DoctorQrMode) {
   return `doctor-qr-${doctorId}-${mode}`;
 }
 
-export default function AdminWheelPage() {
-  const [activeTab, setActiveTab] = useState<"wheel" | "doctors" | "orders" | "newsletter" | "sms" | "registrationEmail" | "sequence">("wheel");
-  const [password, setPassword] = useState("");
+export type AdminWheelTab = "wheel" | "doctors" | "orders" | "newsletter" | "sms" | "registrationEmail" | "sequence";
+
+export type AdminWheelPageProps = {
+  defaultTab?: AdminWheelTab;
+};
+
+const TAB_HEADERS: Record<AdminWheelTab, { kicker: string; title: string; description: string }> = {
+  wheel: { kicker: "Prize operations", title: "Wheel Prizes", description: "Spin odds, prize inventory and the QR codes partners hand out." },
+  doctors: { kicker: "Partner network", title: "Doctor Partners", description: "Registrations, store tiers and referral links for every partner clinic." },
+  orders: { kicker: "Order queue", title: "Shop Orders", description: "Website orders, Maya payments and partner sales attribution." },
+  newsletter: { kicker: "Marketing", title: "Newsletter", description: "Compose and send an email blast to selected partners." },
+  sms: { kicker: "Marketing", title: "SMS Blast", description: "Send a short message to selected partners and review past sends." },
+  sequence: { kicker: "Automation", title: "Email Sequence", description: "The onboarding emails new partners receive, in order." },
+  registrationEmail: { kicker: "Automation", title: "Registration Email", description: "Replaced by Email Sequence." },
+};
+
+function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
+  const searchParams = useSearchParams();
+  const queryTab = searchParams.get("tab") as AdminWheelTab | null;
+  const validTabs: AdminWheelTab[] = ["wheel", "doctors", "orders", "newsletter", "sms", "registrationEmail", "sequence"];
+  const initialTab = defaultTab || (queryTab && validTabs.includes(queryTab) ? queryTab : "wheel");
+  const [activeTab, setActiveTab] = useState<AdminWheelTab>(initialTab);
+
+  useEffect(() => {
+    if (defaultTab) {
+      setActiveTab(defaultTab);
+    } else if (queryTab && validTabs.includes(queryTab)) {
+      setActiveTab(queryTab);
+    }
+  }, [defaultTab, queryTab]);
   const [prizes, setPrizes] = useState<AdminWheelPrize[]>([]);
   const [doctors, setDoctors] = useState<AdminDoctorRegistration[]>([]);
   const [doctorSearch, setDoctorSearch] = useState("");
@@ -381,7 +337,6 @@ export default function AdminWheelPage() {
   const [editingDoctor, setEditingDoctor] = useState<AdminDoctorRegistration | null>(null);
   const [isDoctorSaving, setIsDoctorSaving] = useState(false);
   const [newPrize, setNewPrize] = useState<AdminWheelPrize>(emptyPrize);
-  const [isUnlocked, setIsUnlocked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -606,17 +561,13 @@ export default function AdminWheelPage() {
     return () => window.clearTimeout(timeout);
   }, [newsletterToast]);
 
+  // AdminShell only renders this page once the admin session is valid.
   useEffect(() => {
-    loadWheelApi().then((api) => {
-      if (api.checkAdminSession) {
-        api.checkAdminSession().then((authenticated: boolean) => {
-          if (authenticated) {
-            setIsUnlocked(true);
-            loadAdminData().catch(() => setIsUnlocked(false));
-          }
-        });
-      }
-    });
+    setIsLoading(true);
+    loadAdminData()
+      .catch((caught) => setError(caught instanceof Error ? caught.message : "Unable to load admin data."))
+      .finally(() => setIsLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function loadAdminData() {
@@ -626,14 +577,14 @@ export default function AdminWheelPage() {
     }
 
     const [loadedPrizes, loadedDoctors, loadedNewsletterHistory, loadedSmsHistory, loadedRegistrationEmail, loadedSequence] = await Promise.all([
-      api.getWheelPrizes(""),
-      api.getDoctorRegistrations ? api.getDoctorRegistrations("") : Promise.resolve([]),
-      api.getNewsletterSendHistory ? api.getNewsletterSendHistory("") : Promise.resolve([]),
-      api.getSmsBlastHistory ? api.getSmsBlastHistory("") : Promise.resolve([]),
+      api.getWheelPrizes(),
+      api.getDoctorRegistrations ? api.getDoctorRegistrations() : Promise.resolve([]),
+      api.getNewsletterSendHistory ? api.getNewsletterSendHistory() : Promise.resolve([]),
+      api.getSmsBlastHistory ? api.getSmsBlastHistory() : Promise.resolve([]),
       api.getRegistrationEmailSettings
-        ? api.getRegistrationEmailSettings("")
+        ? api.getRegistrationEmailSettings()
         : Promise.resolve(emptyRegistrationEmailSettings),
-      api.getSequenceSteps ? api.getSequenceSteps("") : Promise.resolve([]),
+      api.getSequenceSteps ? api.getSequenceSteps() : Promise.resolve([]),
     ]);
     setPrizes(loadedPrizes.sort((a, b) => a.sort_order - b.sort_order));
     setDoctors(loadedDoctors);
@@ -645,32 +596,6 @@ export default function AdminWheelPage() {
     setDoctorPage(1);
     setNewsletterPage(1);
     setSmsPage(1);
-    setIsUnlocked(true);
-  }
-
-  async function handleUnlock(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    setNotice(null);
-    setIsLoading(true);
-
-    try {
-      if (password) {
-        const api = await loadWheelApi();
-        if (api.adminLogin) {
-          await api.adminLogin(password);
-          setPassword("");
-        }
-      }
-
-      await loadAdminData();
-      setNotice("Admin data loaded.");
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to load wheel prizes.");
-      setIsUnlocked(false);
-    } finally {
-      setIsLoading(false);
-    }
   }
 
   async function refreshDoctors() {
@@ -684,7 +609,7 @@ export default function AdminWheelPage() {
         throw new Error("Missing getDoctorRegistrations helper in lib/api.ts.");
       }
 
-      setDoctors(await api.getDoctorRegistrations(password));
+      setDoctors(await api.getDoctorRegistrations());
       setDoctorPage(1);
       setNotice("Doctor registrations refreshed.");
     } catch (caught) {
@@ -697,13 +622,13 @@ export default function AdminWheelPage() {
   async function refreshNewsletterHistory() {
     const api = await loadWheelApi();
     if (!api.getNewsletterSendHistory) return;
-    setNewsletterHistory(await api.getNewsletterSendHistory(password));
+    setNewsletterHistory(await api.getNewsletterSendHistory());
   }
 
   async function refreshSmsHistory() {
     const api = await loadWheelApi();
     if (!api.getSmsBlastHistory) return;
-    setSmsHistory(await api.getSmsBlastHistory(password));
+    setSmsHistory(await api.getSmsBlastHistory());
   }
 
   function toggleNewsletterDoctor(doctorId: string) {
@@ -896,7 +821,7 @@ export default function AdminWheelPage() {
         throw new Error("Missing saveRegistrationEmailSettings helper in lib/api.ts.");
       }
 
-      const saved = await api.saveRegistrationEmailSettings(password, {
+      const saved = await api.saveRegistrationEmailSettings({
         ...registrationEmail,
         subject: registrationEmail.subject.trim(),
         replyTo: registrationEmail.replyTo.trim(),
@@ -924,7 +849,7 @@ export default function AdminWheelPage() {
         throw new Error("Missing saveRegistrationEmailSettings helper in lib/api.ts.");
       }
 
-      const saved = await api.saveRegistrationEmailSettings(password, {
+      const saved = await api.saveRegistrationEmailSettings({
         ...registrationEmail,
         enabled: registrationEmail.bodyText.trim().length > 0 ? registrationEmail.enabled : false,
         html: "",
@@ -964,7 +889,7 @@ export default function AdminWheelPage() {
         throw new Error("Missing sendRegistrationEmailTest helper in lib/api.ts.");
       }
 
-      const saved = await api.saveRegistrationEmailSettings(password, {
+      const saved = await api.saveRegistrationEmailSettings({
         ...registrationEmail,
         subject: registrationEmail.subject.trim(),
         replyTo: registrationEmail.replyTo.trim(),
@@ -972,7 +897,7 @@ export default function AdminWheelPage() {
         html: registrationEmail.html.trim(),
       });
       setRegistrationEmail(saved);
-      await api.sendRegistrationEmailTest(password, registrationEmailTestAddress.trim());
+      await api.sendRegistrationEmailTest(registrationEmailTestAddress.trim());
       setNotice(`Test registration email sent to ${registrationEmailTestAddress.trim()}.`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to send test registration email.");
@@ -1004,9 +929,7 @@ export default function AdminWheelPage() {
         throw new Error("Missing sendNewsletter helper in lib/api.ts.");
       }
 
-      const response = await api.sendNewsletter(
-        password,
-        selectedDoctorIds,
+      const response = await api.sendNewsletter(selectedDoctorIds,
         newsletterSubject.trim(),
         newsletterHtml,
       );
@@ -1057,9 +980,7 @@ export default function AdminWheelPage() {
         throw new Error("Missing sendSmsBlast helper in lib/api.ts.");
       }
 
-      const response = await api.sendSmsBlast(
-        password,
-        selectedSmsDoctorIds,
+      const response = await api.sendSmsBlast(selectedSmsDoctorIds,
         smsTitle.trim(),
         smsMessage.trim(),
       );
@@ -1107,7 +1028,7 @@ export default function AdminWheelPage() {
         throw new Error("Missing updateDoctorRegistration helper in lib/api.ts.");
       }
 
-      const updatedDoctor = await api.updateDoctorRegistration(password, {
+      const updatedDoctor = await api.updateDoctorRegistration({
         id: editingDoctor.id,
         name_prefix: editingDoctor.name_prefix.trim(),
         full_name: editingDoctor.full_name.trim(),
@@ -1138,7 +1059,7 @@ export default function AdminWheelPage() {
       const api = await loadWheelApi();
       if (!api.setDoctorShopProtocol) throw new Error("Missing setDoctorShopProtocol helper in lib/api.ts.");
 
-      const saved = await api.setDoctorShopProtocol(password, doctor.id, show);
+      const saved = await api.setDoctorShopProtocol(doctor.id, show);
       setDoctors((current) =>
         current.map((item) => (item.id === doctor.id ? { ...item, shop_show_protocol: saved } : item)),
       );
@@ -1181,7 +1102,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
         throw new Error("Missing adminImpersonateDoctor helper in lib/api.ts.");
       }
 
-      const { actionLink } = await api.adminImpersonateDoctor(password, doctor.email);
+      const { actionLink } = await api.adminImpersonateDoctor(doctor.email);
       // Opened rather than followed, so this admin tab keeps its own state.
       window.open(actionLink, "_blank", "noopener,noreferrer");
       setNotice(`Opened the partner portal as ${doctor.full_name || doctor.email}.`);
@@ -1295,7 +1216,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
         throw new Error("Missing saveWheelPrize helper in lib/api.ts.");
       }
 
-      const savedPrize = await api.saveWheelPrize(password, prize);
+      const savedPrize = await api.saveWheelPrize(prize);
       setPrizes((current) =>
         current
           .map((item) => (item.id === prize.id ? savedPrize : item))
@@ -1321,7 +1242,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
         throw new Error("Missing createWheelPrize helper in lib/api.ts.");
       }
 
-      const createdPrize = await api.createWheelPrize(password, {
+      const createdPrize = await api.createWheelPrize({
         label: newPrize.label,
         note: newPrize.note,
         color: newPrize.color,
@@ -1374,7 +1295,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
     try {
       const api = await loadWheelApi();
       if (!api.reorderSequenceSteps) throw new Error("Missing reorderSequenceSteps helper.");
-      await api.reorderSequenceSteps(password, renumbered.map((s) => s.id!));
+      await api.reorderSequenceSteps(renumbered.map((s) => s.id!));
       setNotice("Sequence reordered.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to reorder steps.");
@@ -1389,8 +1310,8 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
     try {
       const api = await loadWheelApi();
       const [steps, prog] = await Promise.all([
-        api.getSequenceSteps ? api.getSequenceSteps(password) : Promise.resolve([]),
-        api.getSequenceProgress ? api.getSequenceProgress(password) : Promise.resolve({ progress: [], totalSteps: 0 }),
+        api.getSequenceSteps ? api.getSequenceSteps() : Promise.resolve([]),
+        api.getSequenceProgress ? api.getSequenceProgress() : Promise.resolve({ progress: [], totalSteps: 0 }),
       ]);
       setSequenceSteps(steps.sort((a, b) => a.step_number - b.step_number));
       setSequenceProgress(prog.progress);
@@ -1411,7 +1332,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
     try {
       const api = await loadWheelApi();
       if (!api.upsertSequenceStep) throw new Error("Missing upsertSequenceStep helper.");
-      const saved = await api.upsertSequenceStep(password, {
+      const saved = await api.upsertSequenceStep({
         id: editingStep.id,
         stepNumber: editingStep.step_number ?? sequenceSteps.length + 1,
         subject: editingStep.subject.trim(),
@@ -1441,7 +1362,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
     try {
       const api = await loadWheelApi();
       if (!api.deleteSequenceStep) throw new Error("Missing deleteSequenceStep helper.");
-      await api.deleteSequenceStep(password, stepId);
+      await api.deleteSequenceStep(stepId);
       setSequenceSteps((current) => current.filter((s) => s.id !== stepId).map((s, i) => ({ ...s, step_number: i + 1 })));
       setNotice("Step removed and sequence renumbered.");
     } catch (caught) {
@@ -1492,120 +1413,11 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
   }
 
   // Hero summary, one [status, figure, unit] row per tab.
-  const summaryByTab: Record<typeof activeTab, [string, string | number, string]> = {
-    wheel: [`${prizes.length} prizes`, activeWeightTotal, "active weight"],
-    doctors: [`${doctors.length} doctors`, doctors.length, "registrations"],
-    orders: ["website orders", "--", "shown below"],
-    newsletter: [`${selectedDoctorIds.length} selected`, selectedDoctorIds.length, "newsletter recipients"],
-    sms: [`${selectedSmsDoctorIds.length} selected`, selectedSmsDoctorIds.length, "SMS recipients"],
-    sequence: [`${sequenceSteps.length} steps`, sequenceProgress.length, "enrolled doctors"],
-    registrationEmail: [
-      registrationEmail.enabled ? "enabled" : "disabled",
-      registrationEmail.attachments.length,
-      "attachments",
-    ],
-  };
-  const summary = summaryByTab[activeTab];
+  const header = TAB_HEADERS[activeTab];
 
   return (
-    <main className="admin-wheel-shell">
-      <Header dateLabel="Admin Wheel" />
-
-      <section className="admin-wheel-hero">
-        <div>
-          <p className="admin-wheel-kicker">Prize Operations</p>
-          <h1>
-            Wheel
-            <br />
-            <em>Admin</em>
-          </h1>
-        </div>
-        <div className="admin-wheel-summary" aria-live="polite">
-          <span>{summary[0]}</span>
-          <strong>{summary[1]}</strong>
-          <span>{summary[2]}</span>
-        </div>
-      </section>
-
-      <nav className="admin-tabs" aria-label="Admin sections">
-        <button
-          className={activeTab === "wheel" ? "active" : ""}
-          onClick={() => setActiveTab("wheel")}
-          type="button"
-        >
-          Wheel
-        </button>
-        <button
-          className={activeTab === "doctors" ? "active" : ""}
-          onClick={() => setActiveTab("doctors")}
-          type="button"
-        >
-          Doctors
-        </button>
-        <button
-          className={activeTab === "orders" ? "active" : ""}
-          onClick={() => setActiveTab("orders")}
-          type="button"
-        >
-          Orders
-        </button>
-        <button
-          className={activeTab === "newsletter" ? "active" : ""}
-          onClick={() => setActiveTab("newsletter")}
-          type="button"
-        >
-          Newsletter
-        </button>
-        <button
-          className={activeTab === "sms" ? "active" : ""}
-          onClick={() => setActiveTab("sms")}
-          type="button"
-        >
-          SMS Blast
-        </button>
-        <button
-          className={activeTab === "sequence" ? "active" : ""}
-          onClick={() => setActiveTab("sequence")}
-          type="button"
-        >
-          Email Sequence
-        </button>
-        <button
-          disabled
-          title="Replaced by Email Sequence"
-          style={{ opacity: 0.4, cursor: "not-allowed" }}
-          type="button"
-        >
-          Registration Email
-        </button>
-      </nav>
-
-      <form className="admin-wheel-auth" onSubmit={handleUnlock}>
-        <label htmlFor="admin-password">Admin password</label>
-        <div className="admin-wheel-auth-row">
-          <input
-            className="admin-hidden-username"
-            type="text"
-            name="username"
-            autoComplete="username"
-            value="gutguard-admin"
-            readOnly
-            aria-hidden="true"
-            tabIndex={-1}
-          />
-          <input
-            id="admin-password"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            placeholder="Enter password"
-            onChange={(event) => setPassword(event.target.value)}
-          />
-          <button type="submit" disabled={isLoading || password.trim().length === 0}>
-            {isLoading ? "Loading" : isUnlocked ? "Refresh" : "Unlock"}
-          </button>
-        </div>
-      </form>
+    <div className="admin-wheel-shell">
+      <AdminPageHeader kicker={header.kicker} title={header.title} description={header.description} />
 
       {error ? <div className="admin-wheel-alert error">{error}</div> : null}
       {notice ? <div className="admin-wheel-alert">{notice}</div> : null}
@@ -1621,7 +1433,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
         </div>
       ) : null}
 
-      {isUnlocked && activeTab === "wheel" ? (
+      {activeTab === "wheel" ? (
         <>
           <section className="admin-wheel-panel">
             <div className="admin-wheel-panel-head">
@@ -1801,7 +1613,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
         </>
       ) : null}
 
-      {isUnlocked && activeTab === "doctors" ? (
+      {activeTab === "doctors" ? (
         <section className="admin-wheel-panel">
           <div className="admin-wheel-panel-head">
             <div>
@@ -2208,9 +2020,9 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
         </section>
       ) : null}
 
-      {isUnlocked && activeTab === "orders" ? <AdminOrders password={password} partners={doctors} /> : null}
+      {activeTab === "orders" ? <AdminOrders partners={doctors} /> : null}
 
-      {isUnlocked && activeTab === "newsletter" ? (
+      {activeTab === "newsletter" ? (
         <section className="admin-wheel-panel">
           <div className="admin-wheel-panel-head">
             <div>
@@ -2432,7 +2244,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
         </section>
       ) : null}
 
-      {isUnlocked && activeTab === "sms" ? (
+      {activeTab === "sms" ? (
         <section className="admin-wheel-panel">
           <div className="admin-wheel-panel-head">
             <div>
@@ -2673,7 +2485,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
         </section>
       ) : null}
 
-      {isUnlocked && activeTab === "registrationEmail" ? (
+      {activeTab === "registrationEmail" ? (
         <section className="admin-wheel-panel">
           <div className="admin-wheel-panel-head">
             <div>
@@ -2851,7 +2663,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
         </section>
       ) : null}
 
-      {isUnlocked && activeTab === "sequence" ? (
+      {activeTab === "sequence" ? (
         <section className="admin-wheel-panel">
           <div className="admin-wheel-panel-head">
             <div>
@@ -3489,12 +3301,6 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
         </div>
       ) : null}
 
-      {!isUnlocked ? (
-        <section className="admin-wheel-empty">
-          <p>Enter the admin password to load wheel prizes and doctor registrations.</p>
-        </section>
-      ) : null}
-
       {previewStep ? (
         <div
           className="admin-modal-backdrop"
@@ -3531,7 +3337,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
           </div>
         </div>
       ) : null}
-    </main>
+    </div>
   );
 }
 
@@ -3686,4 +3492,12 @@ function escapeHtml(value: string) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+export default function AdminWheelPage(props: AdminWheelPageProps = {}) {
+  return (
+    <Suspense fallback={<div className="admin-wheel-shell" style={{ padding: 40 }}><p>Loading operations...</p></div>}>
+      <AdminWheelPageContent {...props} />
+    </Suspense>
+  );
 }
