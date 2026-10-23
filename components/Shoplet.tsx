@@ -154,10 +154,7 @@ export default function Shoplet() {
   const selectedTier = tiers.find((item) => item.id === tierId) ?? tiers[tiers.length - 1];
   const basketCount = basket.reduce((sum, item) => sum + item.qty, 0);
   const subtotal = basket.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const shippingQuote = quoteShipping(basket, {
-    province: form.province,
-    regionCode: getSelectedRegionCode(form, provinces),
-  });
+  const shippingQuote = quoteShipping(basket, { provinceCode: form.provinceCode });
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -1128,8 +1125,4 @@ function formatMobile(value: string) {
   if (digits.length <= 4) return digits;
   if (digits.length <= 7) return `${digits.slice(0, 4)} ${digits.slice(4)}`;
   return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
-}
-
-function getSelectedRegionCode(form: FormState, provinces: ProvinceOption[]) {
-  return provinces.find((item) => item.code === form.provinceCode)?.regionCode ?? "";
 }
