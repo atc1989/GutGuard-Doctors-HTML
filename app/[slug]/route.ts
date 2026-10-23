@@ -30,6 +30,12 @@ export async function GET(request: NextRequest, context: { params: Promise<{ slu
     return invalidInvitation(destination);
   }
 
+  // Old name links (and pre-shortening keys) are already printed: send them to the key URL
+  // the QR codes now carry, which lands back here and continues below.
+  if (invitation.link_key && slug !== invitation.link_key) {
+    return NextResponse.redirect(new URL(`/${invitation.link_key.toUpperCase()}`, request.url), 307);
+  }
+
   destination.searchParams.set("ref", invitation.routing_slug);
   const response = NextResponse.redirect(destination, 307);
   response.cookies.set(COOKIE, invitation.routing_slug, { httpOnly: true, secure: true, sameSite: "lax", maxAge: MAX_AGE, path: "/physicians/register" });
