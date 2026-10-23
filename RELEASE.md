@@ -46,6 +46,12 @@ Verify locally first: `bash supabase/release-reconciliation.test.sh` (needs Dock
 `PSQL="psql ..."` pointing at any Postgres 16). It loads `supabase/baseline/` — the live
 `doctors`/`sandbox` structure captured 2026-10-08 — applies both files twice and runs the checks.
 
+### Later migrations
+
+| Migration | Production status |
+|---|---|
+| `20261024000000_partner_codes.sql` | **Already applied** on 2026-10-24 by atc1989 — do not re-run. Adds `partner_code` (sequential, 10001+) and the `/s/<code>`, `/j/<code>` and `/admin/codes` functions. Additive; the live code ignores it. |
+
 ## 3. Make the CLI match production
 
 ```bash

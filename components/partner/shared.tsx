@@ -38,16 +38,22 @@ export function orderAddress(order: PartnerOrder) {
 }
 
 /** Mirrors getDoctorQrUrl in the admin, so printed codes match across views. */
-export function getPartnerQrLink(partner: { id: string; routing_slug: string }, mode: PartnerQrMode) {
+export function getPartnerQrLink(
+  partner: { id: string; routing_slug: string; partner_code?: number | null },
+  mode: PartnerQrMode,
+) {
   if (!partner.id) {
     if (mode === "shop") return SHOP_ORIGIN;
     return `${PUBLIC_SITE_ORIGIN}/physicians/register`;
   }
   const key = partnerLinkKey(partner.id);
+  const code = partner.partner_code;
   if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${key}`;
-  if (mode === "referral") return `${PUBLIC_MARKETING_ORIGIN}/${key.toUpperCase()}`;
+  // Shop and join share one partner code and differ only in the prefix. The key links are the
+  // fallback until partner_code is deployed; printed ones keep working either way.
+  if (mode === "referral") return code ? `${PUBLIC_MARKETING_ORIGIN}/j/${code}` : `${PUBLIC_MARKETING_ORIGIN}/${key.toUpperCase()}`;
   if (partner.routing_slug === "dr-grace-saraza") return `${SHOP_ORIGIN}/beehive`;
-  return `${SHOP_ORIGIN}/r/${key}`;
+  return code ? `${PUBLIC_MARKETING_ORIGIN}/s/${code}` : `${SHOP_ORIGIN}/r/${key}`;
 }
 
 type PartnerContextValue = { dashboard: PartnerDashboard; signOut: () => void };

@@ -7,7 +7,7 @@ import AdminOrders from "@/components/AdminOrders";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { DownloadIcon } from "@/components/Icons";
 import { NAME_PREFIXES } from "@/lib/constants";
-import { partnerLinkKey } from "@/lib/referral";
+import { getPartnerQrLink } from "@/components/partner/shared";
 import { formatPrefixedName } from "@/lib/validation";
 import { adminUpgradeToMainStore, adminToggleReferralQr, adminPromotePartner } from "@/lib/api";
 
@@ -49,6 +49,7 @@ type AdminDoctorRegistration = {
   prize_label?: string | null;
   prize_claimed_at?: string | null;
   shop_show_protocol?: boolean;
+  partner_code?: number | null;
 };
 
 type NewsletterSendHistory = {
@@ -156,7 +157,6 @@ const PUBLIC_SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://partner
   /\/$/,
   "",
 );
-const SHOP_ORIGIN = (process.env.NEXT_PUBLIC_SHOP_URL ?? "https://shop.gutguard.ph").replace(/\/$/, "");
 const PLACEHOLDER_TOKENS = [
   "{{doctor_name}}",
   "{{name_prefix}}",
@@ -221,20 +221,9 @@ function getPrizeOdds(prize: AdminWheelPrize, activeWeightTotal: number) {
 
 type DoctorQrMode = "shop" | "referral" | "profile";
 
-const PUBLIC_MARKETING_ORIGIN = (process.env.NEXT_PUBLIC_MARKETING_URL ?? "https://www.gutguard.ph").replace(/\/$/, "");
-
-/**
- * Keyed by partnerLinkKey, not routing slug: the slug is the partner's name, and these URLs
- * are printed on QR posters and shown to customers. Slug links still resolve server-side.
- */
+/** Same links the partner's own share page prints, so posters match across views. */
 function getDoctorQrUrl(doctor: AdminDoctorRegistration, mode: DoctorQrMode) {
-  if (!doctor.id) return "";
-
-  const key = partnerLinkKey(doctor.id);
-  if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${key}`;
-  if (mode === "referral") return `${PUBLIC_MARKETING_ORIGIN}/${key.toUpperCase()}`;
-  if (doctor.routing_slug === "dr-grace-saraza") return `${SHOP_ORIGIN}/beehive`;
-  return `${SHOP_ORIGIN}/r/${key}`;
+  return doctor.id ? getPartnerQrLink(doctor, mode) : "";
 }
 
 function getDoctorQrElementId(doctorId: string, mode: DoctorQrMode) {
@@ -392,6 +381,8 @@ function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
         isReferred ? "referred" : "direct",
         doctor.prize_label ?? "",
         doctor.store_type ?? "",
+        doctor.partner_code ? String(doctor.partner_code) : "",
+        doctor.email ? "" : "pending",
       ]
         .join(" ")
         .toLowerCase()
@@ -1713,6 +1704,27 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                       <span>@{doctor.tiktok_username || "no-handle"}</span>
 
                       <div style={{ margin: "4px 0 8px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                        {doctor.partner_code ? (
+                          <span style={{ fontSize: "12px", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                            #{doctor.partner_code}
+                          </span>
+                        ) : null}
+                        {/* No email = can't sign in yet: a code minted on /admin/codes, waiting for details. */}
+                        {doctor.email ? null : (
+                          <span style={{
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.04em",
+                            padding: "2px 8px",
+                            borderRadius: "4px",
+                            background: "#fff7ed",
+                            color: "#9a3412",
+                            border: "1px solid #fed7aa",
+                          }}>
+                            Pending
+                          </span>
+                        )}
                         <span style={{
                           fontSize: "11px",
                           fontWeight: 700,

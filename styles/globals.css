@@ -5662,12 +5662,19 @@
   color: var(--blue);
 }
 
-.shop-site-menu .shop-site-menu-login {
+.shop-site-menu .shop-site-menu-login,
+.shop-site-menu .shop-site-menu-join {
   margin-top: auto;
   padding-top: 24px;
   color: var(--blue);
   font-family: var(--sans);
   font-size: 15px;
+}
+
+/* The join link takes the bottom slot; Log in sits right under it. */
+.shop-site-menu .shop-site-menu-join + .shop-site-menu-login {
+  margin-top: 0;
+  padding-top: 8px;
 }
 
 .shop-site-menu-close {
@@ -5686,6 +5693,21 @@
 .shop-site-menu button:focus-visible {
   outline: 3px solid var(--gold);
   outline-offset: 3px;
+}
+
+.shop-site-join-short {
+  display: none;
+}
+
+/* Below this the full label runs into the centred links; "Join" fits the actions column. */
+@media (max-width: 1180px) {
+  .shop-site-join-full {
+    display: none;
+  }
+
+  .shop-site-join-short {
+    display: inline;
+  }
 }
 
 @media (max-width: 1080px) {
@@ -8364,6 +8386,101 @@
 .admin-shops-table-wrap {
   overflow-x: auto;
   border: 1px solid var(--rule);
+}
+
+/* /admin/codes: mint a partner code and its two QRs. */
+.admin-codes-actions {
+  margin: 16px 0 24px;
+}
+
+.admin-codes-result {
+  margin-bottom: 32px;
+}
+
+.admin-codes-code {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0 0 16px;
+  color: var(--ink-3);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-codes-code strong {
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 48px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.admin-codes-qrs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.admin-codes-qr {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--rule);
+  background: #fff;
+}
+
+.admin-codes-qr figcaption {
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.admin-codes-qr code {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.admin-codes-qr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-codes-list-title {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.admin-codes-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--rule);
+}
+
+.admin-codes-list li {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule);
+  font-size: 14px;
+}
+
+.admin-codes-list li strong {
+  min-width: 72px;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-codes-list li span {
+  flex: 1;
+  color: var(--ink-3);
 }
 
 .admin-shops-table {

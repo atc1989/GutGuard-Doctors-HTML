@@ -493,6 +493,11 @@ export default function Shoplet() {
             <Link href="/physicians">For Physicians</Link>
           </div>
           <div className="shop-site-actions">
+            {/* The register page picks up this visitor's referrer from the shop's own cookie. */}
+            <Link className="shop-site-login" href="/physicians/register" aria-label="Become a partner">
+              <span className="shop-site-join-full">Become a partner</span>
+              <span className="shop-site-join-short">Join</span>
+            </Link>
             <Link className="shop-site-login" href="/partner">Log in</Link>
             <button className="shop-site-basket" type="button" onClick={() => setDrawerOpen(true)}>
               Basket ({basketCount})
@@ -532,6 +537,7 @@ export default function Shoplet() {
         <Link href="/testimonials" onClick={() => setMenuOpen(false)}>Stories</Link>
         <Link href="/shop" aria-current="page" onClick={() => setMenuOpen(false)}>Shop</Link>
         <Link href="/physicians" onClick={() => setMenuOpen(false)}>For Physicians</Link>
+        <Link className="shop-site-menu-join" href="/physicians/register" onClick={() => setMenuOpen(false)}>Become a partner →</Link>
         <Link className="shop-site-menu-login" href="/partner" onClick={() => setMenuOpen(false)}>Already a partner? Log in →</Link>
       </div>
       <section className="shop-hero">

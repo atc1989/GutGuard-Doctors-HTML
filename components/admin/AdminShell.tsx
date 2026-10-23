@@ -17,6 +17,7 @@ import {
   Menu,
   MessageSquare,
   Package,
+  QrCode,
   Send,
   ShieldCheck,
   ShoppingBag,
@@ -62,6 +63,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: "Partner Network",
     items: [
       { href: "/admin/doctors", label: "Doctor Partners", icon: Users },
+      { href: "/admin/codes", label: "Partner Codes", icon: QrCode },
       { href: "/admin/referral-email", label: "Referral Email", icon: Mail },
     ],
   },
