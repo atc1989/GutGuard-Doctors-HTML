@@ -45,10 +45,7 @@ export function getPartnerQrLink(partner: { id: string; routing_slug: string }, 
   }
   const key = partnerLinkKey(partner.id);
   if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${key}`;
-  if (mode === "referral") {
-    if (partner.routing_slug) return `${PUBLIC_MARKETING_ORIGIN}/${partner.routing_slug.toUpperCase()}`;
-    return `${PUBLIC_SITE_ORIGIN}/physicians/register?ref=${key}`;
-  }
+  if (mode === "referral") return `${PUBLIC_MARKETING_ORIGIN}/${key.toUpperCase()}`;
   if (partner.routing_slug === "dr-grace-saraza") return `${SHOP_ORIGIN}/beehive`;
   return `${SHOP_ORIGIN}/r/${key}`;
 }
