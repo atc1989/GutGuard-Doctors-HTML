@@ -6,6 +6,7 @@ export const PARTNER_PENDING_WELCOME_KEY = "gg_partner_pending_welcome";
 export const LINKS = {
   email: null,
   facebook: "https://www.facebook.com/share/g/1AcZoVc7xp/",
+  messenger: "https://m.me/588775934316393",
   tiktok: "https://www.tiktok.com/@gutguardph",
   reel: null,
 } as const;
