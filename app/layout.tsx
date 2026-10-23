@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces } from "next/font/google";
+import MessengerHead from "@/components/MessengerHead";
 import "@/styles/globals.css";
 
 /**
@@ -58,7 +59,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={fraunces.variable}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <MessengerHead />
+      </body>
     </html>
   );
 }
