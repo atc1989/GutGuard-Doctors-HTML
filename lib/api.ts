@@ -637,16 +637,15 @@ export async function getPartnerInvitation(slug: string): Promise<PartnerInvitat
 
   const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | null;
   const routing_slug = String(row?.routing_slug ?? "").trim();
-  // The registration page shows the referrer to whoever scanned their code: initials only
-  // ("Frederick D. Francisco" -> "F.D.F."), not their full name.
+  // The registration page shows the referrer to whoever scanned their code by partner code
+  // ("partner #10331"), never their name. Initials only if the code is somehow missing.
+  const code = Number(row?.partner_code) || null;
   const initials = String(row?.full_name ?? "")
     .split(/\s+/)
     .map((word) => word.match(/\p{L}/u)?.[0] ?? "")
     .join("")
     .toUpperCase();
-  // A code minted on /admin/codes has no name until admin fills it in; still show who invited.
-  const code = Number(row?.partner_code) || null;
-  const full_name = initials.replace(/./g, "$&.") || (code ? `partner #${code}` : "");
+  const full_name = code ? `partner #${code}` : initials.replace(/./g, "$&.");
   if (!routing_slug) return null;
 
   return { routing_slug, full_name };

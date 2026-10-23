@@ -100,12 +100,6 @@ export default function PartnerApplyForm({
 
   return (
     <form className="partner-form partner-apply-form" onSubmit={handleSubmit} noValidate>
-      {invitedBy?.fullName ? (
-        <p className="partner-invite-note">
-          Invited by <strong>{invitedBy.fullName}</strong>
-        </p>
-      ) : null}
-
       <div className="partner-apply-field">
         <label htmlFor="namePrefix">Prefix</label>
         <select
@@ -261,6 +255,13 @@ export default function PartnerApplyForm({
         <div className="partner-auth-error" role="alert">
           {submitError}
         </div>
+      ) : null}
+
+      {/* Just above Submit: the last thing read before applying is who gets the credit. */}
+      {invitedBy?.fullName ? (
+        <p className="partner-invite-note">
+          Invited by <strong>{invitedBy.fullName}</strong>
+        </p>
       ) : null}
 
       <button type="submit" className="shop-primary partner-auth-primary" disabled={submitting}>

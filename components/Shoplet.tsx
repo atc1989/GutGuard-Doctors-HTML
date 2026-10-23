@@ -494,7 +494,7 @@ export default function Shoplet() {
           </div>
           <div className="shop-site-actions">
             {/* The register page picks up this visitor's referrer from the shop's own cookie. */}
-            <Link className="shop-site-login" href="/physicians/register" aria-label="Become a partner">
+            <Link className="shop-site-join" href="/physicians/register" aria-label="Become a partner">
               <span className="shop-site-join-full">Become a partner</span>
               <span className="shop-site-join-short">Join</span>
             </Link>

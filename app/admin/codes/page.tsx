@@ -23,6 +23,9 @@ export default function AdminCodesPage() {
   const [pending, setPending] = useState<PendingPartner[]>([]);
   const [selected, setSelected] = useState<PendingPartner | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Highest code in use; the confirm dialog previews the next one.
+  const [maxCode, setMaxCode] = useState(0);
+  const [confirming, setConfirming] = useState(false);
 
   // AdminShell only renders this page once the admin session is valid.
   useEffect(() => {
@@ -36,9 +39,11 @@ export default function AdminCodesPage() {
       const res = await fetch("/api/admin/doctors");
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Could not load partners.");
+      const doctors = data.doctors as AdminDoctorRegistration[];
+      setMaxCode(Math.max(0, ...doctors.map((doctor) => doctor.partner_code ?? 0)));
       // Pending == no email yet: it cannot sign in until admin fills the details in.
       setPending(
-        (data.doctors as AdminDoctorRegistration[])
+        doctors
           .filter((doctor) => !doctor.email && doctor.partner_code)
           .map((doctor) => ({
             id: doctor.id,
@@ -65,6 +70,8 @@ export default function AdminCodesPage() {
       const created: PendingPartner = { ...data.partner, created_at: new Date().toISOString() };
       setPending((current) => [created, ...current]);
       setSelected(created);
+      setMaxCode((current) => Math.max(current, created.partner_code));
+      setConfirming(false);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not create a code.");
     } finally {
@@ -100,12 +107,23 @@ export default function AdminCodesPage() {
           </div>
 
           <div className="admin-codes-actions">
-            <button type="button" onClick={generate} disabled={isCreating}>
-              {isCreating ? "Creating…" : "Generate code"}
+            <button type="button" onClick={() => setConfirming(true)} disabled={isCreating}>
+              Generate code
             </button>
           </div>
 
           {selected ? <CodeQrs partner={selected} /> : null}
+
+          {confirming ? (
+            <ConfirmGenerate
+              // ponytail: a preview, not a reservation. Two admins generating at once can each
+              // see the same number; the created code is the one shown after.
+              nextCode={maxCode + 1}
+              isCreating={isCreating}
+              onCancel={() => setConfirming(false)}
+              onConfirm={generate}
+            />
+          ) : null}
 
           <h3 className="admin-codes-list-title">Pending codes ({pending.length})</h3>
           {pending.length === 0 ? (
@@ -129,6 +147,67 @@ export default function AdminCodesPage() {
           )}
         </section>
       ) : null}
+    </div>
+  );
+}
+
+function ConfirmGenerate({
+  nextCode,
+  isCreating,
+  onCancel,
+  onConfirm,
+}: {
+  nextCode: number;
+  isCreating: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const preview = { id: "preview", partner_code: nextCode, routing_slug: `partner-${nextCode}` };
+
+  return (
+    <div
+      className="admin-modal-backdrop"
+      role="presentation"
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && !isCreating) onCancel();
+      }}
+    >
+      <section className="admin-modal admin-codes-confirm" role="dialog" aria-modal="true" aria-labelledby="codes-confirm-title">
+        <div className="admin-modal-head">
+          <div>
+            <p className="admin-wheel-kicker">Confirm new partner</p>
+            <h2 id="codes-confirm-title">Create account #{nextCode}?</h2>
+          </div>
+        </div>
+        <div className="admin-modal-body">
+          <p>
+            This creates a blank partner account. Sales and sign-ups through its QRs are credited to it from the first
+            scan. It stays <strong>Pending</strong> until you add the doctor&apos;s details and email on Doctor Partners.
+          </p>
+          <dl className="admin-confirm-summary">
+            <div>
+              <dt>Account no.</dt>
+              <dd>#{nextCode}</dd>
+            </div>
+            <div>
+              <dt>Shop link</dt>
+              <dd>{getPartnerQrLink(preview, "shop")}</dd>
+            </div>
+            <div>
+              <dt>Join link</dt>
+              <dd>{getPartnerQrLink(preview, "referral")}</dd>
+            </div>
+          </dl>
+        </div>
+        <div className="admin-modal-actions">
+          <button type="button" onClick={onCancel} disabled={isCreating}>
+            Cancel
+          </button>
+          <button type="button" onClick={onConfirm} disabled={isCreating} autoFocus>
+            {isCreating ? "Creating…" : "Generate code"}
+          </button>
+        </div>
+      </section>
     </div>
   );
 }
