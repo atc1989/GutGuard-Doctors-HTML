@@ -227,6 +227,20 @@ export async function serverGetDoctorRegistrations(adminPassword: string): Promi
   return ((data ?? []) as AdminDoctorRegistration[]).map(normalizeAdminDoctorRegistration);
 }
 
+/** A blank partner with just a code; admin fills the details (and email, to sign in) later. */
+export async function serverAdminCreatePendingPartner(
+  adminPassword: string,
+): Promise<{ id: string; partner_code: number; routing_slug: string }> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.rpc("admin_create_pending_partner", {
+    p_admin_password: adminPassword,
+  });
+
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] : data;
+}
+
 export async function serverUpdateDoctorRegistration(
   adminPassword: string,
   doctor: AdminDoctorRegistrationUpdate,

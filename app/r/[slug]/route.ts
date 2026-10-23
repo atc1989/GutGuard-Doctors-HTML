@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { supabase, supabaseShop } from "@/lib/supabase";
-import { REFERRAL_COOKIE, REFERRAL_MAX_AGE_SECONDS, REFERRAL_SHOP_NAME_COOKIE } from "@/lib/referral";
+import { NextRequest } from "next/server";
+import { shopReferralRedirect } from "@/lib/shop-referral";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -8,67 +7,14 @@ export const revalidate = 0;
 type RouteContext = { params: Promise<{ slug: string }> };
 
 /**
- * Partner referral link: /r/<slug> -> remembers the referrer, then sends the visitor
- * to the shop. Deliberately lives on the shop's own origin - a link on another
- * subdomain could not set a cookie this origin can read, and the attribution would
- * silently vanish.
+ * Partner referral link: /r/<key> -> remembers the referrer, then sends the visitor to the
+ * shop. <key> is a link key or routing slug. New posters print /s/<code> instead; this stays
+ * for the links already in circulation.
  *
  * Distinct from /dr/<slug>, which is the doctor's TikTok profile link and is baked
  * into QR codes already in circulation. Do not merge them.
  */
 export async function GET(request: NextRequest, context: RouteContext) {
   const { slug } = await context.params;
-  const clean = decodeURIComponent(slug ?? "").trim().toLowerCase();
-
-  // Shared links sell Try First only unless an admin turned Full Protocol on for this
-  // partner. Partners live in `doctors` even on the sandbox shop, hence `supabase`.
-  // Unknown slug or lookup error -> trial only, never the wider shop.
-  const showsProtocol =
-    clean && supabase
-      ? (await supabase.rpc("shop_link_shows_protocol", { p_key: clean })).data === true
-      : false;
-  const shopUrl = new URL(showsProtocol ? "/shop" : "/shop?trial", request.url);
-  const response = NextResponse.redirect(shopUrl, { status: 302 });
-
-  if (!clean || !supabaseShop) return response;
-
-  // Resolves the slug and records the click in one call - see track_referral_click.
-  const { data, error } = await supabaseShop.rpc("track_referral_click", { p_slug: clean });
-  const matched = typeof data === "string" ? data : Array.isArray(data) ? data[0] : null;
-
-  // Unknown or unreachable slug: still deliver the visitor to the shop, but leave any
-  // existing cookie intact. A typo'd link must not wipe out a real prior referral.
-  if (error || !matched) return response;
-
-  response.cookies.set(REFERRAL_COOKIE, matched, {
-    maxAge: REFERRAL_MAX_AGE_SECONDS,
-    path: "/",
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    // Not httpOnly on purpose: the checkout form reads this in the browser to attach it
-    // to the order. It is a public partner slug, not a credential.
-    httpOnly: false,
-  });
-
-  response.cookies.set(REFERRAL_SHOP_NAME_COOKIE, getReferralShopName(matched, request), {
-    maxAge: REFERRAL_MAX_AGE_SECONDS,
-    path: "/",
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    httpOnly: false,
-  });
-
-  return response;
-}
-
-/**
- * Named shop fronts only. A partner's own name is deliberately NOT derived from the slug
- * any more - the shop greeted every visitor with the referrer's full name.
- */
-function getReferralShopName(slug: string, request: NextRequest) {
-  const requestedShop = request.nextUrl.searchParams.get("shop")?.trim().toLowerCase();
-  if (slug === "dr-grace-saraza" && requestedShop === "beehive") return "Beehive";
-  if (slug === "ginhawa") return "Ginhawa";
-
-  return "";
+  return shopReferralRedirect(request, decodeURIComponent(slug ?? ""));
 }

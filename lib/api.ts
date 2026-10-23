@@ -66,6 +66,8 @@ export type AdminDoctorRegistration = {
   prize_claimed_at?: string | null;
   /** Whether this partner's shared shop link also sells the Full Protocol. */
   shop_show_protocol?: boolean;
+  /** Sequential public code: www.gutguard.ph/s/<code> and /j/<code>. */
+  partner_code?: number | null;
 };
 
 export type AdminDoctorRegistrationUpdate = {
@@ -300,6 +302,7 @@ export type PartnerDashboardQuery = {
 export type PartnerDashboard = {
   partner: {
     id: string;
+    partner_code?: number | null;
     full_name: string;
     routing_slug: string;
     store_type?: StoreType;
@@ -641,7 +644,9 @@ export async function getPartnerInvitation(slug: string): Promise<PartnerInvitat
     .map((word) => word.match(/\p{L}/u)?.[0] ?? "")
     .join("")
     .toUpperCase();
-  const full_name = initials.replace(/./g, "$&.");
+  // A code minted on /admin/codes has no name until admin fills it in; still show who invited.
+  const code = Number(row?.partner_code) || null;
+  const full_name = initials.replace(/./g, "$&.") || (code ? `partner #${code}` : "");
   if (!routing_slug) return null;
 
   return { routing_slug, full_name };
