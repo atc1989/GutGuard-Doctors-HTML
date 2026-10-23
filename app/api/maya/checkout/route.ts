@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { loadCatalog, recomputeSubtotal, type Product, type Promo } from "@/lib/catalog";
 import { createMayaCheckout, isMayaConfigured, toMayaAmount } from "@/lib/maya";
+import { verifyOrderAddress } from "@/lib/order-address";
 import { expectedShippingFee } from "@/lib/shipping";
 import { getSupabaseAdmin, isSupabaseAdminConfigured } from "@/lib/supabase-admin";
 import type { ShopOrderItem } from "@/lib/api";
@@ -22,6 +23,9 @@ type OrderRow = {
   city: string;
   province: string;
   province_code: string | null;
+  city_municipality_code: string | null;
+  barangay: string | null;
+  barangay_code: string | null;
   zip: string;
   shipping_fee: number | string;
   subtotal: number | string;
@@ -49,7 +53,7 @@ export async function POST(request: Request) {
   const { data, error } = await supabase
     .from("shop_orders")
     .select(
-      "id, order_code, status, payment_status, customer_name, first_name, last_name, email, mobile, address, city, province, province_code, zip, shipping_fee, subtotal, total_amount, items, payment_attempts, created_at",
+      "id, order_code, status, payment_status, customer_name, first_name, last_name, email, mobile, address, city, province, province_code, city_municipality_code, barangay, barangay_code, zip, shipping_fee, subtotal, total_amount, items, payment_attempts, created_at",
     )
     .eq("id", orderId)
     .single();
@@ -66,6 +70,16 @@ export async function POST(request: Request) {
 
   // Same reads and fallbacks as the shop, so both agree on every price.
   const { products, promos } = await loadCatalog(supabase);
+
+  // Shipping is priced from the province code, so the address must be that real place.
+  const addressProblem = await verifyOrderAddress(order);
+  if (addressProblem) {
+    console.warn(`Order ${order.order_code} address rejected: ${addressProblem}`);
+    return NextResponse.json(
+      { error: "Your delivery address could not be verified. Please re-enter it and place the order again." },
+      { status: 409 },
+    );
+  }
 
   const amounts = verifyAmounts(order, products, promos);
   if (!amounts) {
