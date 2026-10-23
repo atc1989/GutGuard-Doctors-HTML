@@ -9397,3 +9397,18 @@
     align-items: stretch;
   }
 }
+
+/* Floating Messenger link on public pages. Sits under modals (z 60+). */
+.messenger-head {
+  position: fixed;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #0866ff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
