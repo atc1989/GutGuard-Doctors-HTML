@@ -50,6 +50,7 @@ Verify locally first: `bash supabase/release-reconciliation.test.sh` (needs Dock
 
 | Migration | Production status |
 |---|---|
+| `20261025000000_partner_invitation_can_refer.sql` | **Not applied yet.** Adds `can_refer` to `doctors.get_partner_invitation` (the shop uses it to show "Become a partner" instead of Log in). Additive; both deployments read it, and the code shows Log in until it runs. |
 | `20261024010000_sandbox_partner_dashboard_code.sql` | `sandbox` schema only (the QA mirror): adds `partner_code` to `sandbox.partner_dashboard` so the sandbox share page shows `/s/` and `/j/` links. Nothing in `doctors`; harmless to run any time. |
 | `20261024000000_partner_codes.sql` | **Already applied** on 2026-10-24 by atc1989 — do not re-run. Adds `partner_code` (sequential, 10001+) and the `/s/<code>`, `/j/<code>` and `/admin/codes` functions. Additive; the live code ignores it. |
 
