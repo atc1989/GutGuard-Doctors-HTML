@@ -506,15 +506,16 @@ export default function Shoplet() {
             <Link href="/physicians">For Physicians</Link>
           </div>
           <div className="shop-site-actions">
-            {/* In a partner's shop, "Become a partner" takes Log in's place - unless that partner's
-                referral QR is locked. The register page picks the referrer up from the shop cookie. */}
+            {/* "Become a partner" takes Log in's place in the header - except in the shop of a partner
+                whose referral QR is locked. Log in stays in the mobile menu. The register page picks
+                the referrer up from the shop cookie. */}
             {!referrer || referrer.canRefer ? (
               <Link className="shop-site-join" href="/physicians/register" aria-label="Become a partner">
                 <span className="shop-site-join-full">Become a partner</span>
                 <span className="shop-site-join-short">Join</span>
               </Link>
             ) : null}
-            {!referrer || !referrer.canRefer ? <Link className="shop-site-login" href="/partner">Log in</Link> : null}
+            {referrer && !referrer.canRefer ? <Link className="shop-site-login" href="/partner">Log in</Link> : null}
             <button className="shop-site-basket" type="button" onClick={() => setDrawerOpen(true)}>
               Basket ({basketCount})
             </button>
