@@ -426,6 +426,9 @@ export type MainStoreReports = {
 export type PartnerInvitation = {
   routing_slug: string;
   full_name: string;
+  partner_code: number | null;
+  /** False for an affiliate whose referral QR is locked, and while can_refer is not deployed. */
+  can_refer: boolean;
 };
 
 export type TikTokOrderTimeMode = "create_time" | "update_time";
@@ -648,7 +651,7 @@ export async function getPartnerInvitation(slug: string): Promise<PartnerInvitat
   const full_name = code ? `partner #${code}` : initials.replace(/./g, "$&.");
   if (!routing_slug) return null;
 
-  return { routing_slug, full_name };
+  return { routing_slug, full_name, partner_code: code, can_refer: row?.can_refer === true };
 }
 
 export async function sendPartnerReferralNotification(registrationId: string) {
