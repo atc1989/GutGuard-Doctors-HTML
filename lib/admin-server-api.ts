@@ -304,7 +304,7 @@ export async function serverAdminTransferStore(
   partnerId: string,
   newUplineId: string,
   note?: string,
-): Promise<{ success: boolean; main_store_id: string; points_moved: number }> {
+): Promise<{ success: boolean; main_store_id: string; points_moved: number; sandbox_points_moved: number }> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
 
   const { data, error } = await supabase.rpc("admin_transfer_store", {
@@ -315,7 +315,7 @@ export async function serverAdminTransferStore(
   });
 
   if (error) throw error;
-  return data as { success: boolean; main_store_id: string; points_moved: number };
+  return data as { success: boolean; main_store_id: string; points_moved: number; sandbox_points_moved: number };
 }
 
 // Orders and points live per schema, so these go through supabaseShop like the order RPCs.
