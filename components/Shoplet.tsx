@@ -7,7 +7,7 @@ import { Menu, X } from "lucide-react";
 import { ArrowRightIcon, CheckIcon } from "@/components/Icons";
 import { Logo } from "@/components/GutguardSite";
 import { CompareSheet, FullCompare } from "@/components/ShopCompare";
-import { createShopOrder, loadShopCatalog, sendShopOrderEmail, startMayaCheckout, type ShopOrderItem } from "@/lib/api";
+import { createShopOrder, getPartnerInvitation, loadShopCatalog, sendShopOrderEmail, startMayaCheckout, type ShopOrderItem } from "@/lib/api";
 import {
   DEFAULT_PRODUCTS,
   formatPromoDay,
@@ -136,6 +136,9 @@ export default function Shoplet() {
   const [isLoadingLocalities, setIsLoadingLocalities] = useState(false);
   const [isLoadingBarangays, setIsLoadingBarangays] = useState(false);
   const [referralShopName, setReferralShopName] = useState("");
+  // Set when the visitor came through a partner's shop link: whose shop this is, and whether
+  // that partner may recruit (locked affiliates get Log in instead of "Become a partner").
+  const [referrer, setReferrer] = useState<{ code: number | null; canRefer: boolean } | null>(null);
   // Set by /r/<slug> for partners whose link may not sell the Full Protocol.
   const [trialOnly, setTrialOnly] = useState(false);
   // null until loaded; the fallback list until then. See loadCatalog for failure handling.
@@ -205,6 +208,16 @@ export default function Shoplet() {
   useEffect(() => {
     setReferralShopName(readReferralShopName());
     setTrialOnly(new URLSearchParams(window.location.search).has("trial"));
+    const referralSlug = readReferralSlug();
+    if (referralSlug) {
+      getPartnerInvitation(referralSlug)
+        .then((invite) => {
+          if (invite) setReferrer({ code: invite.partner_code, canRefer: invite.can_refer });
+        })
+        .catch(() => {
+          // Unknown or unreachable referrer: the plain shop header.
+        });
+    }
   }, []);
 
   useEffect(() => {
@@ -493,7 +506,15 @@ export default function Shoplet() {
             <Link href="/physicians">For Physicians</Link>
           </div>
           <div className="shop-site-actions">
-            <Link className="shop-site-login" href="/partner">Log in</Link>
+            {/* In a partner's shop, "Become a partner" takes Log in's place - unless that partner's
+                referral QR is locked. The register page picks the referrer up from the shop cookie. */}
+            {!referrer || referrer.canRefer ? (
+              <Link className="shop-site-join" href="/physicians/register" aria-label="Become a partner">
+                <span className="shop-site-join-full">Become a partner</span>
+                <span className="shop-site-join-short">Join</span>
+              </Link>
+            ) : null}
+            {!referrer || !referrer.canRefer ? <Link className="shop-site-login" href="/partner">Log in</Link> : null}
             <button className="shop-site-basket" type="button" onClick={() => setDrawerOpen(true)}>
               Basket ({basketCount})
             </button>
@@ -532,6 +553,9 @@ export default function Shoplet() {
         <Link href="/testimonials" onClick={() => setMenuOpen(false)}>Stories</Link>
         <Link href="/shop" aria-current="page" onClick={() => setMenuOpen(false)}>Shop</Link>
         <Link href="/physicians" onClick={() => setMenuOpen(false)}>For Physicians</Link>
+        {!referrer || referrer.canRefer ? (
+          <Link className="shop-site-menu-join" href="/physicians/register" onClick={() => setMenuOpen(false)}>Become a partner →</Link>
+        ) : null}
         <Link className="shop-site-menu-login" href="/partner" onClick={() => setMenuOpen(false)}>Already a partner? Log in →</Link>
       </div>
       <section className="shop-hero">
@@ -569,6 +593,7 @@ export default function Shoplet() {
         <div className="shop-buy-inner">
           <div className="shop-section-head">
             <div>
+              {referrer?.code ? <p className="shop-referral-of">Shop of #{referrer.code}</p> : null}
               <p className="shop-kicker">Choose your order</p>
               <h2>{protocolOff ? "Start small - try it first." : "Start small or begin the protocol."}</h2>
             </div>

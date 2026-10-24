@@ -227,6 +227,20 @@ export async function serverGetDoctorRegistrations(adminPassword: string): Promi
   return ((data ?? []) as AdminDoctorRegistration[]).map(normalizeAdminDoctorRegistration);
 }
 
+/** A blank partner with just a code; admin fills the details (and email, to sign in) later. */
+export async function serverAdminCreatePendingPartner(
+  adminPassword: string,
+): Promise<{ id: string; partner_code: number; routing_slug: string }> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.rpc("admin_create_pending_partner", {
+    p_admin_password: adminPassword,
+  });
+
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] : data;
+}
+
 export async function serverUpdateDoctorRegistration(
   adminPassword: string,
   doctor: AdminDoctorRegistrationUpdate,
@@ -283,6 +297,58 @@ export async function serverAdminUpgradeToMainStore(
 
   if (error) throw error;
   return data as { success: boolean; descendants_moved: number };
+}
+
+export async function serverAdminTransferStore(
+  adminPassword: string,
+  partnerId: string,
+  newUplineId: string,
+  note?: string,
+): Promise<{ success: boolean; main_store_id: string; points_moved: number; sandbox_points_moved: number }> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.rpc("admin_transfer_store", {
+    p_admin_password: adminPassword,
+    p_partner_id: partnerId,
+    p_new_upline_id: newUplineId,
+    p_note: note || null,
+  });
+
+  if (error) throw error;
+  return data as { success: boolean; main_store_id: string; points_moved: number; sandbox_points_moved: number };
+}
+
+// Orders and points live per schema, so these go through supabaseShop like the order RPCs.
+export async function serverAdminListUnclaimedPassup(
+  adminPassword: string,
+): Promise<Array<{ store_id: string; orders: number; points: number }>> {
+  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabaseShop.rpc("admin_list_unclaimed_passup", {
+    p_admin_password: adminPassword,
+  });
+
+  if (error) throw error;
+  return (data ?? []) as Array<{ store_id: string; orders: number; points: number }>;
+}
+
+export async function serverAdminAssignUnclaimedPassup(
+  adminPassword: string,
+  storeId: string,
+  partnerId: string,
+  note?: string,
+): Promise<{ success: boolean; orders: number; points: number }> {
+  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabaseShop.rpc("admin_assign_unclaimed_passup", {
+    p_admin_password: adminPassword,
+    p_store_id: storeId,
+    p_partner_id: partnerId,
+    p_note: note || null,
+  });
+
+  if (error) throw error;
+  return data as { success: boolean; orders: number; points: number };
 }
 
 export async function serverAdminToggleReferralQr(

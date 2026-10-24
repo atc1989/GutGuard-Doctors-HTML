@@ -2,14 +2,23 @@
 
 import { ChangeEvent, FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { QRCodeSVG } from "qrcode.react";
+import { QRCodeCanvas, QRCodeSVG } from "qrcode.react";
 import AdminOrders from "@/components/AdminOrders";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { DownloadIcon } from "@/components/Icons";
 import { NAME_PREFIXES } from "@/lib/constants";
-import { partnerLinkKey } from "@/lib/referral";
+import { getPartnerQrLink } from "@/components/partner/shared";
 import { formatPrefixedName } from "@/lib/validation";
-import { adminUpgradeToMainStore, adminToggleReferralQr, adminPromotePartner } from "@/lib/api";
+import { isSandboxShop } from "@/lib/supabase";
+import {
+  adminUpgradeToMainStore,
+  adminToggleReferralQr,
+  adminPromotePartner,
+  adminTransferStore,
+  adminListUnclaimedPassup,
+  adminAssignUnclaimedPassup,
+  type UnclaimedPassup,
+} from "@/lib/api";
 
 type AdminWheelPrize = {
   id?: string;
@@ -49,6 +58,7 @@ type AdminDoctorRegistration = {
   prize_label?: string | null;
   prize_claimed_at?: string | null;
   shop_show_protocol?: boolean;
+  partner_code?: number | null;
 };
 
 type NewsletterSendHistory = {
@@ -156,7 +166,6 @@ const PUBLIC_SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://partner
   /\/$/,
   "",
 );
-const SHOP_ORIGIN = (process.env.NEXT_PUBLIC_SHOP_URL ?? "https://shop.gutguard.ph").replace(/\/$/, "");
 const PLACEHOLDER_TOKENS = [
   "{{doctor_name}}",
   "{{name_prefix}}",
@@ -221,20 +230,9 @@ function getPrizeOdds(prize: AdminWheelPrize, activeWeightTotal: number) {
 
 type DoctorQrMode = "shop" | "referral" | "profile";
 
-const PUBLIC_MARKETING_ORIGIN = (process.env.NEXT_PUBLIC_MARKETING_URL ?? "https://www.gutguard.ph").replace(/\/$/, "");
-
-/**
- * Keyed by partnerLinkKey, not routing slug: the slug is the partner's name, and these URLs
- * are printed on QR posters and shown to customers. Slug links still resolve server-side.
- */
+/** Same links the partner's own share page prints, so posters match across views. */
 function getDoctorQrUrl(doctor: AdminDoctorRegistration, mode: DoctorQrMode) {
-  if (!doctor.id) return "";
-
-  const key = partnerLinkKey(doctor.id);
-  if (mode === "profile") return `${PUBLIC_SITE_ORIGIN}/dr/${key}`;
-  if (mode === "referral") return `${PUBLIC_MARKETING_ORIGIN}/${key.toUpperCase()}`;
-  if (doctor.routing_slug === "dr-grace-saraza") return `${SHOP_ORIGIN}/beehive`;
-  return `${SHOP_ORIGIN}/r/${key}`;
+  return doctor.id ? getPartnerQrLink(doctor, mode) : "";
 }
 
 function getDoctorQrElementId(doctorId: string, mode: DoctorQrMode) {
@@ -279,6 +277,11 @@ function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
   const [upgradingDoctor, setUpgradingDoctor] = useState<AdminDoctorRegistration | null>(null);
   const [upgradeNote, setUpgradeNote] = useState("");
   const [isUpgrading, setIsUpgrading] = useState(false);
+  const [unclaimedPassup, setUnclaimedPassup] = useState<Map<string, UnclaimedPassup>>(new Map());
+  const [pickTarget, setPickTarget] = useState<{ doctor: AdminDoctorRegistration; mode: "transfer" | "assign" } | null>(null);
+  const [pickPartnerId, setPickPartnerId] = useState("");
+  const [pickNote, setPickNote] = useState("");
+  const [isPicking, setIsPicking] = useState(false);
   const [togglingQrDoctorId, setTogglingQrDoctorId] = useState<string | null>(null);
   const [promotingDoctorId, setPromotingDoctorId] = useState<string | null>(null);
   const [doctorPage, setDoctorPage] = useState(1);
@@ -392,6 +395,8 @@ function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
         isReferred ? "referred" : "direct",
         doctor.prize_label ?? "",
         doctor.store_type ?? "",
+        doctor.partner_code ? String(doctor.partner_code) : "",
+        doctor.email ? "" : "pending",
       ]
         .join(" ")
         .toLowerCase()
@@ -570,6 +575,13 @@ function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Kept out of loadAdminData's Promise.all so the page still loads before the RPC is deployed.
+  function loadUnclaimedPassup() {
+    adminListUnclaimedPassup()
+      .then((stores) => setUnclaimedPassup(new Map(stores.map((store) => [store.store_id, store]))))
+      .catch((caught) => console.warn("Unclaimed pass-up points unavailable:", caught));
+  }
+
   async function loadAdminData() {
     const api = await loadWheelApi();
     if (!api.getWheelPrizes) {
@@ -596,6 +608,7 @@ function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
     setDoctorPage(1);
     setNewsletterPage(1);
     setSmsPage(1);
+    loadUnclaimedPassup();
   }
 
   async function refreshDoctors() {
@@ -610,6 +623,7 @@ function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
       }
 
       setDoctors(await api.getDoctorRegistrations());
+      loadUnclaimedPassup();
       setDoctorPage(1);
       setNotice("Doctor registrations refreshed.");
     } catch (caught) {
@@ -1169,33 +1183,72 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
     }
   }
 
+  function openPartnerPicker(doctor: AdminDoctorRegistration, mode: "transfer" | "assign") {
+    setPickTarget({ doctor, mode });
+    setPickPartnerId("");
+    setPickNote("");
+  }
+
+  async function handleConfirmPick() {
+    if (!pickTarget || !pickPartnerId) return;
+    const { doctor, mode } = pickTarget;
+    const partner = doctors.find((d) => d.id === pickPartnerId);
+    const partnerName = partner ? formatPrefixedName(partner.name_prefix, partner.full_name) : "the partner";
+    setIsPicking(true);
+    setError(null);
+    setNotice(null);
+    try {
+      if (mode === "transfer") {
+        const res = await adminTransferStore(doctor.id, pickPartnerId, pickNote);
+        setDoctors((current) =>
+          current.map((d) =>
+            d.id === doctor.id
+              ? {
+                  ...d,
+                  referred_by_partner_id: pickPartnerId,
+                  referrer_name: partner?.full_name ?? null,
+                  referrer_prefix: partner?.name_prefix ?? null,
+                  referrer_slug: partner?.routing_slug ?? null,
+                  main_store_id: res.main_store_id,
+                }
+              : d,
+          ),
+        );
+        setNotice(`Moved ${doctor.full_name} to ${partnerName}; ${isSandboxShop ? res.sandbox_points_moved : res.points_moved} pass-up points transferred.`);
+      } else {
+        const res = await adminAssignUnclaimedPassup(doctor.id, pickPartnerId, pickNote);
+        setUnclaimedPassup((current) => {
+          const next = new Map(current);
+          next.delete(doctor.id);
+          return next;
+        });
+        setNotice(`Gave ${res.points} pass-up points from ${doctor.full_name} (${res.orders} orders) to ${partnerName}.`);
+      }
+      setPickTarget(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save.");
+    } finally {
+      setIsPicking(false);
+    }
+  }
+
   function downloadDoctorQr(doctor: AdminDoctorRegistration, qrUrl: string, mode: DoctorQrMode) {
     setError(null);
     setNotice(null);
 
-    const svg = document.getElementById(getDoctorQrElementId(doctor.id, mode));
-    if (!(svg instanceof SVGSVGElement)) {
+    const canvas = document.getElementById(`${getDoctorQrElementId(doctor.id, mode)}-png`);
+    if (!(canvas instanceof HTMLCanvasElement)) {
       setError("Unable to find the QR code for download.");
       return;
     }
 
-    const clone = svg.cloneNode(true) as SVGSVGElement;
-    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-    clone.setAttribute("width", "512");
-    clone.setAttribute("height", "512");
-
-    const blob = new Blob([new XMLSerializer().serializeToString(clone)], {
-      type: "image/svg+xml;charset=utf-8",
-    });
-    const downloadUrl = URL.createObjectURL(blob);
     const link = document.createElement("a");
 
-    link.href = downloadUrl;
-    link.download = `${doctor.routing_slug || slugifyDownloadName(doctor.full_name)}-${mode}-qr.svg`;
+    link.href = canvas.toDataURL("image/png");
+    link.download = `${doctor.routing_slug || slugifyDownloadName(doctor.full_name)}-${mode}-qr.png`;
     document.body.appendChild(link);
     link.click();
     link.remove();
-    URL.revokeObjectURL(downloadUrl);
     setNotice(`QR downloaded for ${doctor.full_name || qrUrl}.`);
   }
 
@@ -1713,6 +1766,27 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                       <span>@{doctor.tiktok_username || "no-handle"}</span>
 
                       <div style={{ margin: "4px 0 8px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                        {doctor.partner_code ? (
+                          <span style={{ fontSize: "12px", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                            #{doctor.partner_code}
+                          </span>
+                        ) : null}
+                        {/* No email = can't sign in yet: a code minted on /admin/codes, waiting for details. */}
+                        {doctor.email ? null : (
+                          <span style={{
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.04em",
+                            padding: "2px 8px",
+                            borderRadius: "4px",
+                            background: "#fff7ed",
+                            color: "#9a3412",
+                            border: "1px solid #fed7aa",
+                          }}>
+                            Pending
+                          </span>
+                        )}
                         <span style={{
                           fontSize: "11px",
                           fontWeight: 700,
@@ -1729,6 +1803,11 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                         {doctor.store_type === "affiliate" && (
                           <span style={{ fontSize: "11px", color: doctor.referral_qr_enabled ? "#16a34a" : "#64748b" }}>
                             Referral QR: <strong>{doctor.referral_qr_enabled ? "Active" : "Locked"}</strong>
+                          </span>
+                        )}
+                        {unclaimedPassup.has(doctor.id) && (
+                          <span style={{ fontSize: "11px", color: "#b45309" }}>
+                            <strong>{unclaimedPassup.get(doctor.id)!.points}</strong> unclaimed pass-up pts ({unclaimedPassup.get(doctor.id)!.orders} orders)
                           </span>
                         )}
                       </div>
@@ -1780,6 +1859,13 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                             className="admin-doctor-qr-code"
                             value={qrUrl}
                             size={108}
+                            marginSize={2}
+                          />
+                          <QRCodeCanvas
+                            id={`${getDoctorQrElementId(doctor.id, qrMode)}-png`}
+                            hidden
+                            value={qrUrl}
+                            size={1024}
                             marginSize={2}
                           />
                           <div>
@@ -1912,7 +1998,16 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                           >
                             {promotingDoctorId === doctor.id ? "Promoting…" : "Promote to Lifestyle"}
                           </button>
+                          <button type="button" onClick={() => openPartnerPicker(doctor, "transfer")}>
+                            Transfer
+                          </button>
                         </>
+                      )}
+
+                      {unclaimedPassup.has(doctor.id) && (
+                        <button type="button" onClick={() => openPartnerPicker(doctor, "assign")}>
+                          Give points
+                        </button>
                       )}
                     </div>
                   </article>
@@ -1968,6 +2063,89 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                     disabled={isUpgrading}
                   >
                     {isUpgrading ? "Upgrading…" : "Confirm Upgrade & Breakaway"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {pickTarget && (
+            <div className="admin-wheel-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="pick-partner-title" style={{
+              position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
+              background: "rgba(0, 0, 0, 0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999
+            }}>
+              <div style={{ background: "#ffffff", padding: "24px", borderRadius: "12px", maxWidth: "480px", width: "90%", boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)" }}>
+                <h3 id="pick-partner-title" style={{ margin: "0 0 8px", fontSize: "18px", fontWeight: 700 }}>
+                  {pickTarget.mode === "transfer" ? "Transfer Affiliate Store" : "Give Unclaimed Pass-up Points"}
+                </h3>
+                <p style={{ fontSize: "14px", lineHeight: 1.5, color: "#334155", margin: "8px 0" }}>
+                  {pickTarget.mode === "transfer" ? (
+                    <>
+                      <strong>{pickTarget.doctor.full_name}</strong> is currently referred by{" "}
+                      <strong>
+                        {pickTarget.doctor.referrer_name
+                          ? formatPrefixedName(pickTarget.doctor.referrer_prefix, pickTarget.doctor.referrer_name)
+                          : "no one (direct registration)"}
+                      </strong>
+                      .
+                    </>
+                  ) : (
+                    <>
+                      <strong>{unclaimedPassup.get(pickTarget.doctor.id)?.points ?? 0}</strong> pass-up points from{" "}
+                      {unclaimedPassup.get(pickTarget.doctor.id)?.orders ?? 0} orders by <strong>{pickTarget.doctor.full_name}</strong> went to no one because the store had no upline when they were earned.
+                    </>
+                  )}
+                </p>
+                <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "8px", padding: "12px", fontSize: "13px", color: "#92400e", marginBottom: "16px" }}>
+                  {pickTarget.mode === "transfer"
+                    ? "The new upline gets this store's future pass-up points, and the pass-up points the old upline already earned from it move to the new upline. The store moves under the new upline's Main Store."
+                    : pickTarget.doctor.referred_by_partner_id
+                      ? "The points go to the partner you pick. The store's upline does not change; its future sales already pay that upline."
+                      : "The points go to the partner you pick. The store's upline does not change, so its future sales stay unclaimed."}
+                </div>
+                <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "12px" }}>
+                  {pickTarget.mode === "transfer" ? "New upline" : "Give to"}
+                  <select
+                    value={pickPartnerId}
+                    onChange={(e) => setPickPartnerId(e.target.value)}
+                    style={{ width: "100%", padding: "8px", marginTop: "4px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
+                  >
+                    <option value="">Choose a partner…</option>
+                    {doctors
+                      .filter(
+                        (d) =>
+                          d.id !== pickTarget.doctor.id &&
+                          (pickTarget.mode === "assign" || d.id !== pickTarget.doctor.referred_by_partner_id),
+                      )
+                      .sort((a, b) => a.full_name.localeCompare(b.full_name))
+                      .map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {formatPrefixedName(d.name_prefix, d.full_name)}
+                          {d.partner_code ? ` · #${d.partner_code}` : ""}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "4px" }}>
+                  Admin Note (Optional)
+                  <textarea
+                    value={pickNote}
+                    onChange={(e) => setPickNote(e.target.value)}
+                    placeholder="Reason..."
+                    style={{ width: "100%", height: "60px", padding: "8px", marginTop: "4px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px", boxSizing: "border-box" }}
+                  />
+                </label>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "16px" }}>
+                  <button type="button" onClick={() => setPickTarget(null)} disabled={isPicking} style={{ padding: "8px 16px", borderRadius: "6px", border: "1px solid #cbd5e1", background: "#f8fafc" }}>
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    style={{ background: "#d97706", color: "#ffffff", fontWeight: 700, border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer" }}
+                    onClick={handleConfirmPick}
+                    disabled={isPicking || !pickPartnerId}
+                  >
+                    {isPicking ? "Saving…" : pickTarget.mode === "transfer" ? "Confirm Transfer" : "Give Points"}
                   </button>
                 </div>
               </div>

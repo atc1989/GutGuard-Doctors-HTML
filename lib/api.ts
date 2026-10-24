@@ -66,6 +66,8 @@ export type AdminDoctorRegistration = {
   prize_claimed_at?: string | null;
   /** Whether this partner's shared shop link also sells the Full Protocol. */
   shop_show_protocol?: boolean;
+  /** Sequential public code: www.gutguard.ph/s/<code> and /j/<code>. */
+  partner_code?: number | null;
 };
 
 export type AdminDoctorRegistrationUpdate = {
@@ -300,6 +302,7 @@ export type PartnerDashboardQuery = {
 export type PartnerDashboard = {
   partner: {
     id: string;
+    partner_code?: number | null;
     full_name: string;
     routing_slug: string;
     store_type?: StoreType;
@@ -423,6 +426,9 @@ export type MainStoreReports = {
 export type PartnerInvitation = {
   routing_slug: string;
   full_name: string;
+  partner_code: number | null;
+  /** False for an affiliate whose referral QR is locked, and while can_refer is not deployed. */
+  can_refer: boolean;
 };
 
 export type TikTokOrderTimeMode = "create_time" | "update_time";
@@ -634,17 +640,18 @@ export async function getPartnerInvitation(slug: string): Promise<PartnerInvitat
 
   const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | null;
   const routing_slug = String(row?.routing_slug ?? "").trim();
-  // The registration page shows the referrer to whoever scanned their code: initials only
-  // ("Frederick D. Francisco" -> "F.D.F."), not their full name.
+  // The registration page shows the referrer to whoever scanned their code by partner code
+  // ("partner #10331"), never their name. Initials only if the code is somehow missing.
+  const code = Number(row?.partner_code) || null;
   const initials = String(row?.full_name ?? "")
     .split(/\s+/)
     .map((word) => word.match(/\p{L}/u)?.[0] ?? "")
     .join("")
     .toUpperCase();
-  const full_name = initials.replace(/./g, "$&.");
+  const full_name = code ? `partner #${code}` : initials.replace(/./g, "$&.");
   if (!routing_slug) return null;
 
-  return { routing_slug, full_name };
+  return { routing_slug, full_name, partner_code: code, can_refer: row?.can_refer === true };
 }
 
 export async function sendPartnerReferralNotification(registrationId: string) {
@@ -1140,6 +1147,7 @@ export async function getPartnerDashboard(query: PartnerDashboardQuery = {}): Pr
   return {
     partner: {
       id: String(partner.id ?? ""),
+      partner_code: Number(partner.partner_code) || null,
       full_name: String(partner.full_name ?? ""),
       routing_slug: String(partner.routing_slug ?? ""),
       store_type: (partner.store_type ?? "affiliate") as StoreType,
@@ -1335,6 +1343,49 @@ export async function adminUpgradeToMainStore(partnerId: string, note?: string):
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error || "Failed to upgrade partner to Main Store.");
+  }
+  return res.json();
+}
+
+export async function adminTransferStore(
+  partnerId: string,
+  newUplineId: string,
+  note?: string,
+): Promise<{ success: boolean; main_store_id: string; points_moved: number; sandbox_points_moved: number }> {
+  const res = await fetch("/api/admin/doctors/transfer", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ partnerId, newUplineId, note }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to transfer store.");
+  }
+  return res.json();
+}
+
+export type UnclaimedPassup = { store_id: string; orders: number; points: number };
+
+export async function adminListUnclaimedPassup(): Promise<UnclaimedPassup[]> {
+  const res = await fetch("/api/admin/doctors/unclaimed-points");
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Failed to load unclaimed points.");
+  return data.stores ?? [];
+}
+
+export async function adminAssignUnclaimedPassup(
+  storeId: string,
+  partnerId: string,
+  note?: string,
+): Promise<{ success: boolean; orders: number; points: number }> {
+  const res = await fetch("/api/admin/doctors/unclaimed-points", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ storeId, partnerId, note }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to give unclaimed points.");
   }
   return res.json();
 }
