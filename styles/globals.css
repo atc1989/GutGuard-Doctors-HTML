@@ -3364,6 +3364,41 @@
   font-weight: 800;
 }
 
+.shop-pay-methods {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 16px 0 0;
+  border: 0;
+  padding: 0;
+}
+
+.shop-pay-methods legend {
+  margin-bottom: 8px;
+  color: var(--ink-3);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.shop-pay-methods label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  padding: 11px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.shop-pay-methods label.active {
+  border-color: var(--ink);
+}
+
 .shop-payment-note {
   margin-top: 16px;
   border: 1px solid var(--rule);
