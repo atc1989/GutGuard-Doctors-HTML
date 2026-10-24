@@ -23,6 +23,7 @@ type RequestPayload = {
 type ShopOrder = {
   id: string;
   order_code: string;
+  payment_method: string | null;
   customer_name: string | null;
   email: string | null;
   mobile: string | null;
@@ -65,7 +66,7 @@ serveWithCors(async (req) => {
     const { data, error } = await supabase
       .schema(dbSchema)
       .from("shop_orders")
-      .select("id, order_code, customer_name, email, mobile, address, barangay, city, province, zip, subtotal, shipping_fee, total_amount, items, created_at")
+      .select("id, order_code, payment_method, customer_name, email, mobile, address, barangay, city, province, zip, subtotal, shipping_fee, total_amount, items, created_at")
       .eq("id", orderId)
       .single();
 
@@ -169,6 +170,8 @@ async function recordSendAttempt(
 
 function renderEmail(order: ShopOrder, kind: EmailKind, dbSchema: string) {
   const isPaid = kind === "paid";
+  // Consignment/cash are settled offline and approved by an admin - no Maya link to chase.
+  const isOffline = Boolean(order.payment_method) && order.payment_method !== "maya";
   const siteUrl = dbSchema === "sandbox" ? SANDBOX_SITE_URL : PROD_SITE_URL;
   const orderUrl = `${siteUrl}/shop/order/${encodeURIComponent(order.order_code)}`;
   const items = Array.isArray(order.items) ? order.items : [];
@@ -197,9 +200,11 @@ function renderEmail(order: ShopOrder, kind: EmailKind, dbSchema: string) {
           <p style="margin:0 0 22px;color:#3A3A48;font-size:16px;line-height:1.55;">${
             isPaid
               ? "Our admin team will call you to confirm delivery details before we ship."
-              : "Complete payment on Maya to reserve your stock - card, Maya wallet, QRPh, or online banking. Your order page below always has an up-to-date payment link."
+              : isOffline
+                ? "Our team will contact you using the details on your order to settle payment. Your order is confirmed once payment is approved."
+                : "Complete payment on Maya to reserve your stock - card, Maya wallet, QRPh, or online banking. Your order page below always has an up-to-date payment link."
           }</p>
-          <a href="${orderUrl}" style="display:inline-block;background:#0608A9;color:#F4F1EA;text-decoration:none;padding:14px 18px;font-weight:800;">${isPaid ? "View your order" : "View order and pay"}</a>
+          <a href="${orderUrl}" style="display:inline-block;background:#0608A9;color:#F4F1EA;text-decoration:none;padding:14px 18px;font-weight:800;">${isPaid || isOffline ? "View your order" : "View order and pay"}</a>
           <table style="width:100%;border-collapse:collapse;margin-top:26px;font-size:14px;">
             <thead>
               <tr>
@@ -219,7 +224,9 @@ function renderEmail(order: ShopOrder, kind: EmailKind, dbSchema: string) {
           <p style="margin:26px 0 0;color:#6B6B7A;font-size:13px;line-height:1.5;">${
             isPaid
               ? "Keep this email for your records. Reply here if anything about the order looks wrong."
-              : "Maya payment sessions expire after an hour, so always start payment from your order page rather than an old link."
+              : isOffline
+                ? "Keep this email for your reference. Reply here if anything about the order looks wrong."
+                : "Maya payment sessions expire after an hour, so always start payment from your order page rather than an old link."
           }</p>
         </div>
       </div>

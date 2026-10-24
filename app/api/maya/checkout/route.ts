@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { loadCatalog, recomputeSubtotal, type Product, type Promo } from "@/lib/catalog";
+import { loadCatalog, verifyOrderAmounts } from "@/lib/catalog";
 import { createMayaCheckout, isMayaConfigured, toMayaAmount } from "@/lib/maya";
 import { verifyOrderAddress } from "@/lib/order-address";
 import { expectedShippingFee } from "@/lib/shipping";
@@ -14,6 +14,7 @@ type OrderRow = {
   order_code: string;
   status: string;
   payment_status: string;
+  payment_method: string;
   customer_name: string;
   first_name: string | null;
   last_name: string | null;
@@ -53,7 +54,7 @@ export async function POST(request: Request) {
   const { data, error } = await supabase
     .from("shop_orders")
     .select(
-      "id, order_code, status, payment_status, customer_name, first_name, last_name, email, mobile, address, city, province, province_code, city_municipality_code, barangay, barangay_code, zip, shipping_fee, subtotal, total_amount, items, payment_attempts, created_at",
+      "id, order_code, status, payment_status, payment_method, customer_name, first_name, last_name, email, mobile, address, city, province, province_code, city_municipality_code, barangay, barangay_code, zip, shipping_fee, subtotal, total_amount, items, payment_attempts, created_at",
     )
     .eq("id", orderId)
     .single();
@@ -66,6 +67,11 @@ export async function POST(request: Request) {
   // Already settled - send them to the receipt instead of charging twice.
   if (order.payment_status === "paid") {
     return NextResponse.json({ alreadyPaid: true, orderUrl });
+  }
+
+  // Consignment/cash orders are settled offline and approved by an admin - never charge them on Maya.
+  if (order.payment_method !== "maya") {
+    return NextResponse.json({ error: "This order is not paid through Maya." }, { status: 409 });
   }
 
   // Same reads and fallbacks as the shop, so both agree on every price.
@@ -81,7 +87,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const amounts = verifyAmounts(order, products, promos);
+  const shippingFee = expectedShippingFee(order.items, { provinceCode: order.province_code });
+  const amounts = verifyOrderAmounts(order, shippingFee, products, promos);
   if (!amounts) {
     return NextResponse.json(
       { error: "Order totals could not be verified. Please rebuild your basket or contact support." },
@@ -151,28 +158,6 @@ export async function POST(request: Request) {
     const message = caught instanceof Error ? caught.message : "Maya checkout could not be started.";
     return NextResponse.json({ error: message }, { status: 502 });
   }
-}
-
-/**
- * The browser wrote subtotal/shipping/total into the row, so none of it is trusted here.
- * Line prices are re-derived from the server catalog and the shipping fee is re-quoted
- * from the province code and those checked items before any amount is sent to Maya.
- */
-function verifyAmounts(order: OrderRow, products: Product[], promos: Promo[]) {
-  // Order time or now: a promo that ended between placing and paying still honours the order.
-  const subtotal = recomputeSubtotal(order.items, products, promos, [new Date(order.created_at), new Date()]);
-  if (subtotal === null) return null;
-
-  const shippingFee = expectedShippingFee(order.items, { provinceCode: order.province_code });
-  if (shippingFee === null || Number(order.shipping_fee) !== shippingFee) return null;
-
-  const total = subtotal + shippingFee;
-  if (total <= 0) return null;
-
-  // Stored total must agree with the recomputed one; a mismatch means tampering or a stale row.
-  if (Math.round(Number(order.total_amount) * 100) !== Math.round(total * 100)) return null;
-
-  return { subtotal, shippingFee, total };
 }
 
 function buildAddress(order: OrderRow) {
