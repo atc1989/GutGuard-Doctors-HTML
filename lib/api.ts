@@ -1351,7 +1351,7 @@ export async function adminTransferStore(
   partnerId: string,
   newUplineId: string,
   note?: string,
-): Promise<{ success: boolean; main_store_id: string; points_moved: number }> {
+): Promise<{ success: boolean; main_store_id: string; points_moved: number; sandbox_points_moved: number }> {
   const res = await fetch("/api/admin/doctors/transfer", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
