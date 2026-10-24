@@ -2,7 +2,7 @@
 
 import { ChangeEvent, FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { QRCodeSVG } from "qrcode.react";
+import { QRCodeCanvas, QRCodeSVG } from "qrcode.react";
 import AdminOrders from "@/components/AdminOrders";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { DownloadIcon } from "@/components/Icons";
@@ -1164,29 +1164,19 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
     setError(null);
     setNotice(null);
 
-    const svg = document.getElementById(getDoctorQrElementId(doctor.id, mode));
-    if (!(svg instanceof SVGSVGElement)) {
+    const canvas = document.getElementById(`${getDoctorQrElementId(doctor.id, mode)}-png`);
+    if (!(canvas instanceof HTMLCanvasElement)) {
       setError("Unable to find the QR code for download.");
       return;
     }
 
-    const clone = svg.cloneNode(true) as SVGSVGElement;
-    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-    clone.setAttribute("width", "512");
-    clone.setAttribute("height", "512");
-
-    const blob = new Blob([new XMLSerializer().serializeToString(clone)], {
-      type: "image/svg+xml;charset=utf-8",
-    });
-    const downloadUrl = URL.createObjectURL(blob);
     const link = document.createElement("a");
 
-    link.href = downloadUrl;
-    link.download = `${doctor.routing_slug || slugifyDownloadName(doctor.full_name)}-${mode}-qr.svg`;
+    link.href = canvas.toDataURL("image/png");
+    link.download = `${doctor.routing_slug || slugifyDownloadName(doctor.full_name)}-${mode}-qr.png`;
     document.body.appendChild(link);
     link.click();
     link.remove();
-    URL.revokeObjectURL(downloadUrl);
     setNotice(`QR downloaded for ${doctor.full_name || qrUrl}.`);
   }
 
@@ -1792,6 +1782,13 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                             className="admin-doctor-qr-code"
                             value={qrUrl}
                             size={108}
+                            marginSize={2}
+                          />
+                          <QRCodeCanvas
+                            id={`${getDoctorQrElementId(doctor.id, qrMode)}-png`}
+                            hidden
+                            value={qrUrl}
+                            size={1024}
                             marginSize={2}
                           />
                           <div>
