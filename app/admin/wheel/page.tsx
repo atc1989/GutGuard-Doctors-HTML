@@ -9,6 +9,7 @@ import { DownloadIcon } from "@/components/Icons";
 import { NAME_PREFIXES } from "@/lib/constants";
 import { getPartnerQrLink } from "@/components/partner/shared";
 import { formatPrefixedName } from "@/lib/validation";
+import { isSandboxShop } from "@/lib/supabase";
 import {
   adminUpgradeToMainStore,
   adminToggleReferralQr,
@@ -1213,7 +1214,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
               : d,
           ),
         );
-        setNotice(`Moved ${doctor.full_name} to ${partnerName}; ${res.points_moved} pass-up points transferred.`);
+        setNotice(`Moved ${doctor.full_name} to ${partnerName}; ${isSandboxShop ? res.sandbox_points_moved : res.points_moved} pass-up points transferred.`);
       } else {
         const res = await adminAssignUnclaimedPassup(doctor.id, pickPartnerId, pickNote);
         setUnclaimedPassup((current) => {
@@ -2091,14 +2092,16 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                   ) : (
                     <>
                       <strong>{unclaimedPassup.get(pickTarget.doctor.id)?.points ?? 0}</strong> pass-up points from{" "}
-                      {unclaimedPassup.get(pickTarget.doctor.id)?.orders ?? 0} orders by <strong>{pickTarget.doctor.full_name}</strong> went to no one because the store has no upline.
+                      {unclaimedPassup.get(pickTarget.doctor.id)?.orders ?? 0} orders by <strong>{pickTarget.doctor.full_name}</strong> went to no one because the store had no upline when they were earned.
                     </>
                   )}
                 </p>
                 <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "8px", padding: "12px", fontSize: "13px", color: "#92400e", marginBottom: "16px" }}>
                   {pickTarget.mode === "transfer"
                     ? "The new upline gets this store's future pass-up points, and the pass-up points the old upline already earned from it move to the new upline. The store moves under the new upline's Main Store."
-                    : "The points go to the partner you pick. The store's upline does not change, so its future sales stay unclaimed."}
+                    : pickTarget.doctor.referred_by_partner_id
+                      ? "The points go to the partner you pick. The store's upline does not change; its future sales already pay that upline."
+                      : "The points go to the partner you pick. The store's upline does not change, so its future sales stay unclaimed."}
                 </div>
                 <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "12px" }}>
                   {pickTarget.mode === "transfer" ? "New upline" : "Give to"}
