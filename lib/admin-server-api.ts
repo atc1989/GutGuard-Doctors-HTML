@@ -299,6 +299,58 @@ export async function serverAdminUpgradeToMainStore(
   return data as { success: boolean; descendants_moved: number };
 }
 
+export async function serverAdminTransferStore(
+  adminPassword: string,
+  partnerId: string,
+  newUplineId: string,
+  note?: string,
+): Promise<{ success: boolean; main_store_id: string; points_moved: number }> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase.rpc("admin_transfer_store", {
+    p_admin_password: adminPassword,
+    p_partner_id: partnerId,
+    p_new_upline_id: newUplineId,
+    p_note: note || null,
+  });
+
+  if (error) throw error;
+  return data as { success: boolean; main_store_id: string; points_moved: number };
+}
+
+// Orders and points live per schema, so these go through supabaseShop like the order RPCs.
+export async function serverAdminListUnclaimedPassup(
+  adminPassword: string,
+): Promise<Array<{ store_id: string; orders: number; points: number }>> {
+  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabaseShop.rpc("admin_list_unclaimed_passup", {
+    p_admin_password: adminPassword,
+  });
+
+  if (error) throw error;
+  return (data ?? []) as Array<{ store_id: string; orders: number; points: number }>;
+}
+
+export async function serverAdminAssignUnclaimedPassup(
+  adminPassword: string,
+  storeId: string,
+  partnerId: string,
+  note?: string,
+): Promise<{ success: boolean; orders: number; points: number }> {
+  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabaseShop.rpc("admin_assign_unclaimed_passup", {
+    p_admin_password: adminPassword,
+    p_store_id: storeId,
+    p_partner_id: partnerId,
+    p_note: note || null,
+  });
+
+  if (error) throw error;
+  return data as { success: boolean; orders: number; points: number };
+}
+
 export async function serverAdminToggleReferralQr(
   adminPassword: string,
   partnerId: string,

@@ -1344,6 +1344,49 @@ export async function adminUpgradeToMainStore(partnerId: string, note?: string):
   return res.json();
 }
 
+export async function adminTransferStore(
+  partnerId: string,
+  newUplineId: string,
+  note?: string,
+): Promise<{ success: boolean; main_store_id: string; points_moved: number }> {
+  const res = await fetch("/api/admin/doctors/transfer", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ partnerId, newUplineId, note }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to transfer store.");
+  }
+  return res.json();
+}
+
+export type UnclaimedPassup = { store_id: string; orders: number; points: number };
+
+export async function adminListUnclaimedPassup(): Promise<UnclaimedPassup[]> {
+  const res = await fetch("/api/admin/doctors/unclaimed-points");
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Failed to load unclaimed points.");
+  return data.stores ?? [];
+}
+
+export async function adminAssignUnclaimedPassup(
+  storeId: string,
+  partnerId: string,
+  note?: string,
+): Promise<{ success: boolean; orders: number; points: number }> {
+  const res = await fetch("/api/admin/doctors/unclaimed-points", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ storeId, partnerId, note }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to give unclaimed points.");
+  }
+  return res.json();
+}
+
 export async function adminToggleReferralQr(partnerId: string, enabled: boolean): Promise<{ success: boolean; referral_qr_enabled: boolean }> {
   const res = await fetch("/api/admin/doctors/toggle-qr", {
     method: "POST",
