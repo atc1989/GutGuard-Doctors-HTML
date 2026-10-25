@@ -166,6 +166,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
   function openApproval(order: ShopOrder) {
     setApproving(order);
     setApprovalReference("");
+    setError(null);
   }
 
   async function approveOrder(event: FormEvent<HTMLFormElement>) {
@@ -486,6 +487,9 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
               {approving.customer_name} - {formatPeso(approving.total_amount)}. Approving marks the order paid, credits the
               referring partner&apos;s points and emails the customer a receipt.
             </p>
+
+            {/* The page-level alert sits behind this modal, so a refused approval must show here. */}
+            {error ? <div className="admin-wheel-alert error">{error}</div> : null}
 
             <div className="admin-edit-grid">
               <label className="admin-edit-wide">
