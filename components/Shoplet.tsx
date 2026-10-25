@@ -468,7 +468,7 @@ export default function Shoplet() {
         // still counts. Attribution is frozen into the row before the Maya redirect.
         referralSlug: readReferralSlug(),
       });
-      sendShopOrderEmail(order.id).catch((emailError) => {
+      const emailSent = sendShopOrderEmail(order.id).catch((emailError) => {
         console.error("Shop order email failed", emailError);
       });
       savedOrderId = order.id;
@@ -477,6 +477,8 @@ export default function Shoplet() {
 
       // Consignment/cash wait for admin approval on the order page - no Maya session.
       if (paymentMethod !== "maya") {
+        // Navigating right away cancels the in-flight email request; Maya's checkout call gives it time.
+        await emailSent;
         window.localStorage.removeItem(BASKET_STORAGE_KEY);
         window.location.assign(`/shop/order/${encodeURIComponent(order.order_code)}`);
         return;
