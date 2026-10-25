@@ -175,7 +175,7 @@ export default function OrderStatus({ orderCode }: { orderCode: string }) {
           </div>
           {order.maya_reference ? (
             <div>
-              <dt>Maya reference</dt>
+              <dt>Payment reference</dt>
               <dd>
                 {order.maya_reference}
                 <small>Quote this if you contact us</small>
