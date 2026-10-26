@@ -56,12 +56,12 @@ export default function MainStoreEPointsPage() {
   return (
     <>
       <PageHeader
-        kicker="E-Points & rebates"
+        kicker="G-Points & rebates"
         title="Points & Cash Rebates"
       />
 
       {/* Top Overview Stats Bar */}
-      <section className="pp-stats" aria-label="E-Points summary">
+      <section className="pp-stats" aria-label="G-Points summary">
         <StatTile
           label="Direct shop points"
           value={`${points.own_points} pts`}
@@ -85,7 +85,7 @@ export default function MainStoreEPointsPage() {
       </section>
 
       {/* Main Tab Switcher */}
-      <div className="pp-seg" role="tablist" aria-label="E-Points view">
+      <div className="pp-seg" role="tablist" aria-label="G-Points view">
         <button
           type="button"
           role="tab"
@@ -591,7 +591,7 @@ function RebateMilestoneDrawer({
           <div>
             <dt>Requirement</dt>
             <dd>
-              <b>{rebate.milestone_pts} E-Points reached</b>
+              <b>{rebate.milestone_pts} G-Points reached</b>
             </dd>
           </div>
           <div>

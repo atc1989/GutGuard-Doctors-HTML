@@ -201,7 +201,7 @@ export default function PartnersPage() {
               onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
               aria-label="Sort partners"
             >
-              <option value="points">Most E-Points</option>
+              <option value="points">Most G-Points</option>
               <option value="orders">Most Orders</option>
               <option value="volume">Highest Sales</option>
               <option value="name">Alphabetical</option>
@@ -387,7 +387,7 @@ export default function PartnersPage() {
                         </div>
                         <div>
                           <strong className="is-blue">+{pointsData.totalPts}</strong>
-                          <small>E-Points</small>
+                          <small>G-Points</small>
                         </div>
                         <button
                           type="button"
@@ -480,9 +480,9 @@ export default function PartnersPage() {
                 </div>
 
                 <div className="pp-sheet-row">
-                  <span className="pp-sheet-dt">Contributed E-Points</span>
+                  <span className="pp-sheet-dt">Contributed G-Points</span>
                   <strong className="pp-sheet-dd" style={{ color: "var(--blue)" }}>
-                    +{partnerPointsMap.get(selectedPartner.routing_slug)?.totalPts || 0} E-Points
+                    +{partnerPointsMap.get(selectedPartner.routing_slug)?.totalPts || 0} G-Points
                   </strong>
                 </div>
 

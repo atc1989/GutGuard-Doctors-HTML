@@ -68,6 +68,9 @@ export type AdminDoctorRegistration = {
   shop_show_protocol?: boolean;
   /** Sequential public code: www.gutguard.ph/s/<code> and /j/<code>. */
   partner_code?: number | null;
+  /** Partner Codes: admin-only description, and where the QR is used (pre-fills the join form). */
+  code_note?: string;
+  code_source?: string;
 };
 
 export type AdminDoctorRegistrationUpdate = {
@@ -429,6 +432,8 @@ export type PartnerInvitation = {
   partner_code: number | null;
   /** False for an affiliate whose referral QR is locked, and while can_refer is not deployed. */
   can_refer: boolean;
+  /** Set on Partner Codes; pre-fills "Where did you find us?" on this partner's join form. */
+  code_source: string;
 };
 
 export type TikTokOrderTimeMode = "create_time" | "update_time";
@@ -651,7 +656,13 @@ export async function getPartnerInvitation(slug: string): Promise<PartnerInvitat
   const full_name = code ? `partner #${code}` : initials.replace(/./g, "$&.");
   if (!routing_slug) return null;
 
-  return { routing_slug, full_name, partner_code: code, can_refer: row?.can_refer === true };
+  return {
+    routing_slug,
+    full_name,
+    partner_code: code,
+    can_refer: row?.can_refer === true,
+    code_source: String(row?.code_source ?? "").trim(),
+  };
 }
 
 export async function sendPartnerReferralNotification(registrationId: string) {

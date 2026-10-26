@@ -642,8 +642,9 @@ export default function Shoplet() {
                 <button type="button" className={showTrials ? "active" : ""} onClick={() => setMode("trial")}>
                   Try first
                 </button>
-                <button type="button" className={showTrials ? "" : "active"} onClick={() => setMode("protocol")}>
+                <button type="button" className={showTrials ? "shop-segment-pick" : "active shop-segment-pick"} onClick={() => setMode("protocol")}>
                   Full protocol
+                  <span className="shop-segment-badge">Recommended</span>
                 </button>
               </div>
             )}

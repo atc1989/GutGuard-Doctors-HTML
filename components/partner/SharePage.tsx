@@ -9,11 +9,13 @@ import {
   ExternalLink,
   Lock,
   Printer,
+  Share2,
   X,
 } from "lucide-react";
 import { Logo } from "@/components/GutguardSite";
 import {
   PageHeader,
+  QR_LOGO_PROPS,
   StatTile,
   getPartnerQrLink,
   useCopy,
@@ -30,7 +32,7 @@ function PosterLogo() {
 
 export default function SharePage() {
   const { dashboard } = usePartner();
-  const { copied, copy } = useCopy();
+  const { copied, share } = useCopy();
   const { copied: msgCopied, copy: copyMsg } = useCopy();
   const qrRef = useRef<HTMLDivElement>(null);
   const linkRef = useRef<HTMLParagraphElement>(null);
@@ -131,8 +133,8 @@ export default function SharePage() {
     requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[data-qr-mode="${next}"]`)?.focus());
   }
 
-  async function copyLink() {
-    if (await copy(link)) return;
+  async function shareLink() {
+    if (await share(link)) return;
     const selection = window.getSelection();
     if (selection && linkRef.current) {
       const range = document.createRange();
@@ -261,11 +263,10 @@ export default function SharePage() {
                   <button
                     type="button"
                     className="shop-primary"
-                    onClick={copyLink}
-                    aria-label="Copy link to clipboard"
+                    onClick={shareLink}
                   >
-                    {copied ? <Check size={14} /> : <Copy size={14} />}
-                    <span>{copied ? "Copied" : "Copy link"}</span>
+                    {copied ? <Check size={14} /> : <Share2 size={14} />}
+                    <span>{copied ? "Copied" : "Share link"}</span>
                   </button>
                   <a
                     href={link}
@@ -364,11 +365,11 @@ export default function SharePage() {
                     key={qrMode}
                     value={link}
                     size={QR_RENDER_PX}
-                    level="M"
+                    {...QR_LOGO_PROPS}
                     marginSize={2}
                     style={{ width: "100%", height: "100%", display: "block" }}
                   />
-                  <QRCodeCanvas className="partner-qr-download-canvas" value={link} size={QR_RENDER_PX} level="M" marginSize={4} />
+                  <QRCodeCanvas className="partner-qr-download-canvas" value={link} size={QR_RENDER_PX} {...QR_LOGO_PROPS} marginSize={4} />
                 </div>
                 <p style={{ margin: "10px 0 0", fontSize: "11px", color: "var(--ink-3)", textAlign: "center" }}>
                   Point phone camera at screen to test destination
@@ -409,7 +410,7 @@ export default function SharePage() {
             <div className="partner-poster-preview" aria-label={`${posterTitle(qrMode)} poster preview`}>
               <PosterLogo />
               <strong>{posterTitle(qrMode)}</strong>
-              <div className="partner-poster-qr"><QRCodeSVG value={link} size={QR_RENDER_PX} level="M" marginSize={4} style={{ width: "100%", height: "auto" }} /></div>
+              <div className="partner-poster-qr"><QRCodeSVG value={link} size={QR_RENDER_PX} {...QR_LOGO_PROPS} marginSize={4} style={{ width: "100%", height: "auto" }} /></div>
               <small>{link}</small>
             </div>
             <div className="partner-poster-actions">
@@ -441,7 +442,7 @@ export default function SharePage() {
         <div className="partner-print" aria-hidden="true">
           <PosterLogo />
           <strong>{posterTitle(qrMode)}</strong>
-          <QRCodeSVG value={link} size={QR_RENDER_PX} level="M" marginSize={4} />
+          <QRCodeSVG value={link} size={QR_RENDER_PX} {...QR_LOGO_PROPS} marginSize={4} />
           <small>{link}</small>
         </div>
       )}

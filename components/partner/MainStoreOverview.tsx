@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Check, Copy } from "lucide-react";
+import { ArrowRight, Check, Share2 } from "lucide-react";
 import {
   CYCLE_TARGET,
   EmptyState,
@@ -18,7 +18,7 @@ import { getMainStoreDashboard, getMainStoreReports, type MainStoreDashboard, ty
 
 export default function MainStoreOverview() {
   const { dashboard } = usePartner();
-  const { copied, copy } = useCopy();
+  const { copied, share } = useCopy();
   const [mainData, setMainData] = useState<MainStoreDashboard | null>(null);
   const [recentOrders, setRecentOrders] = useState<MainStoreOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -150,9 +150,9 @@ export default function MainStoreOverview() {
               </Link>
             </div>
             <p className="partner-link">{regLink}</p>
-            <button type="button" className="shop-primary pp-block-btn" onClick={() => copy(regLink)}>
-              {copied ? <Check aria-hidden="true" size={16} /> : <Copy aria-hidden="true" size={16} />}
-              <span>{copied ? "Copied" : "Copy partner invite link"}</span>
+            <button type="button" className="shop-primary pp-block-btn" onClick={() => share(regLink)}>
+              {copied ? <Check aria-hidden="true" size={16} /> : <Share2 aria-hidden="true" size={16} />}
+              <span>{copied ? "Copied" : "Share partner invite link"}</span>
             </button>
           </section>
         </div>

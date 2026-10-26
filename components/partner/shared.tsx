@@ -11,7 +11,16 @@ export const PUBLIC_MARKETING_ORIGIN = (process.env.NEXT_PUBLIC_MARKETING_URL ??
 
 export type PartnerQrMode = "shop" | "referral" | "profile";
 
-/** Group target that one E-Points cycle counts towards. */
+/**
+ * Every QR is drawn at 1024px with the GutGuard logo in the middle. Level H error correction
+ * keeps it scannable with the centre cleared (excavate). Sizes are in that 1024px space.
+ */
+export const QR_LOGO_PROPS = {
+  level: "H",
+  imageSettings: { src: "/gutguard-logo.png", width: 145, height: 220, excavate: true },
+} as const;
+
+/** Group target that one G-Points cycle counts towards. */
 export const CYCLE_TARGET = 1500;
 
 export const peso = (value: number) =>
@@ -84,7 +93,19 @@ export function useCopy() {
       return false;
     }
   }
-  return { copied, copy };
+  /** Phones get the native share sheet; elsewhere (and if sharing fails) the link is copied. */
+  async function share(text: string) {
+    if (navigator.share && window.matchMedia("(pointer: coarse)").matches) {
+      try {
+        await navigator.share({ url: text });
+        return true;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return true;
+      }
+    }
+    return copy(text);
+  }
+  return { copied, copy, share };
 }
 
 export function PageHeader({ kicker, title }: { kicker: string; title: string }) {
