@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 // One Vercel project serves the public website and two operational hosts:
 //   gutguard.ph          - marketing pages
 //   shop.gutguard.ph     - the shop and Maya checkout
-//   partners.gutguard.ph - registration, partner area, /dr/<slug> QR links
+//   partners.gutguard.ph - registration and partner area
 // The app's own "/" is now the consumer marketing page. Route only each operational
 // subdomain's root to its intended front door; deeper paths remain available normally.
 const SHOP_HOST = process.env.NEXT_PUBLIC_SHOP_HOST ?? "shop.gutguard.ph";

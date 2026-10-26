@@ -39,9 +39,7 @@ type AdminDoctorRegistration = {
   name_prefix: string;
   email: string;
   mobile: string;
-  tiktok_username: string;
   routing_slug: string;
-  redirect_url: string;
   specialty: string;
   practice_location: string;
   where_did_you_find_us?: string;
@@ -172,7 +170,6 @@ const PLACEHOLDER_TOKENS = [
   "{{prefixed_name}}",
   "{{doctor_email}}",
   "{{doctor_mobile}}",
-  "{{tiktok_username}}",
   "{{specialty}}",
   "{{clinic_location}}",
   "{{registered_at}}",
@@ -183,7 +180,6 @@ const SMS_PLACEHOLDER_TOKENS = [
   "{{name_prefix}}",
   "{{prefixed_name}}",
   "{{doctor_mobile}}",
-  "{{tiktok_username}}",
   "{{specialty}}",
   "{{clinic_location}}",
   "{{registered_at}}",
@@ -195,11 +191,9 @@ const REGISTRATION_EMAIL_TOKENS = [
   "{{prefixed_name}}",
   "{{doctor_email}}",
   "{{doctor_mobile}}",
-  "{{tiktok_username}}",
   "{{specialty}}",
   "{{clinic_location}}",
   "{{routing_url}}",
-  "{{redirect_url}}",
   "{{registered_at}}",
 ];
 const emptyRegistrationEmailSettings: RegistrationEmailSettings = {
@@ -228,7 +222,7 @@ function getPrizeOdds(prize: AdminWheelPrize, activeWeightTotal: number) {
   return (prize.chance_weight / activeWeightTotal) * 100;
 }
 
-type DoctorQrMode = "shop" | "referral" | "profile";
+type DoctorQrMode = "shop" | "referral";
 
 /** Same links the partner's own share page prints, so posters match across views. */
 function getDoctorQrUrl(doctor: AdminDoctorRegistration, mode: DoctorQrMode) {
@@ -383,9 +377,7 @@ function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
         doctor.name_prefix,
         doctor.email,
         doctor.mobile,
-        doctor.tiktok_username,
         doctor.routing_slug,
-        doctor.redirect_url,
         doctor.specialty,
         doctor.practice_location,
         doctor.where_did_you_find_us ?? "",
@@ -419,7 +411,6 @@ function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
         doctor.name_prefix,
         doctor.email,
         doctor.mobile,
-        doctor.tiktok_username,
         doctor.specialty,
         doctor.practice_location,
         doctor.prize_label ?? "",
@@ -452,7 +443,6 @@ function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
         doctor.name_prefix,
         doctor.email,
         doctor.mobile,
-        doctor.tiktok_username,
         doctor.specialty,
         doctor.practice_location,
         doctor.prize_label ?? "",
@@ -1048,8 +1038,6 @@ function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
         full_name: editingDoctor.full_name.trim(),
         email: editingDoctor.email.trim(),
         mobile: editingDoctor.mobile.trim(),
-        tiktok_username: editingDoctor.tiktok_username.trim().replace(/^@+/, ""),
-        redirect_url: editingDoctor.redirect_url.trim(),
         specialty: editingDoctor.specialty.trim(),
         practice_location: editingDoctor.practice_location.trim(),
       });
@@ -1768,7 +1756,6 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                   <article className="admin-doctor-row" key={doctor.id}>
                     <div className="admin-doctor-primary">
                       <strong>{formatPrefixedName(doctor.name_prefix, doctor.full_name) || "Unnamed doctor"}</strong>
-                      <span>@{doctor.tiktok_username || "no-handle"}</span>
 
                       <div style={{ margin: "4px 0 8px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                         {doctor.partner_code ? (
@@ -1838,14 +1825,6 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                         >
                           Partner invite
                         </button>
-                        <button
-                          type="button"
-                          className={qrMode === "profile" ? "active" : ""}
-                          aria-pressed={qrMode === "profile"}
-                          onClick={() => setDoctorQrModes((current) => ({ ...current, [doctor.id]: "profile" }))}
-                        >
-                          TikTok route
-                        </button>
                       </div>
                       {qrMode === "shop" ? (
                         <label className="admin-doctor-shop-protocol">
@@ -1878,11 +1857,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                           />
                           <div>
                             <small>
-                              {qrMode === "shop"
-                                ? "Shop referral route"
-                                : qrMode === "referral"
-                                  ? "Partner registration invite"
-                                  : "TikTok redirect route"}
+                              {qrMode === "shop" ? "Shop referral route" : "Partner registration invite"}
                             </small>
                             <code>{qrUrl}</code>
                             <div className="admin-doctor-qr-actions">
@@ -1917,10 +1892,6 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                       <div>
                         <dt>Mobile</dt>
                         <dd>{doctor.mobile || "--"}</dd>
-                      </div>
-                      <div>
-                        <dt>Redirect</dt>
-                        <dd>{doctor.redirect_url || "--"}</dd>
                       </div>
                       <div>
                         <dt>Specialty</dt>
@@ -2222,7 +2193,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                   id="newsletter-search"
                   type="search"
                   value={newsletterSearch}
-                  placeholder="Name, email, TikTok, clinic..."
+                  placeholder="Name, email, clinic..."
                   onChange={(event) => {
                     setNewsletterSearch(event.target.value);
                     setNewsletterPage(1);
@@ -2342,10 +2313,6 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                       </span>
                     </label>
                     <dl className="admin-doctor-details">
-                      <div>
-                        <dt>TikTok</dt>
-                        <dd>@{doctor.tiktok_username || "no-handle"}</dd>
-                      </div>
                       <div>
                         <dt>City address</dt>
                         <dd>{doctor.practice_location || "--"}</dd>
@@ -2519,7 +2486,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                 id="sms-search"
                 type="search"
                 value={smsSearch}
-                placeholder="Name, mobile, TikTok, clinic..."
+                placeholder="Name, mobile, clinic..."
                 onChange={(event) => {
                   setSmsSearch(event.target.value);
                   setSmsPage(1);
@@ -2584,10 +2551,6 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                       </span>
                     </label>
                     <dl className="admin-doctor-details">
-                      <div>
-                        <dt>TikTok</dt>
-                        <dd>@{doctor.tiktok_username || "no-handle"}</dd>
-                      </div>
                       <div>
                         <dt>City address</dt>
                         <dd>{doctor.practice_location || "--"}</dd>
@@ -3430,14 +3393,6 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                 />
               </label>
               <label>
-                TikTok username
-                <input
-                  required
-                  value={editingDoctor.tiktok_username}
-                  onChange={(event) => setEditingDoctor({ ...editingDoctor, tiktok_username: event.target.value })}
-                />
-              </label>
-              <label>
                 Routing slug
                 <input
                   value={editingDoctor.routing_slug || ""}
@@ -3448,15 +3403,6 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                     })
                   }
                   placeholder="e.g. icsps"
-                />
-              </label>
-              <label className="admin-edit-wide">
-                Redirect link
-                <input
-                  type="url"
-                  value={editingDoctor.redirect_url || ""}
-                  placeholder="https://www.tiktok.com/@gutguardph"
-                  onChange={(event) => setEditingDoctor({ ...editingDoctor, redirect_url: event.target.value })}
                 />
               </label>
               <label>
@@ -3511,7 +3457,6 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                 .replace(/\{\{\s*doctor_name\s*\}\}/g, "Sample Doctor")
                 .replace(/\{\{\s*doctor_email\s*\}\}/g, "doctor@clinic.com")
                 .replace(/\{\{\s*doctor_mobile\s*\}\}/g, "09171234567")
-                .replace(/\{\{\s*tiktok_username\s*\}\}/g, "gutguardph")
                 .replace(/\{\{\s*specialty\s*\}\}/g, "Gastroenterology")
                 .replace(/\{\{\s*clinic_location\s*\}\}/g, "Makati City")
                 .replace(/\{\{\s*registered_at\s*\}\}/g, "Jun 20, 2026")
@@ -3559,7 +3504,6 @@ function renderNewsletterPreview(html: string) {
     prefixed_name: "Dr. Maria Santos",
     doctor_email: "doctor@example.com",
     doctor_mobile: "09171234567",
-    tiktok_username: "gutguarddoctor",
     specialty: "Internal Medicine",
     clinic_location: "Makati City",
     registered_at: "Jun 12, 2026",
@@ -3578,7 +3522,6 @@ function renderSmsPreview(message: string) {
     name_prefix: "Dr.",
     prefixed_name: "Dr. Maria Santos",
     doctor_mobile: "+639171234567",
-    tiktok_username: "gutguarddoctor",
     specialty: "Internal Medicine",
     clinic_location: "Makati City",
     registered_at: "Jun 12, 2026",
@@ -3618,11 +3561,9 @@ function renderRegistrationEmailPreview(html: string) {
     prefixed_name: "Dr. Maria Santos",
     doctor_email: "doctor@example.com",
     doctor_mobile: "09171234567",
-    tiktok_username: "gutguarddoctor",
     specialty: "Internal Medicine",
     clinic_location: "Makati City",
-    routing_url: `${PUBLIC_SITE_ORIGIN}/dr/maria-santos`,
-    redirect_url: "https://www.tiktok.com/@gutguarddoctor",
+    routing_url: `${PUBLIC_SITE_ORIGIN}/r/maria-santos`,
     registered_at: "Jun 12, 2026",
   };
 

@@ -19,11 +19,9 @@ type DoctorRegistration = {
   name_prefix: string | null;
   email: string | null;
   mobile: string | null;
-  tiktok_username: string | null;
   specialty: string | null;
   practice_location: string | null;
   routing_slug: string | null;
-  redirect_url: string | null;
   created_at: string | null;
 };
 
@@ -64,7 +62,7 @@ serveWithCors(async (req) => {
     const { data: registration, error: registrationError } = await supabase
       .from("doctor_registrations")
       .select(
-        "id, name_prefix, full_name, email, mobile, tiktok_username, specialty, practice_location, routing_slug, redirect_url, created_at",
+        "id, name_prefix, full_name, email, mobile, specialty, practice_location, routing_slug, created_at",
       )
       .eq("id", registrationId)
       .single();
@@ -198,19 +196,16 @@ async function recordSendAttempt(
 
 function renderDoctorTemplate(html: string, doctor: DoctorRegistration) {
   const routingSlug = doctor.routing_slug || slugifyDoctorRoute(doctor.full_name);
-  const tiktokUsername = (doctor.tiktok_username ?? "").trim().replace(/^@+/, "").toLowerCase();
-  const routingUrl = `${getSiteOrigin()}/dr/${routingSlug}`;
+  const routingUrl = `${getSiteOrigin()}/r/${routingSlug}`;
   const replacements: Record<string, string> = {
     doctor_name: doctor.full_name ?? "",
     name_prefix: doctor.name_prefix ?? "",
     prefixed_name: formatPrefixedName(doctor.name_prefix, doctor.full_name),
     doctor_email: doctor.email ?? "",
     doctor_mobile: doctor.mobile ?? "",
-    tiktok_username: tiktokUsername,
     specialty: doctor.specialty ?? "",
     clinic_location: doctor.practice_location ?? "",
     routing_url: routingUrl,
-    redirect_url: doctor.redirect_url ?? (tiktokUsername ? `https://www.tiktok.com/@${tiktokUsername}` : ""),
     registered_at: formatDate(doctor.created_at),
   };
 

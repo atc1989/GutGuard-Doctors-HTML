@@ -311,7 +311,7 @@ export default function AdminPromosPage() {
               </div>
             </form>
           ) : (
-            <div className="admin-tiktok-row-actions">
+            <div className="admin-table-row-actions">
               <button type="button" onClick={() => setDraft(emptyDraft())}>
                 New promo
               </button>
@@ -347,7 +347,7 @@ export default function AdminPromosPage() {
                           .join(" · ")}
                       </p>
                     </div>
-                    <div className="admin-tiktok-row-actions">
+                    <div className="admin-table-row-actions">
                       <button type="button" onClick={() => setDraft(promo)} disabled={isSaving}>
                         Edit
                       </button>

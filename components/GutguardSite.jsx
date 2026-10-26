@@ -1163,7 +1163,7 @@ export function Logo({ h = 26, className = "", style = undefined }) {
 }
 const DISEASE_FACTORY_URL = "/science#mechanism";
 
-/* protocol ladder — per-cap follows TikTok. CONFIRM caps for Start & Grow (scaled from Peak: 400 caps / 90 days). */
+/* protocol ladder — CONFIRM caps for Start & Grow (scaled from Peak: 400 caps / 90 days). */
 /* signature motion: measurement numbers resolve into view (the "we measure" feel) */
 function CountUp({ to, from = 0, prefix = "", suffix = "", dur = 1300 }) {
   const [val, setVal] = useState(from);

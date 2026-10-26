@@ -146,7 +146,7 @@ export default function AdminTestimonialsPage() {
                       </div>
                     )}
 
-                    <div className="admin-tiktok-row-actions">
+                    <div className="admin-table-row-actions">
                       <button
                         type="button"
                         disabled={savingId === story.id}

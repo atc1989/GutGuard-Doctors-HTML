@@ -7,7 +7,6 @@ import { registerDoctor } from "@/lib/api";
 import type { FieldErrors, FieldName, FormValues } from "@/lib/validation";
 import {
   normalizeMobile,
-  normalizeTikTokUsername,
   validateField,
   validateForm,
 } from "@/lib/validation";
@@ -23,7 +22,6 @@ const INITIAL_VALUES: FormValues = {
   fullName: "",
   email: "",
   mobile: "",
-  tiktokUsername: "",
   specialty: "",
   otherSpecialty: "",
   location: "",
@@ -92,7 +90,6 @@ export default function PartnerApplyForm({
         fullName: values.fullName.trim(),
         email,
         mobile: normalizeMobile(values.mobile),
-        tiktokUsername: normalizeTikTokUsername(values.tiktokUsername ?? ""),
         specialty:
           values.specialty === "Other" ? values.otherSpecialty.trim() : values.specialty.trim(),
         location: values.location.trim(),
@@ -174,20 +171,6 @@ export default function PartnerApplyForm({
         inputMode="tel"
         required
       />
-      <ApplyField
-        id="tiktokUsername"
-        label="TikTok username"
-        optional
-        help="Used for your profile QR code."
-        error="Enter a valid TikTok username, or leave this blank."
-        value={values.tiktokUsername}
-        hasError={errors.tiktokUsername}
-        onValueChange={handleValueChange}
-        onFieldBlur={handleFieldBlur}
-        type="text"
-        placeholder="@gutguardph"
-        autoComplete="off"
-      />
 
       <div className="partner-apply-field">
         <label htmlFor="specialty">Specialty</label>
@@ -255,7 +238,7 @@ export default function PartnerApplyForm({
         onValueChange={handleValueChange}
         onFieldBlur={handleFieldBlur}
         type="text"
-        placeholder="e.g. Friend, Facebook, TikTok, clinic event"
+        placeholder="e.g. Friend, Facebook, clinic event"
         autoComplete="off"
       />
 
@@ -344,9 +327,6 @@ function ApplyField({
 
 function getRegistrationError(error: unknown) {
   const message = error instanceof Error ? error.message.toLowerCase() : "";
-  if (message.includes("duplicate") && message.includes("tiktok")) {
-    return "This TikTok username has already been registered. Please check the handle and try again.";
-  }
   if (message.includes("duplicate") && message.includes("email")) {
     return "This email has already been registered. Sign in with a one-time code instead.";
   }

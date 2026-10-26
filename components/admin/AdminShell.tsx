@@ -25,7 +25,6 @@ import {
   Store,
   Tag,
   Users,
-  Video,
   X,
 } from "lucide-react";
 import { adminLogin, adminLogout, checkAdminSession } from "@/lib/api";
@@ -56,7 +55,6 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/admin/products", label: "Product Catalog", icon: ShoppingBag },
       { href: "/admin/promos", label: "Promotions", icon: Tag },
       { href: "/admin/referred-shops", label: "Referred Clinics", icon: Store },
-      { href: "/admin/tiktok", label: "TikTok Shop", icon: Video },
     ],
   },
   {
