@@ -1088,6 +1088,11 @@ function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
     setNotice(null);
 
     try {
+      // Same as the partner pages' Share link: share sheet on phones, copy elsewhere.
+      if (navigator.share && window.matchMedia("(pointer: coarse)").matches) {
+        await navigator.share({ url }).catch(() => undefined);
+        return;
+      }
       await navigator.clipboard.writeText(url);
       setNotice("Doctor QR link copied.");
     } catch {
@@ -1879,7 +1884,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                             <code>{qrUrl}</code>
                             <div className="admin-doctor-qr-actions">
                               <button type="button" onClick={() => copyDoctorQrUrl(qrUrl)}>
-                                Copy QR link
+                                Share QR link
                               </button>
                               <button
                                 type="button"
