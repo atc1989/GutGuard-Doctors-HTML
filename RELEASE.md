@@ -50,6 +50,7 @@ Verify locally first: `bash supabase/release-reconciliation.test.sh` (needs Dock
 
 | Migration | Production status |
 |---|---|
+| `20261028000000_product_points.sql` | **Not applied yet.** E-Points per product instead of 1 pt per ₱1,000: Blister Trial 1, Bottle Trial 3, Start 3, Grow 12, Peak 33 (times qty; shipping no longer counts; minimum 1 per order). Adds `products.points` and `order_points(items)` in `doctors` and `sandbox`, and replaces `award_order_points` (same safety as 20261008). Re-runnable. Only affects orders paid after it runs. To recompute past orders too, run `supabase/data-fixes/20261028_recompute_product_points.sql` afterwards (preview query inside; Bottle Trial orders go **down** 4 → 3 per bottle). |
 | `20261027000000_offline_payment_methods.sql` | **Not applied yet.** Replaces `create_shop_order` in `doctors` and `sandbox` (same signature, no DROP). Accepts only `maya` / `consignment` / `cash` and files consignment/cash orders as `payment_review` for admin approval. Apply it **before** deploying the app: without it, consignment/cash orders land as `pending_payment` and show a Maya pay button. Also redeploy `send-shop-order-email`, which now has its own copy for consignment/cash orders. |
 | `20261026000000_admin_transfer_store.sql` | **Already applied** on 2026-10-24 by atc1989 — do not re-run. Adds the admin RPCs for transferring an Affiliate store to a new upline (`doctors.admin_transfer_store`, which moves past pass-up points in both schemas) and for listing and assigning unclaimed pass-up points (`admin_list_unclaimed_passup` / `admin_assign_unclaimed_passup` in `doctors` and `sandbox`). Additive, service_role only. |
 | `20261025000000_partner_invitation_can_refer.sql` | **Already applied** on 2026-10-24 by atc1989 — do not re-run. Adds `can_refer` to `doctors.get_partner_invitation` (the shop uses it to show "Become a partner" instead of Log in). Additive; both deployments read it. |
@@ -95,8 +96,8 @@ order to affiliate. Check that list of names before committing.
 
 ## Open business decisions (not code bugs)
 
-- **Points rule.** Live: 1 pt per ₱1,000 of order total (incl. shipping), full copy to the
-  upline. `public/02_LCA_Compensation_Program.pdf` defines rebates on ₱ sales within a 90-day
+- **Points rule.** Per product from `20261028000000_product_points.sql` (Blister 1, Bottle 3,
+  Start 3, Grow 12, Peak 33), full copy to the upline; before it, 1 pt per ₱1,000 of order total. `public/02_LCA_Compensation_Program.pdf` defines rebates on ₱ sales within a 90-day
   pilot (₱300k/₱700k/₱1.5M → ₱18k/₱52k/₱230k); the portal shows 300/750/1,500 pts →
   ₱18k/₱70k/₱150k. Production also has an unused `doctors.calculate_order_points` (caps/10)
   that is not in the repo. Pick one.
