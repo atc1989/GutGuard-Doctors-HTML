@@ -8,7 +8,7 @@ User-visible changes only. Rules: see "Patch notes" in `AGENTS.md`.
 - Partner QR codes (Share page, Admin → Partner Codes and Admin → Doctors) now have the GutGuard logo in the middle, on screen and in the downloaded PNG.
 - "Copy link" buttons are now "Share link": on phones they open the share menu, elsewhere they copy the link.
 - Points are now called G-Points everywhere in the partner dashboard.
-- Partner overview (Affiliate): the welcome banner can be closed with an X and stays closed; the "Referred-partner orders" tile is replaced by a highlighted "Share link" tile; the shop link card explains that the first paid order unlocks the Referral QR.
+- Partner overview (Affiliate): the welcome banner can be closed with an X and stays closed; the "Referred-partner orders" tile is replaced by a blue "Share link" tile; the shop link card explains that the first paid order unlocks the Referral QR.
 - Shop: the Full protocol tab is marked "Recommended".
 - Registration form: the "Where did you find us?" example now reads "e.g. Friend, Facebook, clinic event".
 - Admin: Affiliate stores can be transferred to a new upline from the Doctors list (the pass-up points they already earned move to the new upline), and pass-up points from stores with no upline show on the store's row and can be given to a partner.
