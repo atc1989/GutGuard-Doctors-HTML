@@ -52,7 +52,7 @@ export default function OverviewPage() {
 
       {isAffiliate && !welcomeClosed && (
         <div style={{
-          background: "linear-gradient(135deg, #064e3b 0%, #047857 100%)",
+          background: "linear-gradient(135deg, var(--blue-press) 0%, var(--blue) 100%)",
           color: "#ffffff",
           borderRadius: "10px",
           padding: "16px 20px",

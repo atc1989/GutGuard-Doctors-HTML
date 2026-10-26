@@ -2785,15 +2785,15 @@
   box-shadow: 0 2px 7px rgba(15, 15, 24, 0.09);
 }
 
-/* Full protocol is the pick we want seen: a green ring and a badge sitting on the top edge. */
+/* Full protocol is the pick we want seen: a blue ring and a badge sitting on the top edge. */
 .shop-segment button.shop-segment-pick {
   position: relative;
-  box-shadow: inset 0 0 0 1.5px #047857;
-  color: #065f46;
+  box-shadow: inset 0 0 0 1.5px var(--blue);
+  color: var(--blue);
 }
 
 .shop-segment button.shop-segment-pick.active {
-  box-shadow: inset 0 0 0 1.5px #047857, 0 2px 7px rgba(15, 15, 24, 0.09);
+  box-shadow: inset 0 0 0 1.5px var(--blue), 0 2px 7px rgba(15, 15, 24, 0.09);
 }
 
 .shop-segment-badge {
@@ -2802,7 +2802,7 @@
   right: 8px;
   padding: 2px 7px;
   border-radius: 999px;
-  background: #047857;
+  background: var(--blue);
   color: #fff;
   font-size: 9px;
   font-weight: 900;
@@ -6727,13 +6727,13 @@
 .pp-stat small { color: var(--ink-3); font-size: 11px; font-weight: 700; }
 
 /* Share tile: same footprint as a stat, coloured so it reads as the action in the row. */
-.pp-stat.pp-stat-share { background: linear-gradient(135deg, #064e3b 0%, #047857 100%); border-color: #047857; color: #fff; }
+.pp-stat.pp-stat-share { background: linear-gradient(135deg, var(--blue-press) 0%, var(--blue) 100%); border-color: var(--blue); color: #fff; }
 .pp-stat.pp-stat-share > span,
 .pp-stat.pp-stat-share small { color: rgba(255, 255, 255, 0.85); }
 .pp-stat-share button {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   min-height: 40px; border: 0; border-radius: var(--r-sm);
-  background: #fde047; color: #064e3b; font: inherit; font-size: 14px; font-weight: 900; cursor: pointer;
+  background: #fde047; color: var(--blue-press); font: inherit; font-size: 14px; font-weight: 900; cursor: pointer;
 }
 .pp-stat-share button span { color: inherit; font-size: inherit; letter-spacing: 0; text-transform: none; }
 .pp-stat-share button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
@@ -6747,7 +6747,7 @@
 
 .pp-unlock-hint {
   display: flex; gap: 8px; align-items: flex-start; margin: 12px 0 0; padding: 10px 12px;
-  border-radius: var(--r-sm); background: #ecfdf5; color: #065f46; font-size: 12px; line-height: 1.45;
+  border-radius: var(--r-sm); background: #eef0ff; color: var(--blue); font-size: 12px; line-height: 1.45;
 }
 .pp-unlock-hint svg { flex-shrink: 0; margin-top: 1px; }
 
