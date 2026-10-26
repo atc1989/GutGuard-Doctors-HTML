@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Check, ChevronDown, Coins, Copy, LayoutDashboard, LogOut, Package, QrCode, Users } from "lucide-react";
+import { Check, ChevronDown, Coins, LayoutDashboard, LogOut, Package, QrCode, Share2, Users } from "lucide-react";
 import { Logo } from "@/components/GutguardSite";
 import { PUBLIC_MARKETING_ORIGIN, getPartnerQrLink, useCopy, usePartner } from "./shared";
 
@@ -29,7 +29,7 @@ function initials(name: string) {
 export default function PartnerShell({ children }: { children: React.ReactNode }) {
   const { dashboard, signOut } = usePartner();
   const pathname = usePathname();
-  const { copied, copy } = useCopy();
+  const { copied, share } = useCopy();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const shopLink = getPartnerQrLink(dashboard.partner, "shop");
@@ -64,9 +64,9 @@ export default function PartnerShell({ children }: { children: React.ReactNode }
         <a className="pp-brand" href={PUBLIC_MARKETING_ORIGIN} aria-label="GutGuard home"><Logo h={26} /></a>
         <span className="pp-portal-name">Partner Portal</span>
         <div className="pp-topbar-spacer" />
-        <button type="button" className="pp-copy-btn" onClick={() => copy(shopLink)} aria-label="Copy shop link">
-          {copied ? <Check aria-hidden="true" size={16} /> : <Copy aria-hidden="true" size={16} />}
-          <span>{copied ? "Copied" : "Copy shop link"}</span>
+        <button type="button" className="pp-copy-btn" onClick={() => share(shopLink)} aria-label="Share shop link">
+          {copied ? <Check aria-hidden="true" size={16} /> : <Share2 aria-hidden="true" size={16} />}
+          <span>{copied ? "Copied" : "Share shop link"}</span>
         </button>
         <div className="pp-user" ref={menuRef}>
           <button type="button" className="pp-user-btn" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>
@@ -108,7 +108,7 @@ export default function PartnerShell({ children }: { children: React.ReactNode }
           <div className="pp-side-card">
             <p className="shop-kicker">{isMainStore ? "Main shop link" : "Your shop link"}</p>
             <p className="pp-side-link">{shopLink.replace(/^https?:\/\//, "")}</p>
-            <button type="button" className="shop-secondary" onClick={() => copy(shopLink)}>{copied ? "Copied" : "Copy link"}</button>
+            <button type="button" className="shop-secondary" onClick={() => share(shopLink)}>{copied ? "Copied" : "Share link"}</button>
             <small>{dashboard.clicks.last_30_days} clicks in the last 30 days</small>
           </div>
         </aside>
