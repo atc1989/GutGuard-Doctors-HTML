@@ -17,7 +17,6 @@ import {
   Tag,
   TrendingUp,
   Users,
-  Video,
 } from "lucide-react";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 
@@ -173,13 +172,6 @@ export default function AdminOverviewPage() {
       href: "/admin/sequence",
       icon: ListOrdered,
       color: "#0D9488",
-    },
-    {
-      title: "TikTok Shop Operations",
-      desc: "Sync external orders from TikTok Shop and run raw API diagnostic console commands.",
-      href: "/admin/tiktok",
-      icon: Video,
-      color: "#111827",
     },
     {
       title: "Referral Notification Email",

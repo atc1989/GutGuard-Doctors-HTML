@@ -24,7 +24,6 @@ import type {
   ShopPaymentStatus,
   SmsBlastResponse,
   SmsSendHistory,
-  TikTokAdminAction,
 } from "@/lib/api";
 
 type PrizeRow = {
@@ -64,20 +63,12 @@ function mapWheelPrizeRow(row: PrizeRow): WheelPrize {
 }
 
 function normalizeAdminDoctorRegistration(doctor: AdminDoctorRegistration): AdminDoctorRegistration {
-  const tiktokUsername = (doctor.tiktok_username ?? "")
-    .trim()
-    .replace(/^@+/, "")
-    .toLowerCase();
-
   const routingSlug = (doctor.routing_slug ?? "").trim() || slugifyDoctorRoute(doctor.full_name);
 
   return {
     ...doctor,
     name_prefix: doctor.name_prefix ?? "",
-    tiktok_username: tiktokUsername,
     routing_slug: routingSlug,
-    redirect_url:
-      (doctor.redirect_url ?? "").trim() || (tiktokUsername ? `https://www.tiktok.com/@${tiktokUsername}` : ""),
     where_did_you_find_us: doctor.where_did_you_find_us ?? "",
     referred_by_partner_id: doctor.referred_by_partner_id ?? null,
     referrer_name: doctor.referrer_name ?? null,
@@ -260,8 +251,6 @@ export async function serverUpdateDoctorRegistration(
     p_name_prefix: doctor.name_prefix,
     p_email: doctor.email,
     p_mobile: doctor.mobile,
-    p_tiktok_username: doctor.tiktok_username,
-    p_redirect_url: doctor.redirect_url,
     p_specialty: doctor.specialty,
     p_practice_location: doctor.practice_location,
   });
@@ -511,23 +500,6 @@ export async function serverAdminUpdateShopOrder(
 
   if (error) throw error;
   return normalizeShopOrder(Array.isArray(data) ? data[0] : data);
-}
-
-// ─── TikTok ─────────────────────────────────────────────────────────────────
-
-export async function serverCallTikTokAdminApi<TResponse>(
-  adminPassword: string,
-  action: TikTokAdminAction,
-  payload: Record<string, unknown>,
-): Promise<TResponse> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-
-  const { data, error } = await supabase.functions.invoke("tiktok-shop-admin", {
-    body: { adminPassword, action, payload },
-  });
-
-  if (error) throw new Error(await getSupabaseFunctionErrorMessage(error));
-  return data as TResponse;
 }
 
 // ─── Sequence ───────────────────────────────────────────────────────────────

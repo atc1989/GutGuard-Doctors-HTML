@@ -228,10 +228,10 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
       </div>
 
       {approvalOrders.length > 0 ? (
-        <section className="admin-tiktok-subsection">
+        <section className="admin-table-subsection">
           <h3>For approval (consignment and cash)</h3>
-          <div className="admin-tiktok-table-wrap">
-            <table className="admin-tiktok-table admin-shop-orders-table">
+          <div className="admin-table-table-wrap">
+            <table className="admin-table-table admin-shop-orders-table">
               <thead>
                 <tr>
                   <th>Order</th>
@@ -258,7 +258,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                     <td>{formatPeso(order.total_amount)}</td>
                     <td>{formatAdminDate(order.created_at)}</td>
                     <td>
-                      <div className="admin-tiktok-row-actions">
+                      <div className="admin-table-row-actions">
                         <button type="button" onClick={() => setSelectedOrder(order)}>
                           View
                         </button>
@@ -276,8 +276,8 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
       ) : null}
 
       {filteredOrders.length > 0 ? (
-        <div className="admin-tiktok-table-wrap">
-          <table className="admin-tiktok-table admin-shop-orders-table">
+        <div className="admin-table-table-wrap">
+          <table className="admin-table-table admin-shop-orders-table">
             <thead>
               <tr>
                 <th>Order</th>
@@ -307,7 +307,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                   <td>{formatPeso(order.total_amount)}</td>
                   <td>{formatAdminDate(order.created_at)}</td>
                   <td>
-                    <div className="admin-tiktok-row-actions">
+                    <div className="admin-table-row-actions">
                       <button type="button" onClick={() => setSelectedOrder(order)}>
                         View
                       </button>
@@ -363,10 +363,10 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                 ]}
               />
 
-              <section className="admin-tiktok-subsection">
+              <section className="admin-table-subsection">
                 <h3>Line items</h3>
-                <div className="admin-tiktok-table-wrap">
-                  <table className="admin-tiktok-table compact admin-shop-line-items-table">
+                <div className="admin-table-table-wrap">
+                  <table className="admin-table-table compact admin-shop-line-items-table">
                     <thead>
                       <tr>
                         <th>Item</th>
@@ -530,7 +530,7 @@ function isAwaitingApproval(order: ShopOrder) {
 
 function Summary({ items }: { items: Array<[string, string]> }) {
   return (
-    <dl className="admin-tiktok-summary-grid">
+    <dl className="admin-table-summary-grid">
       {items.map(([label, value]) => (
         <div key={label}>
           <dt>{label}</dt>

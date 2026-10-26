@@ -306,28 +306,24 @@ function sampleDoctor() {
     full_name: "Maria Santos",
     email: "doctor@example.com",
     mobile: "09171234567",
-    tiktok_username: "gutguarddoctor",
     specialty: "Internal Medicine",
     practice_location: "Makati City",
     routing_slug: "maria-santos",
-    redirect_url: "https://www.tiktok.com/@gutguarddoctor",
     created_at: new Date().toISOString(),
   };
 }
 
 function renderTemplate(html: string, doctor: Record<string, string>) {
-  const routingUrl = `${getSiteOrigin()}/dr/${doctor.routing_slug}`;
+  const routingUrl = `${getSiteOrigin()}/r/${doctor.routing_slug}`;
   const replacements: Record<string, string> = {
     doctor_name: doctor.full_name ?? "",
     name_prefix: doctor.name_prefix ?? "",
     prefixed_name: formatPrefixedName(doctor.name_prefix, doctor.full_name),
     doctor_email: doctor.email ?? "",
     doctor_mobile: doctor.mobile ?? "",
-    tiktok_username: doctor.tiktok_username ?? "",
     specialty: doctor.specialty ?? "",
     clinic_location: doctor.practice_location ?? "",
     routing_url: routingUrl,
-    redirect_url: doctor.redirect_url ?? "",
     registered_at: formatDate(doctor.created_at),
   };
 

@@ -60,7 +60,6 @@ You can start in any of these ways:
 | Name | Yes | Your full name |
 | Email address | Yes | You will sign in with this email, so use one you check |
 | Mobile | Yes | A PH number such as `09171234567` or `+639171234567` |
-| TikTok username | No | Used for your **Profile QR**. Leave it blank if you don't have one |
 | Specialty | Yes | If you pick **"Other"**, type your specialty in the extra box |
 | Complete Clinic Address | Yes | |
 | Where did you find us? | No | For example: colleague, social media, event |
@@ -108,7 +107,6 @@ There is no password. You stay signed in on that browser until you sign out: cli
    - **"Copy text"** — copies a ready-made message for Viber, WhatsApp or SMS.
    - **"Download PNG"** — saves a high-resolution QR image.
    - **"Preview poster"**, then **"Print poster"** — prints an A4 poster.
-4. Optional: the **"Profile QR"** tab links to your TikTok profile, if you gave a username when you applied.
 
 > **How credit works:** a customer is linked to the **last** partner link they clicked, for **30 days**. If they later click another partner's link, that partner gets the next order. An order is not credited to you if the buyer's email or mobile matches yours.
 
@@ -159,9 +157,7 @@ There is no password. You stay signed in on that browser until you sign out: cli
 |---|---|
 | "Please complete the highlighted fields." | Fix every field outlined in red |
 | "Please enter a valid PH mobile number." | Type it as `09` + 9 digits, e.g. `09171234567` |
-| "Enter a valid TikTok username, or leave this blank." | Use letters, numbers, `.` or `_` only, or leave it empty |
 | "This email has already been registered…" | You already have an account. Click **"Sign in"** |
-| "This TikTok username has already been registered…" | Check the spelling. If it really is yours, contact GutGuard |
 | "A partner cannot refer themselves…" | You opened your own invite link. Register without it |
 | "Your account was created, but we couldn't email a sign-in code." | Click **"Email me a sign-in code"** on the sign-in screen |
 | The "Invited by" line doesn't appear | The invite link was wrong. Ask your inviter to resend it **before** you submit. Afterwards, only an admin can fix it (see 2.2, Transfer) |
@@ -317,7 +313,7 @@ Things to know about admin sessions:
 | Group | Pages |
 |---|---|
 | Overview | Dashboard |
-| Commerce & Sales | Shop Orders, Product Catalog, Promotions, Referred Clinics, TikTok Shop |
+| Commerce & Sales | Shop Orders, Product Catalog, Promotions, Referred Clinics |
 | Partner Network | Doctor Partners, Partner Codes, Referral Email |
 | Marketing & Automation | Wheel Prizes, Newsletter, SMS Blast, Email Sequence |
 | Content & Moderation | Testimonials |
@@ -339,7 +335,7 @@ Things to know about admin sessions:
 | Setting | Where it is changed | Who |
 |---|---|---|
 | Admin password, Maya payment keys, site addresses, database schema | Vercel → Project → Environment Variables | atc1989 (production) |
-| Email sending (Resend), SMS gateway (iTexMo), TikTok Shop keys | Supabase → Edge Functions → Secrets | atc1989 |
+| Email sending (Resend), SMS gateway (iTexMo) | Supabase → Edge Functions → Secrets | atc1989 |
 | Sign-in email template and sender | Supabase → Authentication → Email Templates / SMTP | atc1989 |
 | Products, prices, promos | **Admin → Product Catalog / Promotions** | Any admin |
 | Referral email, email sequence | **Admin → Referral Email / Email Sequence** | Any admin |
@@ -513,7 +509,6 @@ Partners have **no passwords**, so there is nothing to reset. When a partner can
 | Need | Where |
 |---|---|
 | All partner shops, with orders and paid sales | **Referred Clinics**. Filter, sort, **"Group by referrer"**, then **"Download CSV"** |
-| TikTok Shop orders | **TikTok Shop** → **"Refresh orders"**. Nothing loads until you press it |
 | Newsletter and SMS send history | **Newsletter** / **SMS Blast** → a recipient's **"Last newsletter" / "Last SMS"** link |
 | Email series progress | **Email Sequence** → **"Refresh"** shows **Enrolled Doctors** |
 

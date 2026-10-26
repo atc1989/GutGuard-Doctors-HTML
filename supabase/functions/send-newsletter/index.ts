@@ -20,7 +20,6 @@ type DoctorRegistration = {
   name_prefix: string | null;
   email: string | null;
   mobile: string | null;
-  tiktok_username: string | null;
   specialty: string | null;
   practice_location: string | null;
   created_at: string | null;
@@ -92,7 +91,7 @@ serveWithCors(async (req) => {
 
     const { data: doctors, error: doctorsError } = await supabase
       .from("doctor_registrations")
-      .select("id, name_prefix, full_name, email, mobile, tiktok_username, specialty, practice_location, created_at")
+      .select("id, name_prefix, full_name, email, mobile, specialty, practice_location, created_at")
       .in("id", cleanDoctorIds);
 
     if (doctorsError) {
@@ -267,7 +266,6 @@ function renderDoctorTemplate(html: string, doctor: DoctorRegistration) {
     prefixed_name: formatPrefixedName(doctor.name_prefix, doctor.full_name),
     doctor_email: doctor.email ?? "",
     doctor_mobile: doctor.mobile ?? "",
-    tiktok_username: doctor.tiktok_username ?? "",
     specialty: doctor.specialty ?? "",
     clinic_location: doctor.practice_location ?? "",
     registered_at: formatDate(doctor.created_at),

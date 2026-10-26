@@ -33,7 +33,6 @@ create table public.doctor_registrations (
   -- does not exist anywhere.
   email text not null default '',
   mobile text,
-  tiktok_username text,
   specialty text,
   practice_location text,
   routing_slug text not null,
