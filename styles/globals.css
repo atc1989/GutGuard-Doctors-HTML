@@ -6550,7 +6550,8 @@
   inset: auto 0 0 0;
   z-index: 30;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   height: calc(64px + env(safe-area-inset-bottom, 0px));
   padding-bottom: env(safe-area-inset-bottom, 0px);
   border-top: 1px solid var(--rule);
@@ -7406,6 +7407,24 @@
 .pp-log b.is-passup { color: var(--blue); }
 .pp-log b.is-gold { color: var(--gold-text, var(--gold)); font-family: var(--serif); font-size: 18px; font-weight: 400; }
 .pp-log-end { text-align: right; }
+
+/* Wallet */
+.pp-wallet-form { max-width: 420px; }
+.pp-wallet-form select {
+  min-height: 46px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  background: var(--bone);
+  padding: 12px 14px;
+  font: inherit;
+}
+.pp-wallet-summary { display: grid; gap: 6px; margin: 6px 0 2px; border: 1px solid var(--rule); border-radius: var(--r-sm); padding: 12px 14px; }
+.pp-wallet-summary div { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
+.pp-wallet-summary dt { color: var(--ink-3); }
+.pp-wallet-summary .is-total { border-top: 1px solid var(--rule-soft); padding-top: 6px; font-weight: 800; }
+.pp-wallet-notice { color: #047857; font-size: 14px; font-weight: 700; }
+.pp-log .partner-badge { margin-left: 6px; vertical-align: middle; }
+.partner-badge.rejected { border-color: rgba(157, 36, 48, 0.32); color: #9d2430; }
 
 /* Interactive log row per GutGuard Design System */
 .pp-log-item-interactive {

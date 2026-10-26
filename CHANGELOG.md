@@ -4,6 +4,7 @@ User-visible changes only. Rules: see "Patch notes" in `AGENTS.md`.
 
 ## Unreleased
 - TikTok is removed everywhere: no TikTok username on the registration form or in Admin → Doctors, no Profile QR (old /dr/ links now open the home page), no Admin → TikTok Shop page, and the welcome and newsletter emails describe the GutGuard Partner Program instead of the TikTok Affiliate Program.
+- Partner dashboard: new Wallet page showing available, pending and withdrawn rebate balance, a withdrawal request form (GCash, Maya or bank; minimum ₱500, fixed ₱60 fee) and withdrawal history with status. Admin → Withdrawals lists requests; admins approve with the transfer reference or reject with a reason (the amount returns to the partner's wallet).
 - Partner QR codes (Share page, Admin → Partner Codes and Admin → Doctors) now have the GutGuard logo in the middle, on screen and in the downloaded PNG.
 - "Copy link" buttons are now "Share link": on phones they open the share menu, elsewhere they copy the link.
 - Points are now called G-Points everywhere in the partner dashboard.

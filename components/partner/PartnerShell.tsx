@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Check, ChevronDown, Coins, LayoutDashboard, LogOut, Package, QrCode, Share2, Users } from "lucide-react";
+import { Check, ChevronDown, Coins, LayoutDashboard, LogOut, Package, QrCode, Share2, Users, Wallet } from "lucide-react";
 import { Logo } from "@/components/GutguardSite";
 import { PUBLIC_MARKETING_ORIGIN, getPartnerQrLink, useCopy, usePartner } from "./shared";
 
@@ -12,6 +12,7 @@ const LIFESTYLE_NAV = [
   { href: "/partner/orders", label: "Orders", short: "Orders", icon: Package },
   { href: "/partner/partners", label: "Referred partners", short: "Partners", icon: Users },
   { href: "/partner/e-points", label: "G-Points", short: "G-Points", icon: Coins },
+  { href: "/partner/wallet", label: "Wallet", short: "Wallet", icon: Wallet },
   { href: "/partner/share", label: "Share & QR", short: "Share", icon: QrCode },
 ] as const;
 
@@ -19,6 +20,7 @@ const MAIN_STORE_NAV = [
   { href: "/partner", label: "Overview", short: "Overview", icon: LayoutDashboard },
   { href: "/partner/reports", label: "Reports & Stores", short: "Reports", icon: Package },
   { href: "/partner/e-points", label: "Combined G-Points", short: "G-Points", icon: Coins },
+  { href: "/partner/wallet", label: "Wallet", short: "Wallet", icon: Wallet },
   { href: "/partner/share", label: "Share & QR", short: "Share", icon: QrCode },
 ] as const;
 
