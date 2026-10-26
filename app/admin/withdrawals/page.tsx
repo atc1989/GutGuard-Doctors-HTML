@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import type { AdminWithdrawal } from "@/lib/admin-server-api";
 
@@ -20,6 +20,8 @@ export default function AdminWithdrawalsPage() {
   const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[]>([]);
   const [filter, setFilter] = useState<Filter>("pending");
   const [error, setError] = useState<string | null>(null);
+  const [acting, setActing] = useState<{ id: string; status: "approved" | "rejected" } | null>(null);
+  const [input, setInput] = useState("");
 
   // AdminShell only renders this page once the admin session is valid.
   useEffect(() => {
@@ -42,12 +44,11 @@ export default function AdminWithdrawalsPage() {
     }
   }
 
-  async function process(item: AdminWithdrawal, status: "approved" | "rejected") {
-    const net = money(item.amount - item.fee);
-    const input = status === "approved"
-      ? window.prompt(`Send ${net} to ${item.partner_name}, then enter the transfer reference number:`)
-      : window.prompt(`Reason for rejecting ${item.partner_name}'s ${money(item.amount)} request (the partner sees this):`);
-    if (!input?.trim()) return;
+  // Inline form, not window.prompt: in-app browsers and some phones block prompts.
+  async function process(event: FormEvent, item: AdminWithdrawal) {
+    event.preventDefault();
+    if (!acting || !input.trim()) return;
+    const { status } = acting;
 
     setBusyId(item.id);
     setError(null);
@@ -59,6 +60,7 @@ export default function AdminWithdrawalsPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Could not update the withdrawal.");
+      setActing(null);
       await load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not update the withdrawal.");
@@ -143,16 +145,37 @@ export default function AdminWithdrawalsPage() {
                         {item.admin_note ? <small>{item.admin_note}</small> : null}
                       </td>
                       <td>
-                        {item.status === "pending" ? (
+                        {item.status !== "pending" ? null : acting?.id === item.id ? (
+                          <form onSubmit={(event) => process(event, item)} style={{ display: "grid", gap: 6, minWidth: 220 }}>
+                            <label>
+                              {acting.status === "approved"
+                                ? `Send ${money(item.amount - item.fee)} first, then enter the transfer reference`
+                                : "Reason for rejecting (the partner sees this)"}
+                              <input
+                                autoFocus required maxLength={acting.status === "approved" ? 120 : 500}
+                                value={input} onChange={(event) => setInput(event.target.value)}
+                                aria-label={acting.status === "approved" ? "Transfer reference" : "Rejection reason"}
+                              />
+                            </label>
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <button type="submit" className="admin-overview-action-btn" disabled={busyId === item.id}>
+                                {acting.status === "approved" ? "Confirm approve" : "Confirm reject"}
+                              </button>
+                              <button type="button" className="admin-overview-action-btn" disabled={busyId === item.id} onClick={() => setActing(null)}>
+                                Cancel
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
                           <div style={{ display: "flex", gap: 8 }}>
-                            <button type="button" className="admin-overview-action-btn" disabled={busyId === item.id} onClick={() => process(item, "approved")}>
+                            <button type="button" className="admin-overview-action-btn" onClick={() => { setActing({ id: item.id, status: "approved" }); setInput(""); }}>
                               Approve
                             </button>
-                            <button type="button" className="admin-overview-action-btn" disabled={busyId === item.id} onClick={() => process(item, "rejected")}>
+                            <button type="button" className="admin-overview-action-btn" onClick={() => { setActing({ id: item.id, status: "rejected" }); setInput(""); }}>
                               Reject
                             </button>
                           </div>
-                        ) : null}
+                        )}
                       </td>
                     </tr>
                   ))}
