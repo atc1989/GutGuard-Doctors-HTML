@@ -578,15 +578,22 @@ function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
       throw new Error("Missing getWheelPrizes helper in lib/api.ts.");
     }
 
+    // The email settings come from edge functions; one failing must not blank the doctor list
+    // (Orders' partner names and partner picker). Its error still shows in the banner.
+    const showFailure = <T,>(fallback: T) => (caught: unknown) => {
+      setError(caught instanceof Error ? caught.message : "Unable to load admin data.");
+      return fallback;
+    };
+
     const [loadedPrizes, loadedDoctors, loadedNewsletterHistory, loadedSmsHistory, loadedRegistrationEmail, loadedSequence] = await Promise.all([
       api.getWheelPrizes(),
       api.getDoctorRegistrations ? api.getDoctorRegistrations() : Promise.resolve([]),
       api.getNewsletterSendHistory ? api.getNewsletterSendHistory() : Promise.resolve([]),
       api.getSmsBlastHistory ? api.getSmsBlastHistory() : Promise.resolve([]),
       api.getRegistrationEmailSettings
-        ? api.getRegistrationEmailSettings()
+        ? api.getRegistrationEmailSettings().catch(showFailure(emptyRegistrationEmailSettings))
         : Promise.resolve(emptyRegistrationEmailSettings),
-      api.getSequenceSteps ? api.getSequenceSteps() : Promise.resolve([]),
+      api.getSequenceSteps ? api.getSequenceSteps().catch(showFailure([])) : Promise.resolve([]),
     ]);
     setPrizes(loadedPrizes.sort((a, b) => a.sort_order - b.sort_order));
     setDoctors(loadedDoctors);
