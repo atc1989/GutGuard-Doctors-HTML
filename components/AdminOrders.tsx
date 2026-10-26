@@ -2,13 +2,17 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
+  adminCreateOfflineOrder,
   adminImpersonateDoctor,
   adminListShopOrders,
   adminUpdateShopOrder,
+  loadShopCatalog,
+  type AdminOfflineOrderInput,
   type ShopOrder,
   type ShopOrderStatus,
   type ShopPaymentStatus,
 } from "@/lib/api";
+import { priceOrderLines, type Product, type Promo } from "@/lib/catalog";
 
 const ORDER_STATUSES: ShopOrderStatus[] = [
   "pending_payment",
@@ -22,7 +26,26 @@ const ORDER_STATUSES: ShopOrderStatus[] = [
 const PAYMENT_STATUSES: ShopPaymentStatus[] = ["pending", "review", "paid", "failed", "refunded"];
 
 /** Only what the referral column needs, so this does not depend on the admin doctor type. */
-type PartnerLike = { id: string; full_name: string; email: string; store_type?: "affiliate" | "lifestyle" | "main" };
+type PartnerLike = {
+  id: string;
+  full_name: string;
+  email: string;
+  routing_slug?: string;
+  store_type?: "affiliate" | "lifestyle" | "main";
+};
+
+const EMPTY_OFFLINE_ORDER: AdminOfflineOrderInput = {
+  paymentMethod: "consignment",
+  reference: "",
+  firstName: "",
+  lastName: "",
+  mobile: "",
+  email: "",
+  address: "",
+  items: [{ id: "", qty: 1 }],
+  referralSlug: "",
+  adminNotes: "",
+};
 
 export default function AdminOrders({ partners }: { partners: PartnerLike[] }) {
   const [orders, setOrders] = useState<ShopOrder[]>([]);
@@ -33,9 +56,10 @@ export default function AdminOrders({ partners }: { partners: PartnerLike[] }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  // Consignment/cash order being approved, and the reference number the admin types in.
-  const [approving, setApproving] = useState<ShopOrder | null>(null);
-  const [approvalReference, setApprovalReference] = useState("");
+  // Consignment/cash sale the admin is typing in; saved straight away as paid.
+  const [newOrder, setNewOrder] = useState<AdminOfflineOrderInput | null>(null);
+  const [newOrderError, setNewOrderError] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState<{ products: Product[]; promos: Promo[] }>({ products: [], promos: [] });
 
   const partnerNames = useMemo(
     () => new Map(partners.map((partner) => [partner.id, partner.full_name])),
@@ -99,7 +123,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
     loadOrders();
   }, [loadOrders]);
 
-  const searchedOrders = useMemo(() => {
+  const filteredOrders = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return orders;
     return orders.filter((order) =>
@@ -122,16 +146,9 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
     );
   }, [orders, partnerNames, search]);
 
-  // Consignment/cash orders sit in their own list until an admin approves them.
-  const approvalOrders = useMemo(() => searchedOrders.filter(isAwaitingApproval), [searchedOrders]);
-  const filteredOrders = useMemo(() => searchedOrders.filter((order) => !isAwaitingApproval(order)), [searchedOrders]);
-
   const metrics = useMemo(
     () => ({
-      awaitingApproval: orders.filter(isAwaitingApproval).length,
-      pending: orders.filter(
-        (order) => !isAwaitingApproval(order) && (order.status === "pending_payment" || order.status === "payment_review"),
-      ).length,
+      pending: orders.filter((order) => order.status === "pending_payment" || order.status === "payment_review").length,
       confirmed: orders.filter((order) => order.status === "confirmed" || order.status === "fulfilled").length,
     }),
     [orders],
@@ -163,39 +180,54 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
     }
   }
 
-  function openApproval(order: ShopOrder) {
-    setApproving(order);
-    setApprovalReference("");
-    setError(null);
+  function openNewOrder() {
+    setNewOrder(EMPTY_OFFLINE_ORDER);
+    setNewOrderError(null);
+    if (catalog.products.length === 0) {
+      loadShopCatalog()
+        .then(setCatalog)
+        .catch(() => setNewOrderError("Could not load the product list. Close and try again."));
+    }
   }
 
-  async function approveOrder(event: FormEvent<HTMLFormElement>) {
+  function setNewOrderLine(index: number, line: { id: string; qty: number }) {
+    setNewOrder((current) =>
+      current ? { ...current, items: current.items.map((item, i) => (i === index ? line : item)) } : current,
+    );
+  }
+
+  async function saveNewOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!approving) return;
-    const reference = approvalReference.trim();
-    if (!reference) return;
+    if (!newOrder) return;
 
     setIsSaving(true);
-    setError(null);
+    setNewOrderError(null);
     setNotice(null);
 
     try {
-      const saved = await adminUpdateShopOrder({
-        id: approving.id,
-        status: "paid",
-        paymentStatus: "paid",
-        mayaReference: reference,
-        adminNotes: approving.admin_notes ?? "",
-      });
-      setOrders((current) => current.map((order) => (order.id === saved.id ? saved : order)));
-      setApproving(null);
-      setNotice(`Approved ${saved.order_code} as paid.`);
+      const saved = await adminCreateOfflineOrder(newOrder);
+      setOrders((current) => [saved, ...current]);
+      setNewOrder(null);
+      setNotice(`Saved ${saved.order_code} as a paid ${saved.payment_method} order.`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not approve order.");
+      setNewOrderError(caught instanceof Error ? caught.message : "Could not save the order.");
     } finally {
       setIsSaving(false);
     }
   }
+
+  // Priced the same way the server will price it, so the admin sees the total before saving.
+  const newOrderItems = newOrder
+    ? priceOrderLines(newOrder.items.filter((item) => item.id), catalog.products, catalog.promos)
+    : null;
+  const newOrderTotal = (newOrderItems ?? []).reduce((sum, item) => sum + item.price * item.qty, 0);
+  const referralPartners = useMemo(
+    () =>
+      partners
+        .filter((partner) => partner.routing_slug)
+        .sort((a, b) => a.full_name.localeCompare(b.full_name)),
+    [partners],
+  );
 
   return (
     <section className="admin-wheel-panel admin-shop-orders-shell">
@@ -205,8 +237,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
           <h2>Website orders</h2>
         </div>
         <p>
-          {metrics.awaitingApproval} awaiting approval. {metrics.pending} pending payment review. {metrics.confirmed}{" "}
-          confirmed or fulfilled.
+          {metrics.pending} pending payment review. {metrics.confirmed} confirmed or fulfilled.
         </p>
       </div>
 
@@ -225,55 +256,10 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
         <button type="button" onClick={loadOrders} disabled={isLoading}>
           {isLoading ? "Loading" : "Refresh orders"}
         </button>
+        <button type="button" onClick={openNewOrder}>
+          Add order
+        </button>
       </div>
-
-      {approvalOrders.length > 0 ? (
-        <section className="admin-table-subsection">
-          <h3>For approval (consignment and cash)</h3>
-          <div className="admin-table-table-wrap">
-            <table className="admin-table-table admin-shop-orders-table">
-              <thead>
-                <tr>
-                  <th>Order</th>
-                  <th>Customer</th>
-                  <th>Mobile</th>
-                  <th>Method</th>
-                  <th>Came from</th>
-                  <th>Total</th>
-                  <th>Created</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {approvalOrders.map((order) => (
-                  <tr key={order.id}>
-                    <td>{order.order_code}</td>
-                    <td>
-                      <strong>{order.customer_name}</strong>
-                      <span>{order.email}</span>
-                    </td>
-                    <td>{order.mobile}</td>
-                    <td>{formatStatus(order.payment_method)}</td>
-                    <td>{referralSource(order, partnerNames, partnerStoreTypes)}</td>
-                    <td>{formatPeso(order.total_amount)}</td>
-                    <td>{formatAdminDate(order.created_at)}</td>
-                    <td>
-                      <div className="admin-table-row-actions">
-                        <button type="button" onClick={() => setSelectedOrder(order)}>
-                          View
-                        </button>
-                        <button type="button" onClick={() => openApproval(order)}>
-                          Approve
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      ) : null}
 
       {filteredOrders.length > 0 ? (
         <div className="admin-table-table-wrap">
@@ -434,7 +420,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                   <small>
                     {selectedOrder.payment_method === "maya"
                       ? "Maya writes this on payment. Only edit it to reconcile a payment the webhook missed."
-                      : "Entered when the order is approved. Required before a consignment or cash order is marked paid."}
+                      : "The bank or cash reference entered when this order was added."}
                   </small>
                 </label>
                 <label className="admin-edit-wide">
@@ -470,50 +456,172 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
         </div>
       ) : null}
 
-      {approving ? (
+      {newOrder ? (
         <div className="admin-modal-backdrop" role="presentation">
-          <form className="admin-modal" role="dialog" aria-modal="true" onSubmit={approveOrder}>
+          <form className="admin-modal admin-shop-order-modal" role="dialog" aria-modal="true" onSubmit={saveNewOrder}>
             <div className="admin-modal-head">
               <div>
-                <p className="admin-wheel-kicker">Approve {formatStatus(approving.payment_method)} order</p>
-                <h2>{approving.order_code}</h2>
+                <p className="admin-wheel-kicker">Consignment or cash sale</p>
+                <h2>Add order</h2>
               </div>
-              <button type="button" onClick={() => setApproving(null)}>
+              <button type="button" onClick={() => setNewOrder(null)}>
                 Close
               </button>
             </div>
 
-            <p>
-              {approving.customer_name} - {formatPeso(approving.total_amount)}. Approving marks the order paid, credits the
-              referring partner&apos;s points and emails the customer a receipt.
-            </p>
+            <p>Saved as paid straight away. Prices come from the product catalog; there is no shipping fee.</p>
 
-            {/* The page-level alert sits behind this modal, so a refused approval must show here. */}
-            {error ? <div className="admin-wheel-alert error">{error}</div> : null}
+            {/* The page-level alert sits behind this modal, so errors must show here. */}
+            {newOrderError ? <div className="admin-wheel-alert error">{newOrderError}</div> : null}
 
             <div className="admin-edit-grid">
-              <label className="admin-edit-wide">
-                {approving.payment_method === "consignment" ? "Bank reference no." : "Reference no."}
+              <label>
+                Payment method
+                <select
+                  value={newOrder.paymentMethod}
+                  onChange={(event) =>
+                    setNewOrder({ ...newOrder, paymentMethod: event.target.value as AdminOfflineOrderInput["paymentMethod"] })
+                  }
+                >
+                  <option value="consignment">Consignment</option>
+                  <option value="cash">Cash</option>
+                </select>
+              </label>
+              <label>
+                {newOrder.paymentMethod === "consignment" ? "Bank reference no." : "Reference no."}
                 <input
-                  value={approvalReference}
+                  value={newOrder.reference}
                   required
-                  autoFocus
                   placeholder={
-                    approving.payment_method === "consignment"
-                      ? "Reference number on the bank deposit or transfer"
+                    newOrder.paymentMethod === "consignment"
+                      ? "Reference on the bank deposit or transfer"
                       : "Cash receipt or reference number"
                   }
-                  onChange={(event) => setApprovalReference(event.target.value)}
+                  onChange={(event) => setNewOrder({ ...newOrder, reference: event.target.value })}
+                />
+              </label>
+              <label>
+                First name
+                <input
+                  value={newOrder.firstName}
+                  required
+                  onChange={(event) => setNewOrder({ ...newOrder, firstName: event.target.value })}
+                />
+              </label>
+              <label>
+                Last name
+                <input
+                  value={newOrder.lastName}
+                  required
+                  onChange={(event) => setNewOrder({ ...newOrder, lastName: event.target.value })}
+                />
+              </label>
+              <label>
+                Mobile
+                <input
+                  type="tel"
+                  value={newOrder.mobile}
+                  required
+                  onChange={(event) => setNewOrder({ ...newOrder, mobile: event.target.value })}
+                />
+              </label>
+              <label>
+                Email (optional, gets the receipt)
+                <input
+                  type="email"
+                  value={newOrder.email}
+                  onChange={(event) => setNewOrder({ ...newOrder, email: event.target.value })}
+                />
+              </label>
+              <label className="admin-edit-wide">
+                Address
+                <textarea
+                  value={newOrder.address}
+                  required
+                  rows={2}
+                  onChange={(event) => setNewOrder({ ...newOrder, address: event.target.value })}
+                />
+              </label>
+
+              {newOrder.items.map((line, index) => (
+                <div key={index} className="admin-edit-wide admin-offline-order-line">
+                  <label>
+                    Product
+                    <select
+                      value={line.id}
+                      required
+                      onChange={(event) => setNewOrderLine(index, { ...line, id: event.target.value })}
+                    >
+                      <option value="">{catalog.products.length ? "Select product" : "Loading products"}</option>
+                      {catalog.products
+                        .filter((product) => product.status === "active")
+                        .map((product) => (
+                          <option key={product.id} value={product.id}>
+                            {product.name} ({product.caps} caps)
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <label>
+                    Qty
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={line.qty}
+                      required
+                      onChange={(event) => setNewOrderLine(index, { ...line, qty: Number(event.target.value) })}
+                    />
+                  </label>
+                  {newOrder.items.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => setNewOrder({ ...newOrder, items: newOrder.items.filter((_, i) => i !== index) })}
+                    >
+                      Remove
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+              <div className="admin-edit-wide">
+                <button
+                  type="button"
+                  onClick={() => setNewOrder({ ...newOrder, items: [...newOrder.items, { id: "", qty: 1 }] })}
+                >
+                  Add another product
+                </button>
+              </div>
+
+              <label className="admin-edit-wide">
+                Referring partner (optional, credits G-Points)
+                <select
+                  value={newOrder.referralSlug}
+                  onChange={(event) => setNewOrder({ ...newOrder, referralSlug: event.target.value })}
+                >
+                  <option value="">None - direct sale</option>
+                  {referralPartners.map((partner) => (
+                    <option key={partner.id} value={partner.routing_slug}>
+                      {partner.full_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="admin-edit-wide">
+                Admin notes
+                <textarea
+                  value={newOrder.adminNotes}
+                  rows={2}
+                  onChange={(event) => setNewOrder({ ...newOrder, adminNotes: event.target.value })}
                 />
               </label>
             </div>
 
             <div className="admin-modal-actions">
-              <button type="button" onClick={() => setApproving(null)}>
+              <button type="button" onClick={() => setNewOrder(null)}>
                 Cancel
               </button>
-              <button type="submit" disabled={isSaving || !approvalReference.trim()}>
-                {isSaving ? "Approving" : "Approve as paid"}
+              <button type="submit" disabled={isSaving || !newOrderItems}>
+                {isSaving ? "Saving" : `Save as paid${newOrderItems ? ` - ${formatPeso(newOrderTotal)}` : ""}`}
               </button>
             </div>
           </form>
@@ -521,11 +629,6 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
       ) : null}
     </section>
   );
-}
-
-/** Consignment/cash orders waiting for an admin to approve them with a reference number. */
-function isAwaitingApproval(order: ShopOrder) {
-  return order.payment_method !== "maya" && order.payment_status !== "paid" && order.status !== "cancelled";
 }
 
 function Summary({ items }: { items: Array<[string, string]> }) {
