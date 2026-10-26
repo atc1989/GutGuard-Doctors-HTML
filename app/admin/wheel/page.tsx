@@ -7,7 +7,7 @@ import AdminOrders from "@/components/AdminOrders";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { DownloadIcon } from "@/components/Icons";
 import { NAME_PREFIXES } from "@/lib/constants";
-import { getPartnerQrLink } from "@/components/partner/shared";
+import { QR_LOGO_PROPS, getPartnerQrLink } from "@/components/partner/shared";
 import { formatPrefixedName } from "@/lib/validation";
 import { isSandboxShop } from "@/lib/supabase";
 import {
@@ -1863,7 +1863,9 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                             id={getDoctorQrElementId(doctor.id, qrMode)}
                             className="admin-doctor-qr-code"
                             value={qrUrl}
-                            size={108}
+                            // Drawn at the download's size so the logo matches; CSS shows it at 108px.
+                            size={1024}
+                            {...QR_LOGO_PROPS}
                             marginSize={2}
                           />
                           <QRCodeCanvas
@@ -1871,6 +1873,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                             hidden
                             value={qrUrl}
                             size={1024}
+                            {...QR_LOGO_PROPS}
                             marginSize={2}
                           />
                           <div>
