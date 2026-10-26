@@ -4,23 +4,21 @@ _Last reviewed against the code on 2026-10-26. Screen labels are quoted exactly 
 
 ## How to use this guide
 
-GutGuard runs on four connected websites:
+Every GutGuard partner account is a **store**. Each store has one of three levels, and each level sees a slightly different dashboard. Find your level below.
 
-| Website | Who uses it | What it is for |
-|---|---|---|
-| **gutguard.ph** | Everyone | Public information site |
-| **shop.gutguard.ph** | Customers | Buying SynBIOTIC+ |
-| **partners.gutguard.ph** | Doctor partners | Applying, signing in, the partner dashboard |
-| **…/admin** | GutGuard staff | Running the whole system |
+| Store level | Badge next to your name | How you get it | Read |
+|---|---|---|---|
+| 🌱 **Affiliate Store** | "Affiliate" (green) | Every new account starts here | Section 1.1 |
+| 🛍️ **Lifestyle Store** | "Lifestyle" (blue) | **Automatic**, when your first customer completes a paid order | Section 1.2 |
+| 🏢 **Main Store** | "Main Store" (gold) | Upgraded by a GutGuard admin | Section 1.3 |
+| **Administrator** | — | GutGuard staff | Section 2 |
 
-Find your role below and read only that section.
+Each level builds on the one before it. Lifestyle and Main Store partners only need to read what is new for their level; the basics are in 1.1.
 
-- **Section 1 — End-User Roles**
-  - 1.1 New Doctor Applicant
-  - 1.2 Doctor Partner (Affiliate & Lifestyle Store)
-  - 1.3 Main Store Partner
-  - 1.4 Customer (Shopper)
-  - 1.5 Story Contributor (Testimonials)
+- **Section 1 — Store Accounts**
+  - 1.1 Affiliate Store
+  - 1.2 Lifestyle Store
+  - 1.3 Main Store
 - **Section 2 — Administrator Guide**
   - 2.1 System Configuration
   - 2.2 User Management
@@ -30,14 +28,20 @@ Find your role below and read only that section.
 
 ---
 
-# Section 1: End-User Roles
+# Section 1: Store Accounts
 
-## 1.1 New Doctor Applicant
+## 1.1 Affiliate Store
 
 ### Role overview
-You are a doctor (or clinic owner) who wants to join the GutGuard partner program. Once you join, you can share your own shop link with patients and earn E-Points on their purchases.
+You are a doctor (or clinic owner) who has just joined the GutGuard partner program. As an Affiliate, you:
 
-### First-time onboarding
+- Share your **Shop QR** with patients
+- Earn E-Points on their paid orders
+- Make your first paid sale, which upgrades you to a Lifestyle Store
+
+Your **Referral QR** (for inviting other doctors) stays **locked** until that first paid sale.
+
+### First-time onboarding: Apply
 
 You can start in any of these ways:
 
@@ -48,11 +52,7 @@ You can start in any of these ways:
 
 > **Tip:** If someone invited you, use their link. The system remembers the invitation for 30 days on that browser. If you open the form some other way, nobody gets credit for inviting you.
 
-### Core workflow: Apply and open your dashboard
-
-**Step 1 — Fill in the application form**
-
-You will see a page titled **"Apply to become a partner"**. Fill in:
+**Step 1 — Fill in the form.** The page is titled **"Apply to become a partner"**. Fill in:
 
 | Field | Required? | Notes |
 |---|---|---|
@@ -65,142 +65,82 @@ You will see a page titled **"Apply to become a partner"**. Fill in:
 | Complete Clinic Address | Yes | |
 | Where did you find us? | No | For example: colleague, social media, event |
 
-If someone invited you, you will see **"Invited by partner #10xxx"** just above the button. Only the inviting partner's number is shown, not their name.
+If someone invited you, you will see **"Invited by partner #10xxx"** just above the button.
 
-**Step 2 — Submit**
+**Step 2 — Submit.** Click **"Submit application"**. The screen shows **"Application received"**, then **"Sending your sign-in code…"**.
 
-1. Click **"Submit application"**.
-2. The screen shows **"Application received"** and then **"Sending your sign-in code…"**.
+**Step 3 — Enter your code.**
+1. On the **"Check your email"** screen, open the email titled **"Your GutGuard sign-in code"**.
+2. Type the 6 digits into **"Verification code"**.
+3. Click **"Verify and continue"**.
 
-**Step 3 — Enter your 6-digit code**
+**Step 4 — You're in.** Your dashboard opens as an **Affiliate Store**. You also get a permanent **partner number** (for example, 10245) and a welcome email.
 
-1. You are taken to a **"Check your email"** screen.
-2. Open the email with the subject **"Your GutGuard sign-in code"**.
-3. Type the 6 digits into **"Verification code"**.
-4. Click **"Verify and continue"**.
+> Accounts are approved automatically. You don't need to wait for GutGuard to accept you.
 
-**Step 4 — You're in**
-
-Your partner dashboard opens. A welcome email (Step 1 of the GutGuard email series) is sent to you.
-
-Your new account is set up like this:
-
-- It starts as an **Affiliate Store**.
-- It gets a permanent **partner number** (for example, 10245).
-- Your **Shop QR** works right away.
-- Your **Referral QR** (for inviting other doctors) stays **locked** until your first customer pays. See section 1.2.
-
-> There is no password. Each time you sign in, you get a new code by email.
-
-### FAQ / Troubleshooting
-
-| Message or problem | What it means | What to do |
-|---|---|---|
-| "Please complete the highlighted fields." | One or more fields are missing or invalid | Fix every field outlined in red |
-| "Please enter a valid PH mobile number." | The number is not `09…` + 9 digits | Re-type it without the country code, e.g. `09171234567` |
-| "Enter a valid TikTok username, or leave this blank." | The username has spaces or symbols | Use letters, numbers, `.` or `_` only, or leave it empty |
-| "This email has already been registered. Sign in with a one-time code instead." | You already have an account | Click **"Sign in"** and use the same email |
-| "This TikTok username has already been registered…" | Another account uses that username | Check the spelling. If it really is yours, contact GutGuard |
-| "A partner cannot refer themselves…" | You opened your own invite link | Register without the link, or use a different inviter's link |
-| "Your account was created, but we couldn't email a sign-in code." | The account exists but the email failed | Click **"Email me a sign-in code"** on the sign-in screen |
-| The "Invited by" line doesn't appear | The invite link was wrong or expired | Ask your inviter to send their link again **before** you submit. Credit can't be added afterwards, except by an admin transfer (see 2.2) |
-| I can't find the code email | Spam filter, or a typo in the email | Check your Spam/Promotions folders. Wait 60 seconds, then click **"Resend code"** |
-
----
-
-## 1.2 Doctor Partner (Affiliate & Lifestyle Store)
-
-### Role overview
-You share GutGuard with patients and colleagues. You use the dashboard to:
-
-- Get your QR codes and links
-- See orders from your patients
-- Track E-Points and rebate milestones
-- See doctors you have invited (Lifestyle only)
-
-There are two store levels at this stage:
-
-| Store level | How you get it | What it can do |
-|---|---|---|
-| 🌱 **Affiliate** | Every new account starts here | Sell through your **Shop QR**. The Referral QR is locked |
-| 🛍️ **Lifestyle** | **Automatic** when your first customer completes a paid order (an admin can also promote you) | Everything above, **plus** the **Referral QR** to invite other doctors |
-
-### Signing in
+### Signing in later
 
 1. Open **partners.gutguard.ph/partner**. You can also click **"Log in"** on the shop or main site.
 2. On **"Welcome back"**, type your **Email address**.
 3. Click **"Email me a sign-in code"**.
-4. Type the 6-digit code from the email.
-5. Click **"Verify and continue"**.
+4. Type the 6-digit code from the email, then click **"Verify and continue"**.
 
-You stay signed in on that browser until you sign out. To sign out, click your name in the top-right corner, then **"Sign out"**.
+There is no password. You stay signed in on that browser until you sign out: click your name in the top-right corner, then **"Sign out"**.
 
 ### Finding your way around
 
-- **Top bar:** **"Copy shop link"** and your name, with your store level (Affiliate / Lifestyle).
+- **Top bar:** **"Copy shop link"**, and your name with the **"Affiliate"** badge.
+- **Green welcome banner:** "Welcome to the GutGuard Affiliate Track!"
 - **Left menu** (bottom bar on phones):
   - **Overview** — your summary
   - **Orders** — purchases credited to you
-  - **Referred partners** — doctors you invited
+  - **Referred partners** — doctors you invited (empty until you can invite)
   - **E-Points** — points and rebate milestones
   - **Share & QR** — your codes, links and posters
 - **Side card "Your shop link"** — shows the number of clicks in the last 30 days.
 
-### Core workflow A: Get your QR codes and share them
+### Core workflow A: Share your Shop QR
 
 1. Click **Share & QR**.
-2. Choose a tab:
-
-   | Tab | Link it creates | What happens when someone scans it |
-   |---|---|---|
-   | **Shop QR** | `gutguard.ph/s/<your number>` | They go to the shop. Their order is credited to you |
-   | **Referral QR** | `gutguard.ph/j/<your number>` | They go to the partner application form, with you as the inviter |
-   | **Profile QR** | `partners.gutguard.ph/dr/<key>` | They go to your TikTok profile |
-
+2. Open the **"Shop QR"** tab. Your link is `gutguard.ph/s/<your number>`. Patients who scan it go to the shop, and their orders are credited to you.
 3. Use the buttons on the page:
    - **"Copy link"** or **"Open link"** — copy or test the link.
-   - **"Copy text"** — copies a ready-made message you can paste into Viber, WhatsApp or SMS.
+   - **"Copy text"** — copies a ready-made message for Viber, WhatsApp or SMS.
    - **"Download PNG"** — saves a high-resolution QR image.
    - **"Preview poster"**, then **"Print poster"** — prints an A4 poster.
+4. Optional: the **"Profile QR"** tab links to your TikTok profile, if you gave a username when you applied.
 
-> **How credit works:** a customer is linked to the **last** partner link they clicked, for **30 days**. If they later click another partner's link, that partner gets the next order.
+> **How credit works:** a customer is linked to the **last** partner link they clicked, for **30 days**. If they later click another partner's link, that partner gets the next order. An order is not credited to you if the buyer's email or mobile matches yours.
 
-### Core workflow B: Unlock your Referral QR (Affiliate → Lifestyle)
+### Core workflow B: Make your first sale (unlock Lifestyle)
 
-1. While you are an Affiliate, the tab reads **"Referral QR (Locked)"** and shows **"Referral QR Inactive"**.
+1. While you are an Affiliate, the **"Referral QR (Locked)"** tab shows **"Referral QR Inactive"**.
 2. Share your **Shop QR** with a patient.
 3. When that patient's payment is confirmed, your account changes to **Lifestyle** automatically. No action or request is needed.
-4. The badge next to your name changes to **"Lifestyle"**, and the Referral QR becomes active.
+4. The badge next to your name changes to **"Lifestyle"**, and the Referral QR becomes active. Continue with section 1.2.
 
 ### Core workflow C: Check your orders
 
 1. Click **Orders**.
-2. Pick a tab:
-   - **"All orders"**
-   - **"Direct"** — orders through your own links
-   - **"Referred"** — orders through doctors you invited
-3. Filter if needed:
+2. Filter if needed:
    - **Status:** Paid, Awaiting payment, Delivered, Cancelled, Refunded
    - **Sort**
    - **From / To** dates
    - **"Reset"** clears all filters
-4. Click a row to see buyer contact details and the delivery address.
+3. Click a row to see the buyer's contact details and delivery address.
 
 > Buyer contact details are confidential. Use them only to follow up on that order.
 
-### Core workflow D: Track E-Points and rebates
+### Core workflow D: Track your E-Points
 
 **How points are earned**
 - You earn **1 E-Point for every ₱1,000** of a paid order (minimum 1 point per paid order).
-- When a doctor you invited makes a sale, you also receive the same number of **pass-up points**. This only goes one level up.
 - If an order is refunded or its payment fails, its points are removed.
 
 **Steps**
 1. Click **E-Points**.
-2. On the **"Rebates"** tab you will see two tracks. Each runs in cycles of 1,500 points:
-   - **Track A** — your own shop sales
-   - **Track B** — pass-up points from doctors you invited
-3. Each track has three milestones:
+2. On the **"Rebates"** tab, **Track A** counts your own shop sales in cycles of 1,500 points.
+3. Each cycle has three milestones:
 
    | Points in the cycle | Rebate shown |
    |---|---|
@@ -213,56 +153,124 @@ You stay signed in on that browser until you sign out. To sign out, click your n
 
 > Cash rebates are checked and paid by GutGuard administration. "Milestone reached" means you qualify. It does not mean the money has been sent.
 
-### Core workflow E: View your network (Lifestyle)
-
-1. Click **Referred partners**.
-2. **"Team Hierarchy"** lists each doctor you invited, with their orders and the points they passed up to you.
-3. **"Partner Directory"** shows the same doctors as cards. Click **"Profile"** for details.
-
 ### FAQ / Troubleshooting
 
 | Message or problem | What to do |
 |---|---|
+| "Please complete the highlighted fields." | Fix every field outlined in red |
+| "Please enter a valid PH mobile number." | Type it as `09` + 9 digits, e.g. `09171234567` |
+| "Enter a valid TikTok username, or leave this blank." | Use letters, numbers, `.` or `_` only, or leave it empty |
+| "This email has already been registered…" | You already have an account. Click **"Sign in"** |
+| "This TikTok username has already been registered…" | Check the spelling. If it really is yours, contact GutGuard |
+| "A partner cannot refer themselves…" | You opened your own invite link. Register without it |
+| "Your account was created, but we couldn't email a sign-in code." | Click **"Email me a sign-in code"** on the sign-in screen |
+| The "Invited by" line doesn't appear | The invite link was wrong. Ask your inviter to resend it **before** you submit. Afterwards, only an admin can fix it (see 2.2, Transfer) |
 | "This email is not registered as a GutGuard partner." | Sign in with the email you applied with. If GutGuard created your code for you, ask an admin to add your email first |
-| "That code isn't correct…" | Re-type the newest code. Each new code replaces the old one |
+| "That code isn't correct…" | Type the newest code. Each new code replaces the old one |
 | "That code has expired…" | Click **"Resend code"** |
 | "Too many sign-in emails were sent…" / "A new code can't be sent yet…" | Wait about 5 minutes. Only 2 codes can be sent per email in 5 minutes |
 | "Too many sign-in requests…" | Many people on your Wi-Fi are signing in at once. Wait a few minutes |
-| My Referral QR is still locked | Your first **paid** order hasn't come through yet. Orders still "Awaiting payment" don't count |
-| A patient ordered but it isn't in my list | They may have reached the shop without your link, or clicked someone else's link afterwards. An order is not credited if the buyer's email or mobile matches yours |
-| My points and cycle numbers differ between screens | The Overview card adds Track A and Track B together. The E-Points tracks count them separately |
-| "Rebate history" is empty even though a milestone is reached | Rebate payouts are recorded by administration. Contact GutGuard to confirm payout |
+| I can't find the code email | Check Spam/Promotions. Wait 60 seconds, then click **"Resend code"** |
+| My Referral QR is still locked | Your first **paid** order hasn't come through yet. "Awaiting payment" orders don't count |
+| A patient ordered but it isn't in my list | They reached the shop without your link, or clicked someone else's link afterwards |
 
 ---
 
-## 1.3 Main Store Partner
+## 1.2 Lifestyle Store
 
 ### Role overview
-A **Main Store** is a top-level partner that leads its own network of Lifestyle and Affiliate stores. Only a GutGuard admin can upgrade a Lifestyle store to Main Store.
+You have made your first paid sale. Everything from the Affiliate level still works. On top of that, you can now **invite other doctors** with your **Referral QR**. You earn **pass-up points** whenever a doctor you invited makes a sale.
 
-### Signing in
-Main Store partners sign in the same way as every partner (section 1.2). Your name badge reads **"Main Store"** in gold.
+### Onboarding
+There is nothing to apply for. The upgrade happens automatically on your first paid order (an admin can also promote you). Sign in as usual (section 1.1). Your badge now reads **"Lifestyle"**.
 
-### What's different
-Your menu has these pages:
+### Core workflow A: Invite a doctor
+
+1. Click **Share & QR** and open the **"Referral QR"** tab. Your link is `gutguard.ph/j/<your number>`.
+2. Send the link (**"Copy link"** or **"Copy text"**) or print the poster.
+3. The doctor scans it and fills in the application form. They should see **"Invited by partner #<your number>"** above the button.
+4. You receive an email when they register, and they appear under **Referred partners**.
+
+> Ask the doctor to use your link from the start. If they apply without it, you won't get credit, and only an admin can move them under you.
+
+### Core workflow B: View your network
+
+1. Click **Referred partners**.
+2. **"Team Hierarchy"** lists each doctor you invited, with their orders and the points they passed up to you. Click a row to expand it.
+3. **"Partner Directory"** shows the same doctors as cards. Click **"Profile"** for details.
+4. Use the search box and **Sort** (Most E-Points, Most Orders, Highest Sales, Alphabetical) to find someone.
+
+Only doctors you invited **directly** appear here (one level).
+
+### Core workflow C: Orders from your network
+
+1. Click **Orders**.
+2. Use the tabs:
+   - **"Direct"** — orders through your own links
+   - **"Referred"** — orders through doctors you invited
+   - **"All orders"** — both
+
+### Core workflow D: Track both rebate tracks
+
+**Pass-up points:** when a doctor you invited makes a sale, you receive the same number of points they earned. This only goes one level up.
+
+1. Click **E-Points**. The **"Rebates"** tab now has two separate tracks, each in cycles of 1,500 points with the same milestones (300 / 750 / 1,500 pts → ₱18,000 / ₱70,000 / ₱150,000):
+   - **Track A** — your own shop sales
+   - **Track B** — pass-up points from doctors you invited
+2. On **"Points Log"**, use **"My Shop"**, **"Referred"** or **"All Activity"** to see where each point came from.
+
+### FAQ / Troubleshooting
+
+| Problem | What to do |
+|---|---|
+| A doctor I invited isn't in my list | They applied without your link. Ask GutGuard to transfer them (this only works while they are still an Affiliate) |
+| I don't get points from my invitee's invitees | Pass-up points only go one level up |
+| My points and cycle numbers differ between screens | The Overview card adds Track A and Track B together. The E-Points page counts them separately |
+| "Rebate history" is empty even though a milestone is reached | Payouts are recorded by administration. Contact GutGuard to confirm payout |
+
+---
+
+## 1.3 Main Store
+
+### Role overview
+A **Main Store** leads its own network of Lifestyle and Affiliate stores. You use the dashboard to watch the whole network: its stores, orders and combined points.
+
+### Onboarding
+Only a GutGuard admin can upgrade a Lifestyle store to Main Store (a "breakaway"). After the upgrade:
+
+- You are no longer under your old upline.
+- Every store below you in your referral tree moves under you.
+- Your badge reads **"Main Store"** in gold.
+
+Sign in the same way as every partner (section 1.1).
+
+### Finding your way around
+Your menu changes to:
 
 - **Overview**
 - **Reports & Stores**
 - **Combined E-Points**
-- **Share & QR**
-
-On the Share page, the QR tabs are labelled **"Main Shop QR"** and **"Partner Registration QR"**.
+- **Share & QR** — the tabs are labelled **"Main Shop QR"** and **"Partner Registration QR"**
 
 ### Core workflow A: Monitor your network
+
 1. **Overview** shows:
    - **Lifestyle stores** and **Affiliate stores** under you
    - **Network orders**
    - **Network gross** (paid orders only)
+   - **"Recent network orders"**
 2. Click **Reports & Stores**.
-   - **"Store Directory"** lists every store under you. You can filter by **Type** and sort by points, orders, sales or name. The **Referral QR** column shows each store's QR status (Active / Locked).
-   - **"Network Orders"** lists every order across your network. You can filter by **Store** and **Status**. Click **"View"** to see the items and delivery details.
+   - **"Store Directory"** lists every store under you. Filter by **Type** and sort by points, orders, sales or name. The **Referral QR** column shows each store's QR status (Active / Locked).
+   - **"Network Orders"** lists every order across your network. Filter by **Store** and **Status**. Click **"View"** to see the items and delivery details.
 
-### Core workflow B: Combined E-Points
+### Core workflow B: Grow your network
+
+1. Click **Share & QR** → **"Partner Registration QR"**.
+2. Share it with doctors. New doctors who register through it join your network as Affiliate stores.
+3. Use **"Main Shop QR"** for your own direct sales.
+
+### Core workflow C: Combined E-Points
+
 1. Click **Combined E-Points**.
 2. You have **one pooled track**: your own sales plus pass-ups, together, in cycles of 1,500 points. The milestones are the same: 300 / 750 / 1,500 pts → ₱18,000 / ₱70,000 / ₱150,000.
 
@@ -275,109 +283,7 @@ On the Share page, the QR tabs are labelled **"Main Shop QR"** and **"Partner Re
 | Overview tiles all show 0 | Reload the page. If they are still 0, contact GutGuard. Errors on this screen are not shown on the page |
 | Search in Network Orders misses an order | Search only covers the page you are looking at. Clear the search and go to the next page |
 | Status names differ from the Orders page | "Pending" here is the same as "Awaiting payment", and "Fulfilled" is the same as "Delivered" |
-
----
-
-## 1.4 Customer (Shopper)
-
-### Role overview
-You want to buy SynBIOTIC+ and pay online. You don't need an account.
-
-### Getting to the shop
-- Go to **shop.gutguard.ph**, **or**
-- Scan your doctor's **Shop QR** (`gutguard.ph/s/<number>`). The shop will show **"Shop of #<number>"**.
-
-> Links from a doctor often show the **"Try first"** products only. That is normal.
-
-### Core workflow A: Place an order
-
-1. **Choose products.** Under **"Choose your order"**, pick a tab:
-   - **"Try first"** — trial packs
-   - **"Full protocol"** — Start, Grow or Peak packages
-
-   Then click **"Add <product>"**. If a promo is running, you will see the old price crossed out and a **"Limited time offer"** label.
-2. **Review the basket.** The basket opens automatically. Use **−/+** to change the quantity (up to 20 per item). Click **"Checkout"**.
-3. **Fill in delivery details.**
-   - Email
-   - Mobile (`09XX XXX XXXX`)
-   - First name and Last name
-   - Street address
-   - Then choose, in this order: **Capital or Province → City / Municipality → Barangay**
-   - The **ZIP** code fills in automatically when it is known.
-4. **Check the total.** Shipping is calculated from Davao (J&T Express) as soon as you choose a province.
-5. **Pay.** Click **"Pay ₱<total> with Maya"**.
-   - The screen shows **"Order <code> saved."** Your order is saved **before** payment, so it won't be lost.
-   - You are taken to Maya's secure page. You can pay by card, Maya wallet, QRPh or online banking.
-6. **Come back.** After payment you return to your order page automatically.
-
-### Core workflow B: Track your order
-
-- Open the link in the email **"We received your GutGuard order GG-…"**, **or** go to `shop.gutguard.ph/shop/order/<your order code>`.
-- Order codes look like `GG-20261026-1A2B3C4D`.
-
-| Status on page | Meaning | What to do |
-|---|---|---|
-| **Awaiting payment** | The order is saved but not paid | Click **"Pay ₱… with Maya"** |
-| **Confirming** | Maya is still confirming | Wait. The page updates by itself within about 20 seconds |
-| **Paid** | Payment received | Nothing. GutGuard will call you to confirm delivery before shipping |
-| **Payment on hold** | The payment went through and is being verified | Nothing. You'll be emailed once it clears |
-| **Payment failed** | Nothing was charged | Try again with the same or a different payment method |
-| **Cancelled at Maya** | You stopped the payment | Pay whenever you're ready |
-| **Cancelled** | The payment window expired | Place a new order |
-| **Refunded** | Money returned | Allow a few banking days |
-
-You will receive two emails:
-1. **Order received** — sent when your order is saved.
-2. **"Payment confirmed for GutGuard order …"** — sent once payment clears.
-
-### FAQ / Troubleshooting
-
-| Message | What to do |
-|---|---|
-| "Address lists could not be loaded…" | Check your internet and click **"Try again"** |
-| "We could not open the Maya checkout just now, but nothing was lost." | Click **"Try payment again"**, or **"Open my order page"** and pay later |
-| "Your delivery address could not be verified…" | Re-select province, city and barangay from the lists, then order again |
-| "Order totals could not be verified…" | Prices changed since you added items. Empty the basket and add the items again |
-| "We can't price shipping to this province…" / "This order is above 6kg…" | Message GutGuard on Messenger (chat bubble, bottom corner) before paying |
-| An old Maya payment link doesn't work | Maya sessions expire after about an hour. Always pay from your **order page** |
-| Wrong address after paying | Contact GutGuard with your order code **before** it ships |
-
----
-
-## 1.5 Story Contributor (Testimonials)
-
-### Role overview
-You are a GutGuard user who wants to share your experience on the **Stories** page (`gutguard.ph/testimonials`).
-
-### Access
-No account is needed. Go to **Stories** and click **"Share your story →"**. You can also open `/testimonials/share` directly.
-
-### Core workflow: Submit a story
-
-1. Fill in:
-   - **Your name** (2–80 characters)
-   - **Email** (never published)
-   - **City or role** (optional)
-   - **Your story** (40–1,500 characters)
-2. Add pictures if you like:
-   - **Profile photo**: one image
-   - **Photos**: up to 4. JPG, PNG or WebP, 10 MB each
-3. **Video (optional).** Videos can't be uploaded directly. Instead:
-   1. Upload the video to Google Drive.
-   2. In Drive, open **Share → General access** and choose **"Anyone with the link"**.
-   3. Paste that link into **Video link**.
-4. Tick the **consent** box.
-5. Click **"Send my story"**.
-6. You will see **"Thank you — we have it."** A GutGuard staff member reads every story before it is published. This usually takes a few days.
-
-### FAQ / Troubleshooting
-
-| Message | What to do |
-|---|---|
-| "That does not look like a Google Drive link…" | Copy the share link from Google Drive itself |
-| "You already have stories awaiting review…" | You can have up to 3 stories waiting at once. Wait a day |
-| My video won't play on the site | The Drive file isn't public. Set **"Anyone with the link"** |
-| My story was not published | Stories that claim to treat, cure or prevent a disease, or that name another person without their permission, cannot be published |
+| I can't find the Orders or Referred partners pages | Main Stores use **Reports & Stores** instead |
 
 ---
 
