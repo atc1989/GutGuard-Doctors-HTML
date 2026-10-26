@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent, type InputHTMLAttributes } from "react";
+import { useEffect, useState, type FormEvent, type InputHTMLAttributes } from "react";
 import { LoaderCircle } from "lucide-react";
 import { NAME_PREFIXES, SPECIALTIES } from "@/lib/constants";
 import { registerDoctor } from "@/lib/api";
@@ -13,7 +13,7 @@ import {
 } from "@/lib/validation";
 
 type PartnerApplyFormProps = {
-  invitedBy?: { slug: string; fullName: string } | null;
+  invitedBy?: { slug: string; fullName: string; code: number | null; source: string } | null;
   onRegistered: (email: string, doctorId: string) => Promise<void>;
   onSignIn: () => void;
 };
@@ -39,6 +39,14 @@ export default function PartnerApplyForm({
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // The invitation loads after the form: fill in where the inviting QR was used (set on Admin →
+  // Partner Codes), unless the doctor already typed an answer. They can still change it.
+  const inviteSource = invitedBy?.source ?? "";
+  useEffect(() => {
+    if (!inviteSource) return;
+    setValues((current) => (current.whereDidYouFindUs ? current : { ...current, whereDidYouFindUs: inviteSource }));
+  }, [inviteSource]);
 
   function handleValueChange(name: FieldName, value: string) {
     setValues((current) => ({
@@ -247,7 +255,7 @@ export default function PartnerApplyForm({
         onValueChange={handleValueChange}
         onFieldBlur={handleFieldBlur}
         type="text"
-        placeholder="e.g. Colleague, social media, event"
+        placeholder="e.g. Friend, Facebook, TikTok, clinic event"
         autoComplete="off"
       />
 
@@ -258,9 +266,9 @@ export default function PartnerApplyForm({
       ) : null}
 
       {/* Just above Submit: the last thing read before applying is who gets the credit. */}
-      {invitedBy?.fullName ? (
+      {invitedBy?.code || invitedBy?.fullName ? (
         <p className="partner-invite-note">
-          Invited by <strong>{invitedBy.fullName}</strong>
+          Ref number <strong>{invitedBy.code ? `#${invitedBy.code}` : invitedBy.fullName}</strong>
         </p>
       ) : null}
 

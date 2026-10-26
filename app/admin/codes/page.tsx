@@ -3,10 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import { QRCodeCanvas, QRCodeSVG } from "qrcode.react";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
-import { getPartnerQrLink } from "@/components/partner/shared";
+import { QR_LOGO_PROPS, getPartnerQrLink, useCopy } from "@/components/partner/shared";
 import type { AdminDoctorRegistration } from "@/lib/api";
 
-type PendingPartner = { id: string; partner_code: number; routing_slug: string; created_at?: string };
+type PendingPartner = {
+  id: string;
+  partner_code: number;
+  routing_slug: string;
+  created_at?: string;
+  code_note?: string;
+  code_source?: string;
+};
 
 const QR_RENDER_PX = 1024;
 const day = (value: string) =>
@@ -50,6 +57,8 @@ export default function AdminCodesPage() {
             partner_code: doctor.partner_code!,
             routing_slug: doctor.routing_slug,
             created_at: doctor.created_at,
+            code_note: doctor.code_note,
+            code_source: doctor.code_source,
           })),
       );
       setLoaded(true);
@@ -60,14 +69,23 @@ export default function AdminCodesPage() {
     }
   }
 
-  async function generate() {
+  async function generate(note: string, source: string) {
     setIsCreating(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/codes", { method: "POST" });
+      const res = await fetch("/api/admin/codes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note, source }),
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Could not create a code.");
-      const created: PendingPartner = { ...data.partner, created_at: new Date().toISOString() };
+      const created: PendingPartner = {
+        ...data.partner,
+        created_at: new Date().toISOString(),
+        code_note: note.trim(),
+        code_source: source.trim(),
+      };
       setPending((current) => [created, ...current]);
       setSelected(created);
       setMaxCode((current) => Math.max(current, created.partner_code));
@@ -133,7 +151,11 @@ export default function AdminCodesPage() {
               {pending.map((partner) => (
                 <li key={partner.id}>
                   <strong>#{partner.partner_code}</strong>
-                  <span>{partner.created_at ? day(partner.created_at) : ""}</span>
+                  <span>
+                    {partner.created_at ? day(partner.created_at) : ""}
+                    {partner.code_note ? <> · {partner.code_note}</> : null}
+                    {partner.code_source ? <small>Source: {partner.code_source}</small> : null}
+                  </span>
                   <button
                     type="button"
                     aria-pressed={selected?.id === partner.id}
@@ -160,9 +182,11 @@ function ConfirmGenerate({
   nextCode: number;
   isCreating: boolean;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: (note: string, source: string) => void;
 }) {
   const preview = { id: "preview", partner_code: nextCode, routing_slug: `partner-${nextCode}` };
+  const [note, setNote] = useState("");
+  const [source, setSource] = useState("");
 
   return (
     <div
@@ -198,12 +222,34 @@ function ConfirmGenerate({
               <dd>{getPartnerQrLink(preview, "referral")}</dd>
             </div>
           </dl>
+          <label className="admin-codes-field">
+            <span>Description (optional, admin only)</span>
+            <input
+              type="text"
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              maxLength={200}
+              autoFocus
+              placeholder="e.g. Dr. Cruz, Makati clinic"
+            />
+          </label>
+          <label className="admin-codes-field">
+            <span>Where will this QR be used? (optional)</span>
+            <input
+              type="text"
+              value={source}
+              onChange={(event) => setSource(event.target.value)}
+              maxLength={120}
+              placeholder="e.g. Manila Med Expo booth"
+            />
+            <small>Doctors who join through this QR see it already filled in as &ldquo;Where did you find us?&rdquo;</small>
+          </label>
         </div>
         <div className="admin-modal-actions">
           <button type="button" onClick={onCancel} disabled={isCreating}>
             Cancel
           </button>
-          <button type="button" onClick={onConfirm} disabled={isCreating} autoFocus>
+          <button type="button" onClick={() => onConfirm(note, source)} disabled={isCreating}>
             {isCreating ? "Creating…" : "Generate code"}
           </button>
         </div>
@@ -230,7 +276,7 @@ function CodeQrs({ partner }: { partner: PendingPartner }) {
 function CodeQr({ partner, mode, label }: { partner: PendingPartner; mode: "shop" | "referral"; label: string }) {
   const link = getPartnerQrLink(partner, mode);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [copied, setCopied] = useState(false);
+  const { copied, share } = useCopy();
 
   function download() {
     const canvas = canvasRef.current?.querySelector("canvas");
@@ -241,26 +287,16 @@ function CodeQr({ partner, mode, label }: { partner: PendingPartner; mode: "shop
     anchor.click();
   }
 
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(link);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Clipboard blocked: the link is on screen to copy by hand.
-    }
-  }
-
   return (
     <figure className="admin-codes-qr">
       <figcaption>{label}</figcaption>
-      <QRCodeSVG value={link} size={QR_RENDER_PX} level="M" marginSize={4} style={{ width: "100%", height: "auto" }} />
+      <QRCodeSVG value={link} size={QR_RENDER_PX} {...QR_LOGO_PROPS} marginSize={4} style={{ width: "100%", height: "auto" }} />
       <div ref={canvasRef} hidden>
-        <QRCodeCanvas value={link} size={QR_RENDER_PX} level="M" marginSize={4} />
+        <QRCodeCanvas value={link} size={QR_RENDER_PX} {...QR_LOGO_PROPS} marginSize={4} />
       </div>
       <code>{link}</code>
       <div className="admin-codes-qr-actions">
-        <button type="button" onClick={copy}>{copied ? "Copied" : "Copy link"}</button>
+        <button type="button" onClick={() => share(link)}>{copied ? "Copied" : "Share link"}</button>
         <button type="button" onClick={download}>Download PNG</button>
       </div>
     </figure>

@@ -11,14 +11,14 @@ const LIFESTYLE_NAV = [
   { href: "/partner", label: "Overview", short: "Overview", icon: LayoutDashboard },
   { href: "/partner/orders", label: "Orders", short: "Orders", icon: Package },
   { href: "/partner/partners", label: "Referred partners", short: "Partners", icon: Users },
-  { href: "/partner/e-points", label: "E-Points", short: "E-Points", icon: Coins },
+  { href: "/partner/e-points", label: "G-Points", short: "G-Points", icon: Coins },
   { href: "/partner/share", label: "Share & QR", short: "Share", icon: QrCode },
 ] as const;
 
 const MAIN_STORE_NAV = [
   { href: "/partner", label: "Overview", short: "Overview", icon: LayoutDashboard },
   { href: "/partner/reports", label: "Reports & Stores", short: "Reports", icon: Package },
-  { href: "/partner/e-points", label: "Combined E-Points", short: "E-Points", icon: Coins },
+  { href: "/partner/e-points", label: "Combined G-Points", short: "G-Points", icon: Coins },
   { href: "/partner/share", label: "Share & QR", short: "Share", icon: QrCode },
 ] as const;
 

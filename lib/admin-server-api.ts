@@ -230,11 +230,17 @@ export async function serverGetDoctorRegistrations(adminPassword: string): Promi
 /** A blank partner with just a code; admin fills the details (and email, to sign in) later. */
 export async function serverAdminCreatePendingPartner(
   adminPassword: string,
+  note = "",
+  source = "",
 ): Promise<{ id: string; partner_code: number; routing_slug: string }> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
 
+  // Empty fields are left out so the call still matches the one-arg function until
+  // 20261028000000_partner_code_note_source.sql is applied.
   const { data, error } = await supabase.rpc("admin_create_pending_partner", {
     p_admin_password: adminPassword,
+    ...(note ? { p_note: note } : {}),
+    ...(source ? { p_source: source } : {}),
   });
 
   if (error) throw error;

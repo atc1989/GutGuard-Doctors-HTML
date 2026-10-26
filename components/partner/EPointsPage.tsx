@@ -47,20 +47,20 @@ function PartnerEPointsPage() {
   return (
     <>
       <PageHeader
-        kicker="E-Points & Rebates"
+        kicker="G-Points & Rebates"
         title="Point Balances & Cash Rebates"
       />
 
       {/* Top Overview Stats Bar */}
-      <section className="pp-stats" aria-label="E-Points summary">
+      <section className="pp-stats" aria-label="G-Points summary">
         <StatTile label="Direct Shop Points" value={`${points.own_points} pts`} note="kept from direct customer orders" />
         <StatTile label="Referred Pass-Up Points" value={`${points.passup_points} pts`} note="earned from referred downline partners" />
-        <StatTile label="Lifetime E-Points" value={`${points.lifetime_points} pts`} note="direct and pass-up points combined" />
+        <StatTile label="Lifetime G-Points" value={`${points.lifetime_points} pts`} note="direct and pass-up points combined" />
         <StatTile label={`Cycle ${points.current_cycle} Balance`} value={`${points.points_in_cycle} pts`} note={`Target: ${CYCLE_TARGET} pts`} />
       </section>
 
       {/* Main Tab Bar (Shortened, no numbers) */}
-      <div className="pp-seg" role="tablist" aria-label="E-Points view">
+      <div className="pp-seg" role="tablist" aria-label="G-Points view">
         <button type="button" role="tab" aria-selected={tab === "rebates"} className={tab === "rebates" ? "active" : ""} onClick={() => setTab("rebates")}>
           Rebates
         </button>
@@ -83,7 +83,7 @@ function PartnerEPointsPage() {
               </span>
             </div>
             <div className="pp-progress-labels">
-              <strong>{direct.inCycle} / {CYCLE_TARGET} Direct E-Points (Cycle {direct.cycle})</strong>
+              <strong>{direct.inCycle} / {CYCLE_TARGET} Direct G-Points (Cycle {direct.cycle})</strong>
               <span>{Math.round((direct.inCycle / CYCLE_TARGET) * 100)}%</span>
             </div>
             <div className="pp-progress" role="progressbar" aria-valuemin={0} aria-valuemax={CYCLE_TARGET} aria-valuenow={direct.inCycle} aria-label="Direct sales cycle progress">
@@ -116,7 +116,7 @@ function PartnerEPointsPage() {
               </span>
             </div>
             <div className="pp-progress-labels">
-              <strong>{referred.inCycle} / {CYCLE_TARGET} Referred E-Points (Cycle {referred.cycle})</strong>
+              <strong>{referred.inCycle} / {CYCLE_TARGET} Referred G-Points (Cycle {referred.cycle})</strong>
               <span>{Math.round((referred.inCycle / CYCLE_TARGET) * 100)}%</span>
             </div>
             <div className="pp-progress" role="progressbar" aria-valuemin={0} aria-valuemax={CYCLE_TARGET} aria-valuenow={referred.inCycle} aria-label="Referred pass-up cycle progress">
@@ -226,7 +226,7 @@ function PartnerEPointsPage() {
                   Network Performance
                 </span>
                 <strong style={{ display: "block", fontSize: 15, color: "var(--ink)", marginTop: 2 }}>
-                  {points.passup_points} Referred E-Points from {referredSources.length} Downline Orders
+                  {points.passup_points} Referred G-Points from {referredSources.length} Downline Orders
                 </strong>
               </div>
               <Link href="/partner/partners" className="shop-secondary" style={{ minHeight: 38, padding: "0 16px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }}>
