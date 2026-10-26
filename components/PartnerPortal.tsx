@@ -63,7 +63,7 @@ export default function PartnerPortal({ initialView: initialViewProp, referrerSl
   const pendingWelcomeDoctorIdRef = useRef<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
-  const [invitation, setInvitation] = useState<{ slug: string; fullName: string } | null>(null);
+  const [invitation, setInvitation] = useState<{ slug: string; fullName: string; code: number | null; source: string } | null>(null);
 
   const load = useCallback(async () => {
     const dashboard = await getPartnerDashboard();
@@ -148,7 +148,7 @@ export default function PartnerPortal({ initialView: initialViewProp, referrerSl
       .then((invite) => {
         if (cancelled || !invite) return;
         window.sessionStorage.setItem(PARTNER_REFERRER_KEY, invite.routing_slug);
-        setInvitation({ slug: invite.routing_slug, fullName: invite.full_name });
+        setInvitation({ slug: invite.routing_slug, fullName: invite.full_name, code: invite.partner_code, source: invite.code_source });
       })
       .catch(() => {
         // Invalid or unreachable slug: register with no referrer rather than blocking the form.

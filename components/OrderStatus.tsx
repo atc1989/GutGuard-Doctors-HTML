@@ -175,7 +175,7 @@ export default function OrderStatus({ orderCode }: { orderCode: string }) {
           </div>
           {order.maya_reference ? (
             <div>
-              <dt>Maya reference</dt>
+              <dt>Payment reference</dt>
               <dd>
                 {order.maya_reference}
                 <small>Quote this if you contact us</small>
@@ -270,6 +270,18 @@ function getView(order: PublicShopOrder, flag: ReturnFlag, isConfirming: boolean
       kicker: "Refunded",
       headline: "This order was refunded.",
       body: "The payment has been returned to your original payment method. Refunds usually take a few banking days to appear.",
+      showPayButton: false,
+    };
+  }
+
+  // Consignment/cash: create_shop_order files these as payment_review + pending, a pair Maya
+  // never produces. An admin approves them with a reference number once payment is settled.
+  if (order.status === "payment_review" && order.payment_status === "pending") {
+    return {
+      tone: "pending",
+      kicker: "Awaiting approval",
+      headline: `Order ${order.order_code} is received.`,
+      body: "Our team will contact you using the details on your order to settle payment. Your order is confirmed once payment is approved - no online payment is needed.",
       showPayButton: false,
     };
   }

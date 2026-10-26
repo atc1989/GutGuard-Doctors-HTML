@@ -4,7 +4,7 @@ import { pickPrizeIndex } from "@/lib/prizes";
 import { isSupabaseConfigured, supabase, supabaseShop, SHOP_SCHEMA } from "@/lib/supabase";
 import { checkImageFile, TESTIMONIAL_BUCKET } from "@/lib/testimonials";
 import type { AdminTestimonial, PublicTestimonial, TestimonialStatus } from "@/lib/testimonials";
-import type { Prize, RegistrationPayload, TaskId, WheelPrize, WheelPrizeInput } from "@/lib/types";
+import type { Prize, RegistrationPayload, WheelPrize, WheelPrizeInput } from "@/lib/types";
 
 type PrizeRow = {
   id?: string;
@@ -46,9 +46,7 @@ export type AdminDoctorRegistration = {
   name_prefix: string;
   email: string;
   mobile: string;
-  tiktok_username: string;
   routing_slug: string;
-  redirect_url: string;
   specialty: string;
   practice_location: string;
   where_did_you_find_us?: string;
@@ -68,6 +66,9 @@ export type AdminDoctorRegistration = {
   shop_show_protocol?: boolean;
   /** Sequential public code: www.gutguard.ph/s/<code> and /j/<code>. */
   partner_code?: number | null;
+  /** Partner Codes: admin-only description, and where the QR is used (pre-fills the join form). */
+  code_note?: string;
+  code_source?: string;
 };
 
 export type AdminDoctorRegistrationUpdate = {
@@ -76,9 +77,7 @@ export type AdminDoctorRegistrationUpdate = {
   name_prefix: string;
   email: string;
   mobile: string;
-  tiktok_username: string;
   routing_slug?: string;
-  redirect_url: string;
   specialty: string;
   practice_location: string;
 };
@@ -429,124 +428,9 @@ export type PartnerInvitation = {
   partner_code: number | null;
   /** False for an affiliate whose referral QR is locked, and while can_refer is not deployed. */
   can_refer: boolean;
+  /** Set on Partner Codes; pre-fills "Where did you find us?" on this partner's join form. */
+  code_source: string;
 };
-
-export type TikTokOrderTimeMode = "create_time" | "update_time";
-
-export type TikTokOrdersFilters = {
-  timeMode: TikTokOrderTimeMode;
-  startTime?: number;
-  endTime?: number;
-  orderStatus?: string;
-  pageSize: number;
-  pageToken?: string;
-};
-
-export type TikTokOrderSummary = {
-  id: string;
-  status: string;
-  createTime: string;
-  updateTime: string;
-  buyerEmail: string;
-  deliveryOptionName: string;
-  shippingProvider: string;
-  trackingNumber: string;
-  paymentAmount: string;
-  currency: string;
-  buyerMessage?: string;
-  commercePlatform?: string;
-  fulfillmentType?: string;
-  isReplacementOrder?: boolean;
-  isSampleOrder?: boolean;
-  lineItemCount?: number;
-};
-
-export type TikTokAdminAction =
-  | "get-order-list"
-  | "get-order-detail"
-  | "get-price-detail"
-  | "add-external-order-reference"
-  | "get-external-order-references"
-  | "search-order-by-external-reference"
-  | "update-blind-box-opening-results"
-  | "raw-api-request";
-
-export type TikTokDebugMetadata = {
-  method: string;
-  path: string;
-  query: Record<string, unknown>;
-  body: Record<string, unknown>;
-  baseUrl: string;
-  tokenRefreshed?: boolean;
-  requestedAt: string;
-};
-
-export type TikTokRawResponse = {
-  debug: TikTokDebugMetadata;
-  raw: unknown;
-};
-
-export type TikTokOrdersResponse = {
-  orders: TikTokOrderSummary[];
-  nextPageToken: string;
-  totalCount: number | null;
-  debug: TikTokDebugMetadata;
-  raw: unknown;
-};
-
-export type TikTokOrderDetailResponse = TikTokRawResponse & {
-  order: {
-    summary: TikTokOrderSummary;
-    lineItems: Array<{
-      id: string;
-      productName?: string;
-      skuName?: string;
-      quantity?: number;
-      displayStatus?: string;
-      price?: string;
-      currency?: string;
-    }>;
-    packages: Array<{
-      id: string;
-      deliveryOptionName?: string;
-      shippingProvider?: string;
-      trackingNumber?: string;
-    }>;
-    payment: {
-      currency?: string;
-      totalAmount?: string;
-      shippingFee?: string;
-      subTotal?: string;
-    };
-  };
-};
-
-export type TikTokPriceDetailResponse = TikTokRawResponse & {
-  price: {
-    orderId: string;
-    currency: string;
-    totals: Array<{ label: string; amount: string }>;
-    lineItems: Array<{
-      id: string;
-      skuName?: string;
-      productName?: string;
-      quantity?: number;
-      price?: string;
-      currency?: string;
-    }>;
-  };
-};
-
-export type TikTokReferenceResponse = TikTokRawResponse & {
-  references: Array<{
-    orderId?: string;
-    externalReference?: string;
-    createdAt?: string;
-    updatedAt?: string;
-  }>;
-};
-
-export type TikTokRawApiResponse = TikTokRawResponse;
 
 export type RegistrationEmailAttachment = {
   id?: string;
@@ -584,7 +468,6 @@ export async function registerDoctor(payload: RegistrationPayload) {
       p_name_prefix: payload.namePrefix,
       p_email: payload.email,
       p_mobile: payload.mobile,
-      p_tiktok_username: payload.tiktokUsername,
       p_specialty: payload.specialty,
       p_practice_location: payload.location,
       p_referrer_slug: payload.referrerSlug || null,
@@ -602,8 +485,7 @@ export async function registerDoctor(payload: RegistrationPayload) {
         p_name_prefix: payload.namePrefix,
         p_email: payload.email,
         p_mobile: payload.mobile,
-        p_tiktok_username: payload.tiktokUsername,
-        p_specialty: payload.specialty,
+          p_specialty: payload.specialty,
         p_practice_location: payload.location,
         p_referrer_slug: payload.referrerSlug || null,
       });
@@ -651,7 +533,13 @@ export async function getPartnerInvitation(slug: string): Promise<PartnerInvitat
   const full_name = code ? `partner #${code}` : initials.replace(/./g, "$&.");
   if (!routing_slug) return null;
 
-  return { routing_slug, full_name, partner_code: code, can_refer: row?.can_refer === true };
+  return {
+    routing_slug,
+    full_name,
+    partner_code: code,
+    can_refer: row?.can_refer === true,
+    code_source: String(row?.code_source ?? "").trim(),
+  };
 }
 
 export async function sendPartnerReferralNotification(registrationId: string) {
@@ -693,18 +581,6 @@ export async function sendRegistrationEmail(registrationId: string) {
 
 /** @deprecated Use sendRegistrationEmail. */
 export const sendProposalEmail = sendRegistrationEmail;
-
-export async function updateTask(doctorId: string | null | undefined, taskId: TaskId, value: boolean) {
-  if (!doctorId || !isSupabaseConfigured || !supabase) return;
-
-  const { error } = await supabase.rpc("update_doctor_task", {
-    p_doctor_id: doctorId,
-    p_task: taskId,
-    p_value: value,
-  });
-
-  if (error) throw error;
-}
 
 export async function listWheelPrizes(): Promise<WheelPrize[]> {
   if (isSupabaseConfigured && supabase) {
@@ -1254,6 +1130,57 @@ export async function getMainStoreDashboard(): Promise<MainStoreDashboard> {
   };
 }
 
+export type WithdrawalMethod = "gcash" | "maya" | "bank";
+export type PartnerWithdrawal = {
+  id: string;
+  amount: number;
+  fee: number;
+  method: WithdrawalMethod;
+  bank_name: string;
+  account_name: string;
+  account_number: string;
+  status: "pending" | "approved" | "rejected";
+  reference: string;
+  admin_note: string;
+  created_at: string;
+  processed_at: string | null;
+};
+export type PartnerWallet = {
+  earned: number;
+  pending: number;
+  withdrawn: number;
+  available: number;
+  withdrawals: PartnerWithdrawal[];
+};
+
+export async function getPartnerWallet(): Promise<PartnerWallet> {
+  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabaseShop.rpc("partner_wallet");
+  if (error) throw error;
+  return data as PartnerWallet;
+}
+
+export async function requestPartnerWithdrawal(input: {
+  amount: number;
+  method: WithdrawalMethod;
+  accountName: string;
+  accountNumber: string;
+  bankName: string;
+}): Promise<PartnerWithdrawal> {
+  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabaseShop.rpc("request_partner_withdrawal", {
+    p_amount: input.amount,
+    p_method: input.method,
+    p_account_name: input.accountName,
+    p_account_number: input.accountNumber,
+    p_bank_name: input.bankName,
+  });
+  if (error) throw error;
+  return data as PartnerWithdrawal;
+}
+
 export async function getMainStoreReports(query: {
   scope?: string;
   storeId?: string;
@@ -1477,75 +1404,6 @@ export async function adminUpdateShopOrder(
 }
 
 // ─── Email Sequence ────────────────────────────────────────────────────────
-
-export async function getTikTokOrders(
-  filters: TikTokOrdersFilters,
-): Promise<TikTokOrdersResponse> {
-  return callTikTokAdminApi<TikTokOrdersResponse>("get-order-list", filters);
-}
-
-export async function getTikTokOrderDetail(
-  orderId: string,
-): Promise<TikTokOrderDetailResponse> {
-  return callTikTokAdminApi<TikTokOrderDetailResponse>("get-order-detail", { orderId });
-}
-
-export async function getTikTokPriceDetail(
-  orderId: string,
-): Promise<TikTokPriceDetailResponse> {
-  return callTikTokAdminApi<TikTokPriceDetailResponse>("get-price-detail", { orderId });
-}
-
-export async function addTikTokExternalOrderReference(
-  orderId: string,
-  externalOrderReference: string,
-): Promise<TikTokReferenceResponse> {
-  return callTikTokAdminApi<TikTokReferenceResponse>("add-external-order-reference", {
-    orderId,
-    externalOrderReference,
-  });
-}
-
-export async function getTikTokExternalOrderReferences(
-  orderId: string,
-): Promise<TikTokReferenceResponse> {
-  return callTikTokAdminApi<TikTokReferenceResponse>("get-external-order-references", { orderId });
-}
-
-export async function searchTikTokOrderByExternalReference(
-  externalOrderReference: string,
-): Promise<TikTokReferenceResponse> {
-  return callTikTokAdminApi<TikTokReferenceResponse>("search-order-by-external-reference", {
-    externalOrderReference,
-  });
-}
-
-export async function sendTikTokRawApiRequest(
-  payload: {
-    method: "GET" | "POST";
-    path: string;
-    query?: Record<string, string>;
-    body?: Record<string, unknown>;
-  },
-): Promise<TikTokRawApiResponse> {
-  return callTikTokAdminApi<TikTokRawApiResponse>("raw-api-request", payload);
-}
-
-export async function callTikTokAdminApi<TResponse>(
-  action: TikTokAdminAction,
-  payload?: Record<string, unknown>,
-): Promise<TResponse> {
-  const res = await fetch("/api/admin/tiktok", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action, payload }),
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || "TikTok admin request failed.");
-  }
-  return (await res.json()) as TResponse;
-}
 
 export type SequenceAttachment = {
   filename: string;
@@ -1814,16 +1672,12 @@ function mapAdminWheelPrize(prize: WheelPrize): AdminWheelPrize {
 }
 
 function normalizeAdminDoctorRegistration(doctor: AdminDoctorRegistration): AdminDoctorRegistration {
-  const tiktokUsername = (doctor.tiktok_username ?? "").trim().replace(/^@+/, "").toLowerCase();
   const routingSlug = (doctor.routing_slug ?? "").trim() || slugifyDoctorRoute(doctor.full_name);
 
   return {
     ...doctor,
     name_prefix: doctor.name_prefix ?? "",
-    tiktok_username: tiktokUsername,
     routing_slug: routingSlug,
-    redirect_url:
-      (doctor.redirect_url ?? "").trim() || (tiktokUsername ? `https://www.tiktok.com/@${tiktokUsername}` : ""),
     where_did_you_find_us: doctor.where_did_you_find_us ?? "",
     referred_by_partner_id: doctor.referred_by_partner_id ?? null,
     referrer_name: doctor.referrer_name ?? null,

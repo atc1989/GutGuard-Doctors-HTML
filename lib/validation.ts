@@ -3,7 +3,6 @@ export type FieldName =
   | "fullName"
   | "email"
   | "mobile"
-  | "tiktokUsername"
   | "specialty"
   | "otherSpecialty"
   | "location"
@@ -16,10 +15,6 @@ export function normalizeMobile(value: string | undefined) {
   return (value ?? "").replace(/\s|-/g, "");
 }
 
-export function normalizeTikTokUsername(value: string | undefined) {
-  return (value ?? "").trim().replace(/^@+/, "").toLowerCase();
-}
-
 export function formatPrefixedName(prefix?: string | null, fullName?: string | null) {
   const name = (fullName ?? "").trim();
   if (!name) return "";
@@ -29,14 +24,12 @@ export function formatPrefixedName(prefix?: string | null, fullName?: string | n
 export function validateField(name: FieldName, value: string | undefined, optionalFields: FieldName[] = []) {
   const trimmed = (value ?? "").trim();
 
-  // TikTok and Where did you find us are optional everywhere. Empty is valid; a value must still be a handle for TikTok.
-  if (name === "tiktokUsername" && !trimmed) return true;
+  // Where did you find us is optional everywhere.
   if (name === "whereDidYouFindUs" && !trimmed) return true;
   if (optionalFields.includes(name) && !trimmed) return true;
   if (!trimmed) return false;
   if (name === "email") return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
   if (name === "mobile") return /^(09|\+639)\d{9}$/.test(normalizeMobile(trimmed));
-  if (name === "tiktokUsername") return /^[A-Za-z0-9._]{2,24}$/.test(normalizeTikTokUsername(trimmed));
 
   return true;
 }

@@ -33,6 +33,9 @@ export default function AdminOrders({ partners }: { partners: PartnerLike[] }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  // Consignment/cash order being approved, and the reference number the admin types in.
+  const [approving, setApproving] = useState<ShopOrder | null>(null);
+  const [approvalReference, setApprovalReference] = useState("");
 
   const partnerNames = useMemo(
     () => new Map(partners.map((partner) => [partner.id, partner.full_name])),
@@ -96,7 +99,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
     loadOrders();
   }, [loadOrders]);
 
-  const filteredOrders = useMemo(() => {
+  const searchedOrders = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return orders;
     return orders.filter((order) =>
@@ -109,6 +112,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
         order.province,
         order.barangay,
         order.status,
+        order.payment_method,
         order.maya_reference ?? "",
         referralSource(order, partnerNames),
       ]
@@ -118,9 +122,16 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
     );
   }, [orders, partnerNames, search]);
 
+  // Consignment/cash orders sit in their own list until an admin approves them.
+  const approvalOrders = useMemo(() => searchedOrders.filter(isAwaitingApproval), [searchedOrders]);
+  const filteredOrders = useMemo(() => searchedOrders.filter((order) => !isAwaitingApproval(order)), [searchedOrders]);
+
   const metrics = useMemo(
     () => ({
-      pending: orders.filter((order) => order.status === "pending_payment" || order.status === "payment_review").length,
+      awaitingApproval: orders.filter(isAwaitingApproval).length,
+      pending: orders.filter(
+        (order) => !isAwaitingApproval(order) && (order.status === "pending_payment" || order.status === "payment_review"),
+      ).length,
       confirmed: orders.filter((order) => order.status === "confirmed" || order.status === "fulfilled").length,
     }),
     [orders],
@@ -152,6 +163,40 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
     }
   }
 
+  function openApproval(order: ShopOrder) {
+    setApproving(order);
+    setApprovalReference("");
+    setError(null);
+  }
+
+  async function approveOrder(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!approving) return;
+    const reference = approvalReference.trim();
+    if (!reference) return;
+
+    setIsSaving(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const saved = await adminUpdateShopOrder({
+        id: approving.id,
+        status: "paid",
+        paymentStatus: "paid",
+        mayaReference: reference,
+        adminNotes: approving.admin_notes ?? "",
+      });
+      setOrders((current) => current.map((order) => (order.id === saved.id ? saved : order)));
+      setApproving(null);
+      setNotice(`Approved ${saved.order_code} as paid.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not approve order.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <section className="admin-wheel-panel admin-shop-orders-shell">
       <div className="admin-wheel-panel-head">
@@ -160,7 +205,8 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
           <h2>Website orders</h2>
         </div>
         <p>
-          {metrics.pending} pending payment review. {metrics.confirmed} confirmed or fulfilled.
+          {metrics.awaitingApproval} awaiting approval. {metrics.pending} pending payment review. {metrics.confirmed}{" "}
+          confirmed or fulfilled.
         </p>
       </div>
 
@@ -181,9 +227,57 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
         </button>
       </div>
 
+      {approvalOrders.length > 0 ? (
+        <section className="admin-table-subsection">
+          <h3>For approval (consignment and cash)</h3>
+          <div className="admin-table-table-wrap">
+            <table className="admin-table-table admin-shop-orders-table">
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>Customer</th>
+                  <th>Mobile</th>
+                  <th>Method</th>
+                  <th>Came from</th>
+                  <th>Total</th>
+                  <th>Created</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {approvalOrders.map((order) => (
+                  <tr key={order.id}>
+                    <td>{order.order_code}</td>
+                    <td>
+                      <strong>{order.customer_name}</strong>
+                      <span>{order.email}</span>
+                    </td>
+                    <td>{order.mobile}</td>
+                    <td>{formatStatus(order.payment_method)}</td>
+                    <td>{referralSource(order, partnerNames, partnerStoreTypes)}</td>
+                    <td>{formatPeso(order.total_amount)}</td>
+                    <td>{formatAdminDate(order.created_at)}</td>
+                    <td>
+                      <div className="admin-table-row-actions">
+                        <button type="button" onClick={() => setSelectedOrder(order)}>
+                          View
+                        </button>
+                        <button type="button" onClick={() => openApproval(order)}>
+                          Approve
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
+
       {filteredOrders.length > 0 ? (
-        <div className="admin-tiktok-table-wrap">
-          <table className="admin-tiktok-table admin-shop-orders-table">
+        <div className="admin-table-table-wrap">
+          <table className="admin-table-table admin-shop-orders-table">
             <thead>
               <tr>
                 <th>Order</th>
@@ -213,7 +307,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                   <td>{formatPeso(order.total_amount)}</td>
                   <td>{formatAdminDate(order.created_at)}</td>
                   <td>
-                    <div className="admin-tiktok-row-actions">
+                    <div className="admin-table-row-actions">
                       <button type="button" onClick={() => setSelectedOrder(order)}>
                         View
                       </button>
@@ -256,10 +350,11 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                   ["Shipping fee", formatPeso(selectedOrder.shipping_fee)],
                   ["Total", formatPeso(selectedOrder.total_amount)],
                   ["Created", formatAdminDate(selectedOrder.created_at)],
+                  ["Payment method", formatStatus(selectedOrder.payment_method)],
                   ["Payment status", formatStatus(selectedOrder.payment_status)],
                   ["Maya status", selectedOrder.maya_payment_status ?? "--"],
                   ["Maya payment ID", selectedOrder.maya_payment_id ?? "--"],
-                  ["Maya reference", selectedOrder.maya_reference ?? "--"],
+                  ["Payment reference", selectedOrder.maya_reference ?? "--"],
                   ["Paid via", selectedOrder.maya_fund_source ?? "--"],
                   ["Paid at", selectedOrder.paid_at ? formatAdminDate(selectedOrder.paid_at) : "--"],
                   ["Payment attempts", String(selectedOrder.payment_attempts ?? 0)],
@@ -268,10 +363,10 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                 ]}
               />
 
-              <section className="admin-tiktok-subsection">
+              <section className="admin-table-subsection">
                 <h3>Line items</h3>
-                <div className="admin-tiktok-table-wrap">
-                  <table className="admin-tiktok-table compact admin-shop-line-items-table">
+                <div className="admin-table-table-wrap">
+                  <table className="admin-table-table compact admin-shop-line-items-table">
                     <thead>
                       <tr>
                         <th>Item</th>
@@ -326,14 +421,20 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                   </select>
                 </label>
                 <label className="admin-edit-wide">
-                  Maya reference
+                  Payment reference
                   <input
                     value={selectedOrder.maya_reference ?? ""}
-                    placeholder="Filled in automatically by the Maya webhook"
+                    placeholder={
+                      selectedOrder.payment_method === "maya"
+                        ? "Filled in automatically by the Maya webhook"
+                        : "Bank or cash reference number"
+                    }
                     onChange={(event) => setSelectedOrder({ ...selectedOrder, maya_reference: event.target.value })}
                   />
                   <small>
-                    Maya writes this on payment. Only edit it to reconcile a payment the webhook missed.
+                    {selectedOrder.payment_method === "maya"
+                      ? "Maya writes this on payment. Only edit it to reconcile a payment the webhook missed."
+                      : "Entered when the order is approved. Required before a consignment or cash order is marked paid."}
                   </small>
                 </label>
                 <label className="admin-edit-wide">
@@ -368,13 +469,68 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
           </form>
         </div>
       ) : null}
+
+      {approving ? (
+        <div className="admin-modal-backdrop" role="presentation">
+          <form className="admin-modal" role="dialog" aria-modal="true" onSubmit={approveOrder}>
+            <div className="admin-modal-head">
+              <div>
+                <p className="admin-wheel-kicker">Approve {formatStatus(approving.payment_method)} order</p>
+                <h2>{approving.order_code}</h2>
+              </div>
+              <button type="button" onClick={() => setApproving(null)}>
+                Close
+              </button>
+            </div>
+
+            <p>
+              {approving.customer_name} - {formatPeso(approving.total_amount)}. Approving marks the order paid, credits the
+              referring partner&apos;s points and emails the customer a receipt.
+            </p>
+
+            {/* The page-level alert sits behind this modal, so a refused approval must show here. */}
+            {error ? <div className="admin-wheel-alert error">{error}</div> : null}
+
+            <div className="admin-edit-grid">
+              <label className="admin-edit-wide">
+                {approving.payment_method === "consignment" ? "Bank reference no." : "Reference no."}
+                <input
+                  value={approvalReference}
+                  required
+                  autoFocus
+                  placeholder={
+                    approving.payment_method === "consignment"
+                      ? "Reference number on the bank deposit or transfer"
+                      : "Cash receipt or reference number"
+                  }
+                  onChange={(event) => setApprovalReference(event.target.value)}
+                />
+              </label>
+            </div>
+
+            <div className="admin-modal-actions">
+              <button type="button" onClick={() => setApproving(null)}>
+                Cancel
+              </button>
+              <button type="submit" disabled={isSaving || !approvalReference.trim()}>
+                {isSaving ? "Approving" : "Approve as paid"}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </section>
   );
 }
 
+/** Consignment/cash orders waiting for an admin to approve them with a reference number. */
+function isAwaitingApproval(order: ShopOrder) {
+  return order.payment_method !== "maya" && order.payment_status !== "paid" && order.status !== "cancelled";
+}
+
 function Summary({ items }: { items: Array<[string, string]> }) {
   return (
-    <dl className="admin-tiktok-summary-grid">
+    <dl className="admin-table-summary-grid">
       {items.map(([label, value]) => (
         <div key={label}>
           <dt>{label}</dt>

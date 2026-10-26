@@ -12,6 +12,7 @@ import type {
   AdminDoctorRegistrationUpdate,
   AdminWheelPrize,
   NewsletterResponse,
+  PartnerWithdrawal,
   NewsletterSendHistory,
   RegistrationEmailSettings,
   SequenceProgress,
@@ -24,7 +25,6 @@ import type {
   ShopPaymentStatus,
   SmsBlastResponse,
   SmsSendHistory,
-  TikTokAdminAction,
 } from "@/lib/api";
 
 type PrizeRow = {
@@ -64,20 +64,12 @@ function mapWheelPrizeRow(row: PrizeRow): WheelPrize {
 }
 
 function normalizeAdminDoctorRegistration(doctor: AdminDoctorRegistration): AdminDoctorRegistration {
-  const tiktokUsername = (doctor.tiktok_username ?? "")
-    .trim()
-    .replace(/^@+/, "")
-    .toLowerCase();
-
   const routingSlug = (doctor.routing_slug ?? "").trim() || slugifyDoctorRoute(doctor.full_name);
 
   return {
     ...doctor,
     name_prefix: doctor.name_prefix ?? "",
-    tiktok_username: tiktokUsername,
     routing_slug: routingSlug,
-    redirect_url:
-      (doctor.redirect_url ?? "").trim() || (tiktokUsername ? `https://www.tiktok.com/@${tiktokUsername}` : ""),
     where_did_you_find_us: doctor.where_did_you_find_us ?? "",
     referred_by_partner_id: doctor.referred_by_partner_id ?? null,
     referrer_name: doctor.referrer_name ?? null,
@@ -230,11 +222,17 @@ export async function serverGetDoctorRegistrations(adminPassword: string): Promi
 /** A blank partner with just a code; admin fills the details (and email, to sign in) later. */
 export async function serverAdminCreatePendingPartner(
   adminPassword: string,
+  note = "",
+  source = "",
 ): Promise<{ id: string; partner_code: number; routing_slug: string }> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
 
+  // Empty fields are left out so the call still matches the one-arg function until
+  // 20261028000000_partner_code_note_source.sql is applied.
   const { data, error } = await supabase.rpc("admin_create_pending_partner", {
     p_admin_password: adminPassword,
+    ...(note ? { p_note: note } : {}),
+    ...(source ? { p_source: source } : {}),
   });
 
   if (error) throw error;
@@ -254,8 +252,6 @@ export async function serverUpdateDoctorRegistration(
     p_name_prefix: doctor.name_prefix,
     p_email: doctor.email,
     p_mobile: doctor.mobile,
-    p_tiktok_username: doctor.tiktok_username,
-    p_redirect_url: doctor.redirect_url,
     p_specialty: doctor.specialty,
     p_practice_location: doctor.practice_location,
   });
@@ -349,6 +345,37 @@ export async function serverAdminAssignUnclaimedPassup(
 
   if (error) throw error;
   return data as { success: boolean; orders: number; points: number };
+}
+
+export type AdminWithdrawal = PartnerWithdrawal & { partner_id: string; partner_name: string; partner_email: string; partner_mobile: string };
+
+// Withdrawals live per schema, like the rebates they are paid from.
+export async function serverAdminListWithdrawals(adminPassword: string): Promise<AdminWithdrawal[]> {
+  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabaseShop.rpc("admin_list_partner_withdrawals", { p_admin_password: adminPassword });
+  if (error) throw error;
+  return (data ?? []) as AdminWithdrawal[];
+}
+
+export async function serverAdminProcessWithdrawal(
+  adminPassword: string,
+  id: string,
+  status: "approved" | "rejected",
+  reference: string,
+  note: string,
+): Promise<PartnerWithdrawal> {
+  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabaseShop.rpc("admin_process_partner_withdrawal", {
+    p_admin_password: adminPassword,
+    p_id: id,
+    p_status: status,
+    p_reference: reference,
+    p_note: note,
+  });
+  if (error) throw error;
+  return data as PartnerWithdrawal;
 }
 
 export async function serverAdminToggleReferralQr(
@@ -505,23 +532,6 @@ export async function serverAdminUpdateShopOrder(
 
   if (error) throw error;
   return normalizeShopOrder(Array.isArray(data) ? data[0] : data);
-}
-
-// ─── TikTok ─────────────────────────────────────────────────────────────────
-
-export async function serverCallTikTokAdminApi<TResponse>(
-  adminPassword: string,
-  action: TikTokAdminAction,
-  payload: Record<string, unknown>,
-): Promise<TResponse> {
-  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
-
-  const { data, error } = await supabase.functions.invoke("tiktok-shop-admin", {
-    body: { adminPassword, action, payload },
-  });
-
-  if (error) throw new Error(await getSupabaseFunctionErrorMessage(error));
-  return data as TResponse;
 }
 
 // ─── Sequence ───────────────────────────────────────────────────────────────

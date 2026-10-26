@@ -7,6 +7,14 @@
       "runtimeArgs": ["run", "dev"],
       "port": 3000,
       "autoPort": true
+    },
+    {
+      "name": "gutguard-dev-sandbox",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "env": { "NEXT_PUBLIC_SHOP_DB_SCHEMA": "sandbox" },
+      "port": 3000,
+      "autoPort": true
     }
   ]
 }

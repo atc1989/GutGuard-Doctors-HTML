@@ -1,7 +1,4 @@
-import type { TASKS } from "@/lib/constants";
-
 export type Screen = 1 | 2 | 3 | 4;
-export type TaskId = (typeof TASKS)[number]["id"];
 
 export type Registration = {
   id: string;
@@ -9,7 +6,6 @@ export type Registration = {
   fullName: string;
   email: string;
   mobile: string;
-  tiktokUsername: string;
   specialty: string;
   location: string;
   whereDidYouFindUs?: string;
@@ -25,16 +21,6 @@ export type RegistrationEmailDelivery =
   | { status: "sent"; email: string }
   | { status: "failed"; email: string }
   | { status: "not-requested" };
-
-export type TaskState = Record<TaskId, boolean>;
-
-export type ExperienceState = {
-  registration: Registration | null;
-  tasks: TaskState;
-  spun: boolean;
-  prize: Prize | null;
-  prizeNote: string | null;
-};
 
 export type Prize = {
   id?: string;

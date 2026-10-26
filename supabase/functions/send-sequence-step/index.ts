@@ -19,11 +19,9 @@ type DoctorRegistration = {
   name_prefix: string | null;
   email: string | null;
   mobile: string | null;
-  tiktok_username: string | null;
   specialty: string | null;
   practice_location: string | null;
   routing_slug: string | null;
-  redirect_url: string | null;
   created_at: string | null;
 };
 
@@ -77,7 +75,7 @@ serveWithCors(async (req) => {
     // Fetch doctor
     const { data: doctorData, error: doctorError } = await supabase
       .from("doctor_registrations")
-      .select("id, name_prefix, full_name, email, mobile, tiktok_username, specialty, practice_location, routing_slug, redirect_url, created_at")
+      .select("id, name_prefix, full_name, email, mobile, specialty, practice_location, routing_slug, created_at")
       .eq("id", doctorId)
       .single();
 
@@ -198,9 +196,8 @@ serveWithCors(async (req) => {
 });
 
 function renderTemplate(html: string, doctor: DoctorRegistration, clickUrl: string, siteUrl: string, currentStep: number) {
-  const tiktokUsername = (doctor.tiktok_username ?? "").trim().replace(/^@+/, "").toLowerCase();
   const doctorName = (doctor.full_name ?? "").trim().replace(/^dr\.?\s+/i, "");
-  const routingUrl = doctor.routing_slug ? `${siteUrl}/dr/${encodeURIComponent(doctor.routing_slug)}` : "";
+  const routingUrl = doctor.routing_slug ? `${siteUrl}/r/${encodeURIComponent(doctor.routing_slug)}` : "";
 
   const replacements: Record<string, string> = {
     doctor_name: doctor.full_name ?? "",
@@ -208,11 +205,9 @@ function renderTemplate(html: string, doctor: DoctorRegistration, clickUrl: stri
     prefixed_name: formatPrefixedName(doctor.name_prefix, doctor.full_name),
     doctor_email: doctor.email ?? "",
     doctor_mobile: doctor.mobile ?? "",
-    tiktok_username: tiktokUsername,
     specialty: doctor.specialty ?? "",
     clinic_location: doctor.practice_location ?? "",
     routing_url: routingUrl,
-    redirect_url: doctor.redirect_url ?? (tiktokUsername ? `https://www.tiktok.com/@${tiktokUsername}` : ""),
     registered_at: formatDate(doctor.created_at),
     sequence_click_url: clickUrl,
     next_step_number: String(currentStep + 1),
@@ -226,13 +221,11 @@ function renderTemplate(html: string, doctor: DoctorRegistration, clickUrl: stri
 }
 
 function renderSubject(subject: string, doctor: DoctorRegistration) {
-  const tiktokUsername = (doctor.tiktok_username ?? "").trim().replace(/^@+/, "").toLowerCase();
   const doctorName = (doctor.full_name ?? "").trim().replace(/^dr\.?\s+/i, "");
   const replacements: Record<string, string> = {
     doctor_name: doctor.full_name ?? "",
     name_prefix: doctor.name_prefix ?? "",
     prefixed_name: formatPrefixedName(doctor.name_prefix, doctor.full_name),
-    tiktok_username: tiktokUsername,
     specialty: doctor.specialty ?? "",
     clinic_location: doctor.practice_location ?? "",
   };

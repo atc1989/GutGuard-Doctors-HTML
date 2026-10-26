@@ -1,19 +1,18 @@
 "use client";
 
-import { useState, type FormEvent, type InputHTMLAttributes } from "react";
+import { useEffect, useState, type FormEvent, type InputHTMLAttributes } from "react";
 import { LoaderCircle } from "lucide-react";
 import { NAME_PREFIXES, SPECIALTIES } from "@/lib/constants";
 import { registerDoctor } from "@/lib/api";
 import type { FieldErrors, FieldName, FormValues } from "@/lib/validation";
 import {
   normalizeMobile,
-  normalizeTikTokUsername,
   validateField,
   validateForm,
 } from "@/lib/validation";
 
 type PartnerApplyFormProps = {
-  invitedBy?: { slug: string; fullName: string } | null;
+  invitedBy?: { slug: string; fullName: string; code: number | null; source: string } | null;
   onRegistered: (email: string, doctorId: string) => Promise<void>;
   onSignIn: () => void;
 };
@@ -23,7 +22,6 @@ const INITIAL_VALUES: FormValues = {
   fullName: "",
   email: "",
   mobile: "",
-  tiktokUsername: "",
   specialty: "",
   otherSpecialty: "",
   location: "",
@@ -39,6 +37,14 @@ export default function PartnerApplyForm({
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // The invitation loads after the form: fill in where the inviting QR was used (set on Admin →
+  // Partner Codes), unless the doctor already typed an answer. They can still change it.
+  const inviteSource = invitedBy?.source ?? "";
+  useEffect(() => {
+    if (!inviteSource) return;
+    setValues((current) => (current.whereDidYouFindUs ? current : { ...current, whereDidYouFindUs: inviteSource }));
+  }, [inviteSource]);
 
   function handleValueChange(name: FieldName, value: string) {
     setValues((current) => ({
@@ -84,7 +90,6 @@ export default function PartnerApplyForm({
         fullName: values.fullName.trim(),
         email,
         mobile: normalizeMobile(values.mobile),
-        tiktokUsername: normalizeTikTokUsername(values.tiktokUsername ?? ""),
         specialty:
           values.specialty === "Other" ? values.otherSpecialty.trim() : values.specialty.trim(),
         location: values.location.trim(),
@@ -166,20 +171,6 @@ export default function PartnerApplyForm({
         inputMode="tel"
         required
       />
-      <ApplyField
-        id="tiktokUsername"
-        label="TikTok username"
-        optional
-        help="Used for your profile QR code."
-        error="Enter a valid TikTok username, or leave this blank."
-        value={values.tiktokUsername}
-        hasError={errors.tiktokUsername}
-        onValueChange={handleValueChange}
-        onFieldBlur={handleFieldBlur}
-        type="text"
-        placeholder="@gutguardph"
-        autoComplete="off"
-      />
 
       <div className="partner-apply-field">
         <label htmlFor="specialty">Specialty</label>
@@ -247,7 +238,7 @@ export default function PartnerApplyForm({
         onValueChange={handleValueChange}
         onFieldBlur={handleFieldBlur}
         type="text"
-        placeholder="e.g. Colleague, social media, event"
+        placeholder="e.g. Friend, Facebook, clinic event"
         autoComplete="off"
       />
 
@@ -258,9 +249,9 @@ export default function PartnerApplyForm({
       ) : null}
 
       {/* Just above Submit: the last thing read before applying is who gets the credit. */}
-      {invitedBy?.fullName ? (
+      {invitedBy?.code || invitedBy?.fullName ? (
         <p className="partner-invite-note">
-          Invited by <strong>{invitedBy.fullName}</strong>
+          Ref number <strong>{invitedBy.code ? `#${invitedBy.code}` : invitedBy.fullName}</strong>
         </p>
       ) : null}
 
@@ -336,9 +327,6 @@ function ApplyField({
 
 function getRegistrationError(error: unknown) {
   const message = error instanceof Error ? error.message.toLowerCase() : "";
-  if (message.includes("duplicate") && message.includes("tiktok")) {
-    return "This TikTok username has already been registered. Please check the handle and try again.";
-  }
   if (message.includes("duplicate") && message.includes("email")) {
     return "This email has already been registered. Sign in with a one-time code instead.";
   }

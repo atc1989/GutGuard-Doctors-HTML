@@ -183,7 +183,7 @@ function MainStoreReportsView() {
                   onChange={(e) => setStoreSortBy(e.target.value as typeof storeSortBy)}
                   aria-label="Sort descendant stores"
                 >
-                  <option value="points">Most E-Points</option>
+                  <option value="points">Most G-Points</option>
                   <option value="orders">Most Orders</option>
                   <option value="revenue">Highest Sales</option>
                   <option value="name">Alphabetical</option>
@@ -218,7 +218,7 @@ function MainStoreReportsView() {
                       <th>Specialty & Location</th>
                       <th className="numeric">Orders</th>
                       <th className="numeric">Sales Revenue</th>
-                      <th className="numeric">E-Points</th>
+                      <th className="numeric">G-Points</th>
                       <th style={{ textAlign: "center" }}>Referral QR</th>
                     </tr>
                   </thead>

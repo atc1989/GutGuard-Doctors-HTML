@@ -1,4 +1,3 @@
-export const LOCAL_KEY = "gg_lca_v3";
 export const PARTNER_REFERRER_KEY = "gg_partner_ref";
 export const PARTNER_PENDING_SIGNIN_KEY = "gg_partner_pending_signin";
 export const PARTNER_PENDING_WELCOME_KEY = "gg_partner_pending_welcome";
@@ -7,7 +6,6 @@ export const LINKS = {
   email: null,
   facebook: "https://www.facebook.com/share/g/1AcZoVc7xp/",
   messenger: "https://m.me/588775934316393",
-  tiktok: "https://www.tiktok.com/@gutguardph",
   reel: null,
 } as const;
 
@@ -25,34 +23,6 @@ export const SPECIALTIES = [
   "Cardiology",
   "Other",
 ];
-
-export const TASKS = [
-  {
-    id: "email",
-    number: "i.",
-    title: "Confirm your email",
-    meta: "Your proposal is in your inbox.",
-  },
-  {
-    id: "facebook",
-    number: "ii.",
-    title: "Follow our Facebook page",
-    meta: "GutGuard Doctors' TikTok Affiliate.",
-  },
-  {
-    id: "tiktok",
-    number: "iii.",
-    title: "Follow @gutguardph",
-    meta: "Tap follow on the official page.",
-    hasTikTokMark: true,
-  },
-  {
-    id: "reel",
-    number: "iv.",
-    title: "Post your first reel",
-    meta: "A short introduction mentioning GutGuard.",
-  },
-] as const;
 
 export const PRIZES = [
   {

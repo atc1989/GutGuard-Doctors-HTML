@@ -129,6 +129,33 @@ export function recomputeSubtotal(
   return subtotal;
 }
 
+/**
+ * The browser wrote subtotal/shipping/total into the row, so none of it is trusted.
+ * Line prices are re-derived from the server catalog and `shippingFee` is the caller's
+ * server-side re-quote (expectedShippingFee) - passed in so this file keeps no runtime
+ * imports. Null means the stored amounts do not hold up and nothing may be marked paid.
+ */
+export function verifyOrderAmounts(
+  order: { items: ShopOrderItem[]; created_at: string; shipping_fee: number | string; total_amount: number | string },
+  shippingFee: number | null,
+  products: Product[],
+  promos: Promo[],
+) {
+  // Order time or now: a promo that ended between placing and paying still honours the order.
+  const subtotal = recomputeSubtotal(order.items, products, promos, [new Date(order.created_at), new Date()]);
+  if (subtotal === null) return null;
+
+  if (shippingFee === null || Number(order.shipping_fee) !== shippingFee) return null;
+
+  const total = subtotal + shippingFee;
+  if (total <= 0) return null;
+
+  // Stored total must agree with the recomputed one; a mismatch means tampering or a stale row.
+  if (Math.round(Number(order.total_amount) * 100) !== Math.round(total * 100)) return null;
+
+  return { subtotal, shippingFee, total };
+}
+
 // ─── Promos ─────────────────────────────────────────────────────────────────
 // Lives here, not in its own module, so the node test runner can load it without path aliases.
 
