@@ -51,6 +51,8 @@ const nextConfig: NextConfig = {
         // partner front-door change is not pinned in browsers or intermediary caches.
         permanent: false,
       },
+      // Old Profile QRs (/dr/<slug>, TikTok) are printed; send them home instead of a 404.
+      { source: "/dr/:slug*", destination: "/", permanent: false },
     ];
   },
 };
