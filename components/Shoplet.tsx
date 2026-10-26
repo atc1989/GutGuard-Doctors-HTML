@@ -73,26 +73,6 @@ const SCIENCE_URL = "https://gutguard.ph/#/science";
 
 type Mode = "trial" | "protocol";
 type Stage = "shop" | "saving" | "redirecting" | "payment-blocked";
-
-type PaymentMethod = "maya" | "consignment" | "cash";
-
-const PAYMENT_METHODS: { id: PaymentMethod; label: string; note: string }[] = [
-  {
-    id: "maya",
-    label: "Maya",
-    note: "Pay securely on Maya with a credit or debit card, your Maya wallet, QRPh, or online banking. Your order is saved first, so you can always come back and finish payment later.",
-  },
-  {
-    id: "consignment",
-    label: "Consignment",
-    note: "Your order is saved and sent to our team for approval. We will contact you with the bank details, and confirm your order once the deposit is received.",
-  },
-  {
-    id: "cash",
-    label: "Cash",
-    note: "Your order is saved and sent to our team for approval. We will contact you to arrange the cash payment, and confirm your order once it is received.",
-  },
-];
 type InfoModal = "inside" | "trust" | null;
 type FormState = {
   email: string;
@@ -145,7 +125,6 @@ export default function Shoplet() {
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("maya");
   const [createdCode, setCreatedCode] = useState("");
   const [createdOrderId, setCreatedOrderId] = useState("");
   const [provinces, setProvinces] = useState<ProvinceOption[]>([]);
@@ -463,27 +442,17 @@ export default function Shoplet() {
         totalAmount,
         items: basket,
         subtotal,
-        paymentMethod,
+        paymentMethod: "maya",
         // Read at submit, not at mount, so a referral link opened in another tab mid-session
         // still counts. Attribution is frozen into the row before the Maya redirect.
         referralSlug: readReferralSlug(),
       });
-      const emailSent = sendShopOrderEmail(order.id).catch((emailError) => {
+      sendShopOrderEmail(order.id).catch((emailError) => {
         console.error("Shop order email failed", emailError);
       });
       savedOrderId = order.id;
       setCreatedCode(order.order_code);
       setCreatedOrderId(order.id);
-
-      // Consignment/cash wait for admin approval on the order page - no Maya session.
-      if (paymentMethod !== "maya") {
-        // Navigating right away cancels the in-flight email request; Maya's checkout call gives it time.
-        await emailSent;
-        window.localStorage.removeItem(BASKET_STORAGE_KEY);
-        window.location.assign(`/shop/order/${encodeURIComponent(order.order_code)}`);
-        return;
-      }
-
       setStage("redirecting");
 
       // The order is already durable at this point, so a Maya failure is recoverable:
@@ -914,33 +883,15 @@ export default function Shoplet() {
                         <strong>{peso(totalAmount)}</strong>
                       </span>
                     </div>
-                    <fieldset className="shop-pay-methods">
-                      <legend>Payment method</legend>
-                      {PAYMENT_METHODS.map((method) => (
-                        <label key={method.id} className={paymentMethod === method.id ? "active" : ""}>
-                          <input
-                            type="radio"
-                            name="paymentMethod"
-                            value={method.id}
-                            checked={paymentMethod === method.id}
-                            onChange={() => setPaymentMethod(method.id)}
-                          />
-                          {method.label}
-                        </label>
-                      ))}
-                    </fieldset>
                     <div className="shop-payment-note">
-                      {PAYMENT_METHODS.find((method) => method.id === paymentMethod)?.note}
+                      Pay securely on Maya with a credit or debit card, your Maya wallet, QRPh, or online banking. Your
+                      order is saved first, so you can always come back and finish payment later.
                     </div>
                     {shippingQuote.error ? <div className="shop-error">{shippingQuote.error}</div> : null}
                     {submitError ? <div className="shop-error">{submitError}</div> : null}
                     <button type="submit" className="shop-primary" disabled={submitting}>
                       <span>
-                        {stage === "saving"
-                          ? "Saving your order"
-                          : paymentMethod === "maya"
-                            ? `Pay ${peso(totalAmount)} with Maya`
-                            : `Place order - ${peso(totalAmount)}`}
+                        {stage === "saving" ? "Saving your order" : `Pay ${peso(totalAmount)} with Maya`}
                         <small>You will receive an order email and a link to track it.</small>
                       </span>
                       <ArrowRightIcon />

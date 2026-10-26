@@ -1403,6 +1403,35 @@ export async function adminUpdateShopOrder(
   return normalizeShopOrder(Array.isArray(data.order) ? data.order[0] : data.order);
 }
 
+/** A consignment or cash sale the admin records by hand. Saved straight away as paid. */
+export type AdminOfflineOrderInput = {
+  paymentMethod: "consignment" | "cash";
+  reference: string;
+  firstName: string;
+  lastName: string;
+  mobile: string;
+  email: string;
+  address: string;
+  /** Prices come from the catalog on the server; only product and qty are sent. */
+  items: { id: string; qty: number }[];
+  referralSlug: string;
+  adminNotes: string;
+};
+
+export async function adminCreateOfflineOrder(input: AdminOfflineOrderInput): Promise<ShopOrder> {
+  const res = await fetch("/api/admin/shop-orders/offline", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Failed to save the order.");
+  }
+  const data = await res.json();
+  return normalizeShopOrder(Array.isArray(data.order) ? data.order[0] : data.order);
+}
+
 // ─── Email Sequence ────────────────────────────────────────────────────────
 
 export type SequenceAttachment = {

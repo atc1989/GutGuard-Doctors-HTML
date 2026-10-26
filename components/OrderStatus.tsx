@@ -274,18 +274,6 @@ function getView(order: PublicShopOrder, flag: ReturnFlag, isConfirming: boolean
     };
   }
 
-  // Consignment/cash: create_shop_order files these as payment_review + pending, a pair Maya
-  // never produces. An admin approves them with a reference number once payment is settled.
-  if (order.status === "payment_review" && order.payment_status === "pending") {
-    return {
-      tone: "pending",
-      kicker: "Awaiting approval",
-      headline: `Order ${order.order_code} is received.`,
-      body: "Our team will contact you using the details on your order to settle payment. Your order is confirmed once payment is approved - no online payment is needed.",
-      showPayButton: false,
-    };
-  }
-
   // Authorised but not captured. Never offer to pay again - the money is already held.
   if (order.payment_status === "review") {
     return {
