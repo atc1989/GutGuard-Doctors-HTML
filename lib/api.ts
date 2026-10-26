@@ -1130,6 +1130,57 @@ export async function getMainStoreDashboard(): Promise<MainStoreDashboard> {
   };
 }
 
+export type WithdrawalMethod = "gcash" | "maya" | "bank";
+export type PartnerWithdrawal = {
+  id: string;
+  amount: number;
+  fee: number;
+  method: WithdrawalMethod;
+  bank_name: string;
+  account_name: string;
+  account_number: string;
+  status: "pending" | "approved" | "rejected";
+  reference: string;
+  admin_note: string;
+  created_at: string;
+  processed_at: string | null;
+};
+export type PartnerWallet = {
+  earned: number;
+  pending: number;
+  withdrawn: number;
+  available: number;
+  withdrawals: PartnerWithdrawal[];
+};
+
+export async function getPartnerWallet(): Promise<PartnerWallet> {
+  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabaseShop.rpc("partner_wallet");
+  if (error) throw error;
+  return data as PartnerWallet;
+}
+
+export async function requestPartnerWithdrawal(input: {
+  amount: number;
+  method: WithdrawalMethod;
+  accountName: string;
+  accountNumber: string;
+  bankName: string;
+}): Promise<PartnerWithdrawal> {
+  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabaseShop.rpc("request_partner_withdrawal", {
+    p_amount: input.amount,
+    p_method: input.method,
+    p_account_name: input.accountName,
+    p_account_number: input.accountNumber,
+    p_bank_name: input.bankName,
+  });
+  if (error) throw error;
+  return data as PartnerWithdrawal;
+}
+
 export async function getMainStoreReports(query: {
   scope?: string;
   storeId?: string;

@@ -12,6 +12,7 @@ import type {
   AdminDoctorRegistrationUpdate,
   AdminWheelPrize,
   NewsletterResponse,
+  PartnerWithdrawal,
   NewsletterSendHistory,
   RegistrationEmailSettings,
   SequenceProgress,
@@ -344,6 +345,37 @@ export async function serverAdminAssignUnclaimedPassup(
 
   if (error) throw error;
   return data as { success: boolean; orders: number; points: number };
+}
+
+export type AdminWithdrawal = PartnerWithdrawal & { partner_id: string; partner_name: string; partner_email: string; partner_mobile: string };
+
+// Withdrawals live per schema, like the rebates they are paid from.
+export async function serverAdminListWithdrawals(adminPassword: string): Promise<AdminWithdrawal[]> {
+  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabaseShop.rpc("admin_list_partner_withdrawals", { p_admin_password: adminPassword });
+  if (error) throw error;
+  return (data ?? []) as AdminWithdrawal[];
+}
+
+export async function serverAdminProcessWithdrawal(
+  adminPassword: string,
+  id: string,
+  status: "approved" | "rejected",
+  reference: string,
+  note: string,
+): Promise<PartnerWithdrawal> {
+  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabaseShop.rpc("admin_process_partner_withdrawal", {
+    p_admin_password: adminPassword,
+    p_id: id,
+    p_status: status,
+    p_reference: reference,
+    p_note: note,
+  });
+  if (error) throw error;
+  return data as PartnerWithdrawal;
 }
 
 export async function serverAdminToggleReferralQr(
