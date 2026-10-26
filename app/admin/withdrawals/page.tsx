@@ -28,9 +28,9 @@ export default function AdminWithdrawalsPage() {
     load();
   }, []);
 
-  async function load() {
+  async function load(clearError = true) {
     setIsLoading(true);
-    setError(null);
+    if (clearError) setError(null);
     try {
       const res = await fetch("/api/admin/withdrawals");
       const data = await res.json().catch(() => ({}));
@@ -64,6 +64,8 @@ export default function AdminWithdrawalsPage() {
       await load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not update the withdrawal.");
+      // The row may have changed meanwhile (another admin, a double submit), so show what is true now.
+      await load(false);
     } finally {
       setBusyId(null);
     }
@@ -75,7 +77,7 @@ export default function AdminWithdrawalsPage() {
   return (
     <div className="admin-wheel-shell admin-shop-orders-shell">
       <AdminPageHeader kicker="Partner payouts" title="Withdrawals" description="Rebate withdrawal requests from partners.">
-        <button type="button" className="admin-overview-action-btn" onClick={load} disabled={isLoading}>
+        <button type="button" className="admin-overview-action-btn" onClick={() => load()} disabled={isLoading}>
           {isLoading ? "Loading" : "Refresh"}
         </button>
       </AdminPageHeader>
