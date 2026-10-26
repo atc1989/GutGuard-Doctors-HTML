@@ -156,6 +156,29 @@ export function verifyOrderAmounts(
   return { subtotal, shippingFee, total };
 }
 
+/**
+ * Prices admin-entered order lines (consignment/cash orders) from the catalog, exactly as
+ * the shop would charge them now - the admin only picks products and quantities. Null when
+ * a line is unknown, not for sale or has a bad quantity.
+ */
+export function priceOrderLines(
+  lines: { id: string; qty: number }[],
+  products: Product[],
+  promos: Promo[],
+  at: Date = new Date(),
+): ShopOrderItem[] | null {
+  if (!Array.isArray(lines) || lines.length === 0) return null;
+  const items: ShopOrderItem[] = [];
+  for (const line of lines) {
+    const product = products.find((candidate) => candidate.id === line?.id && candidate.status === "active");
+    const qty = Number(line?.qty);
+    if (!product || !Number.isInteger(qty) || qty < 1 || qty > MAX_QTY_PER_LINE) return null;
+    const price = promoPrice(product.id, product.price, promos, at).price;
+    items.push({ id: product.id, name: `SynBIOTIC+ ${product.name}`, caps: product.caps, price, qty });
+  }
+  return items;
+}
+
 // ─── Promos ─────────────────────────────────────────────────────────────────
 // Lives here, not in its own module, so the node test runner can load it without path aliases.
 
