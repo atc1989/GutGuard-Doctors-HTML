@@ -137,6 +137,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
         order.barangay,
         order.status,
         order.payment_method,
+        salesChannel(order),
         order.maya_reference ?? "",
         referralSource(order, partnerNames),
       ]
@@ -270,6 +271,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                 <th>Customer</th>
                 <th>Mobile</th>
                 <th>Status</th>
+                <th>Payment</th>
                 <th>Came from</th>
                 <th>Total</th>
                 <th>Created</th>
@@ -288,6 +290,10 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                   <td>
                     {formatStatus(order.status)}
                     <span>{formatStatus(order.payment_status)}</span>
+                  </td>
+                  <td>
+                    {formatStatus(order.payment_method)}
+                    <span>{salesChannel(order)}</span>
                   </td>
                   <td>{referralSource(order, partnerNames, partnerStoreTypes)}</td>
                   <td>{formatPeso(order.total_amount)}</td>
@@ -336,7 +342,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                   ["Shipping fee", formatPeso(selectedOrder.shipping_fee)],
                   ["Total", formatPeso(selectedOrder.total_amount)],
                   ["Created", formatAdminDate(selectedOrder.created_at)],
-                  ["Payment method", formatStatus(selectedOrder.payment_method)],
+                  ["Payment method", `${formatStatus(selectedOrder.payment_method)} (${salesChannel(selectedOrder)})`],
                   ["Payment status", formatStatus(selectedOrder.payment_status)],
                   ["Maya status", selectedOrder.maya_payment_status ?? "--"],
                   ["Maya payment ID", selectedOrder.maya_payment_id ?? "--"],
@@ -629,6 +635,11 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
       ) : null}
     </section>
   );
+}
+
+/** Maya orders come from shop checkout; consignment/cash are only added by an admin (Add order). */
+function salesChannel(order: ShopOrder) {
+  return order.payment_method === "maya" ? "Online" : "Store";
 }
 
 function Summary({ items }: { items: Array<[string, string]> }) {
