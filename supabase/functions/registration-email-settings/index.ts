@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.106.2";
 import { serveWithCors } from "../_shared/cors.ts";
+import { isServiceRoleRequest } from "../_shared/service-auth.ts";
 
 type AdminClient = SupabaseClient<any, "public", any>;
 
@@ -60,7 +61,7 @@ serveWithCors(async (req) => {
 
   // Admin-only: callable by the /api/admin server routes (service role), not by the public anon key,
   // so this cannot be used to guess the admin password around the login rate limit.
-  if (req.headers.get("Authorization") !== `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`) {
+  if (!(await isServiceRoleRequest(req))) {
     return jsonResponse({ error: "Unauthorized" }, 401);
   }
 
