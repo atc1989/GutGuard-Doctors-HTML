@@ -39,11 +39,29 @@ export default function OrderStatus({ orderCode }: { orderCode: string }) {
     let cancelled = false;
 
     load()
-      .then((fetched) => {
+      .then(async (fetched) => {
         if (cancelled) return;
+        setIsLoading(false);
         if (fetched?.payment_status === "paid") {
           pollsLeft.current = 0;
           setIsConfirming(false);
+        }
+        // Reopening the emailed order link has no ?p=success flag. Reconcile on
+        // every visit too, including paid orders whose receipt needs a retry.
+        if (fetched) {
+          try {
+            const result = await reconcileMayaPayment(orderCode);
+            if (!cancelled && (result.changed || result.paymentStatus !== fetched.payment_status)) {
+              await load();
+              if (result.paymentStatus === "paid") {
+                pollsLeft.current = 0;
+                setIsConfirming(false);
+              }
+            }
+          } catch {
+            // Keep the saved order visible. The checkout endpoint independently
+            // verifies Maya before allowing another payment attempt.
+          }
         }
       })
       .catch((caught) => {
@@ -56,7 +74,7 @@ export default function OrderStatus({ orderCode }: { orderCode: string }) {
     return () => {
       cancelled = true;
     };
-  }, [load]);
+  }, [load, orderCode]);
 
   // Maya redirects the customer back before (or racing with) the server-to-server webhook,
   // so a "success" return waits a few seconds for the row to settle rather than guessing.

@@ -135,7 +135,7 @@ export async function createMayaCheckout(payload: MayaCheckoutRequest): Promise<
     body: JSON.stringify(payload),
   })) as MayaCheckoutResponse;
 
-  if (!body?.redirectUrl) throw new Error("Maya did not return a checkout URL.");
+  if (!body?.checkoutId || !body?.redirectUrl) throw new Error("Maya did not return complete checkout details.");
   return body;
 }
 
@@ -148,4 +148,13 @@ export async function getMayaPayment(paymentId: string): Promise<MayaPayment> {
   if (!secretKey) throw new Error("MAYA_SECRET_KEY is not set.");
 
   return (await mayaFetch(`/payments/v1/payments/${encodeURIComponent(paymentId)}`, secretKey)) as MayaPayment;
+}
+
+/** Recovery when creation succeeded at Maya but the response or local save was lost. */
+export async function getMayaPaymentsByReference(reference: string): Promise<MayaPayment[]> {
+  const secretKey = process.env.MAYA_SECRET_KEY;
+  if (!secretKey) throw new Error("MAYA_SECRET_KEY is not set.");
+  const payments = await mayaFetch(`/payments/v1/payment-rrns/${encodeURIComponent(reference)}`, secretKey);
+  if (!Array.isArray(payments)) throw new Error("Maya returned an invalid payment lookup.");
+  return payments as MayaPayment[];
 }

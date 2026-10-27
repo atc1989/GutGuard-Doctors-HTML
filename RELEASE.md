@@ -48,6 +48,13 @@ Verify locally first: `bash supabase/release-reconciliation.test.sh` (needs Dock
 
 ### Later migrations
 
+#### Payment recovery rollout (not deployed)
+
+1. Apply only the `sandbox.shop_orders` statement in `20261027052931_payment_recovery.sql` to QA first. It adds nullable `maya_checkout_url`; no data rewrite. Only atc1989 applies the `doctors.shop_orders` statement for production, before deploying the app.
+2. Redeploy `send-shop-order-email` before the app: it verifies paid status, checks delivery-log errors, and supplies Resend's per-order/schema/kind idempotency key. Existing sent logs continue to prevent repeats. Resend's additional concurrency protection lasts 24 hours; if an email was accepted but logging fails for over 24 hours, check provider delivery before retrying manually.
+3. Deploy the app from sandbox and test two simultaneous Pay requests, pending-session resume, success with delayed webhook, failed-save recovery by reference, and receipt failure followed by webhook/reconcile retry. No tests should use production keys or write production orders.
+4. An uncertain Create Checkout response stays reserved: reconciliation looks it up by its saved request reference. A missing/ambiguous Maya result does **not** permit another charge; support must inspect Maya before resolving the order. Legacy active sessions without a saved URL cannot be resumed automatically; wait for a confirmed terminal failure/expiry. Do not reset attempts or references to bypass this protection.
+
 | Migration | Production status |
 |---|---|
 | `20261031000000_order_fulfillment_fields_doctors.sql` (production) / `20261031000000_order_fulfillment_fields_sandbox.sql` (QA) | **Not applied on production yet.** Two separate files, one per schema: run the sandbox file first. Adds to `shop_orders`: `order_time`, `pof_time`, `tracking_number`, `pickup_time`, `tracking_status` (checked list), `bot_message`, `salesperson`, and `sales_channel` (`online` default / `store`, check). Marks existing consignment/cash orders `store`. Additive and re-runnable, no DROP. Apply **before** deploying: without it, Admin → Add order and editing the fulfilment fields in an order fail with a missing-column error (plain status saves keep working). |
