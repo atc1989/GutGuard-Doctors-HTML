@@ -13,6 +13,7 @@ type PendingPartner = {
   created_at?: string;
   code_note?: string;
   code_source?: string;
+  code_label?: string;
 };
 
 const QR_RENDER_PX = 1024;
@@ -59,6 +60,7 @@ export default function AdminCodesPage() {
             created_at: doctor.created_at,
             code_note: doctor.code_note,
             code_source: doctor.code_source,
+            code_label: doctor.code_label,
           })),
       );
       setLoaded(true);
@@ -69,23 +71,28 @@ export default function AdminCodesPage() {
     }
   }
 
-  async function generate(note: string, source: string) {
+  async function generate(note: string, source: string, label: string) {
     setIsCreating(true);
     setError(null);
     try {
       const res = await fetch("/api/admin/codes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note, source }),
+        body: JSON.stringify({ note, source, label }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Could not create a code.");
+      const { label_saved: labelSaved, ...partner } = data.partner;
       const created: PendingPartner = {
-        ...data.partner,
+        ...partner,
         created_at: new Date().toISOString(),
         code_note: note.trim(),
         code_source: source.trim(),
+        code_label: labelSaved ? label.trim() : "",
       };
+      if (label.trim() && !labelSaved) {
+        setError(`Code #${created.partner_code} was created without its label: the database doesn't support labels yet.`);
+      }
       setPending((current) => [created, ...current]);
       setSelected(created);
       setMaxCode((current) => Math.max(current, created.partner_code));
@@ -153,6 +160,7 @@ export default function AdminCodesPage() {
                   <strong>#{partner.partner_code}</strong>
                   <span>
                     {partner.created_at ? day(partner.created_at) : ""}
+                    {partner.code_label ? <> · <em>{partner.code_label}</em></> : null}
                     {partner.code_note ? <> · {partner.code_note}</> : null}
                     {partner.code_source ? <small>Source: {partner.code_source}</small> : null}
                   </span>
@@ -182,9 +190,10 @@ function ConfirmGenerate({
   nextCode: number;
   isCreating: boolean;
   onCancel: () => void;
-  onConfirm: (note: string, source: string) => void;
+  onConfirm: (note: string, source: string, label: string) => void;
 }) {
   const preview = { id: "preview", partner_code: nextCode, routing_slug: `partner-${nextCode}` };
+  const [label, setLabel] = useState("");
   const [note, setNote] = useState("");
   const [source, setSource] = useState("");
 
@@ -223,13 +232,24 @@ function ConfirmGenerate({
             </div>
           </dl>
           <label className="admin-codes-field">
+            <span>Label (optional, shown publicly on the join page)</span>
+            <input
+              type="text"
+              value={label}
+              onChange={(event) => setLabel(event.target.value)}
+              maxLength={40}
+              autoFocus
+              placeholder="e.g. GSC"
+            />
+            <small>Doctors who join through this QR see &ldquo;Ref number #{nextCode}{label.trim() ? ` · ${label.trim()}` : ""}&rdquo;.</small>
+          </label>
+          <label className="admin-codes-field">
             <span>Description (optional, admin only)</span>
             <input
               type="text"
               value={note}
               onChange={(event) => setNote(event.target.value)}
               maxLength={200}
-              autoFocus
               placeholder="e.g. Dr. Cruz, Makati clinic"
             />
           </label>
@@ -249,7 +269,7 @@ function ConfirmGenerate({
           <button type="button" onClick={onCancel} disabled={isCreating}>
             Cancel
           </button>
-          <button type="button" onClick={() => onConfirm(note, source)} disabled={isCreating}>
+          <button type="button" onClick={() => onConfirm(note, source, label)} disabled={isCreating}>
             {isCreating ? "Creating…" : "Generate code"}
           </button>
         </div>

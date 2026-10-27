@@ -70,6 +70,8 @@ export type AdminDoctorRegistration = {
   /** Partner Codes: admin-only description, and where the QR is used (pre-fills the join form). */
   code_note?: string;
   code_source?: string;
+  /** Not returned by admin_list_doctor_registrations yet; see 20261101000000_partner_code_label.sql. */
+  code_label?: string;
 };
 
 export type AdminDoctorRegistrationUpdate = {
@@ -438,6 +440,8 @@ export type PartnerInvitation = {
   can_refer: boolean;
   /** Set on Partner Codes; pre-fills "Where did you find us?" on this partner's join form. */
   code_source: string;
+  /** Public label set on Partner Codes ("GSC"), shown beside the ref number. "" until 20261101000000 runs. */
+  code_label: string;
 };
 
 export type RegistrationEmailAttachment = {
@@ -547,6 +551,7 @@ export async function getPartnerInvitation(slug: string): Promise<PartnerInvitat
     partner_code: code,
     can_refer: row?.can_refer === true,
     code_source: String(row?.code_source ?? "").trim(),
+    code_label: String(row?.code_label ?? "").trim(),
   };
 }
 

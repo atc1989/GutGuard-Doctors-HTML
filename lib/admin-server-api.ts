@@ -227,19 +227,31 @@ export async function serverAdminCreatePendingPartner(
   adminPassword: string,
   note = "",
   source = "",
-): Promise<{ id: string; partner_code: number; routing_slug: string }> {
+  label = "",
+): Promise<{ id: string; partner_code: number; routing_slug: string; label_saved: boolean }> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  const client = supabase;
 
-  // Empty fields are left out so the call still matches the one-arg function until
-  // 20261028000000_partner_code_note_source.sql is applied.
-  const { data, error } = await supabase.rpc("admin_create_pending_partner", {
-    p_admin_password: adminPassword,
-    ...(note ? { p_note: note } : {}),
-    ...(source ? { p_source: source } : {}),
-  });
+  // Empty fields are left out so the call still matches the older functions until
+  // 20261028000000_partner_code_note_source.sql / 20261101000000_partner_code_label.sql are applied.
+  const create = (withLabel: boolean) =>
+    client.rpc("admin_create_pending_partner", {
+      p_admin_password: adminPassword,
+      ...(note ? { p_note: note } : {}),
+      ...(source ? { p_source: source } : {}),
+      ...(withLabel && label ? { p_label: label } : {}),
+    });
+
+  let { data, error } = await create(true);
+  let labelSaved = Boolean(label);
+  // No p_label yet (label migration not applied): still create the code, without the label.
+  if (error && label && error.code === "PGRST202") {
+    ({ data, error } = await create(false));
+    labelSaved = false;
+  }
 
   if (error) throw error;
-  return Array.isArray(data) ? data[0] : data;
+  return { ...(Array.isArray(data) ? data[0] : data), label_saved: labelSaved };
 }
 
 export async function serverUpdateDoctorRegistration(
