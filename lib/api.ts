@@ -3,6 +3,7 @@ import { loadCatalog } from "@/lib/catalog";
 import { pickPrizeIndex } from "@/lib/prizes";
 import { isSupabaseConfigured, supabase, supabaseShop, SHOP_SCHEMA } from "@/lib/supabase";
 import { checkImageFile, TESTIMONIAL_BUCKET } from "@/lib/testimonials";
+import { cleanFulfillment, type OrderFulfillment } from "@/lib/order-fulfillment";
 import type { AdminTestimonial, PublicTestimonial, TestimonialStatus } from "@/lib/testimonials";
 import type { Prize, RegistrationPayload, WheelPrize, WheelPrizeInput } from "@/lib/types";
 
@@ -240,6 +241,9 @@ export type ShopOrder = {
   subtotal: number;
   items: ShopOrderItem[];
   admin_notes: string | null;
+  /** "store" = added by an admin (Add order); "online" = shop checkout. */
+  sales_channel: "online" | "store";
+  fulfillment: OrderFulfillment;
   created_at: string;
   updated_at: string;
 };
@@ -250,6 +254,10 @@ export type ShopOrderAdminUpdate = {
   paymentStatus: ShopPaymentStatus;
   mayaReference: string;
   adminNotes: string;
+  /** Saved alongside when present (order detail); left untouched when omitted. */
+  fulfillment?: OrderFulfillment;
+  /** Only Add order sets this ("store"); checkout orders keep the "online" default. */
+  salesChannel?: "store";
 };
 
 /** One attributed order as a partner is allowed to see it - no buyer contact or address. */
@@ -1403,9 +1411,9 @@ export async function adminUpdateShopOrder(
   return normalizeShopOrder(Array.isArray(data.order) ? data.order[0] : data.order);
 }
 
-/** A consignment or cash sale the admin records by hand. Saved straight away as paid. */
+/** A sale the admin records by hand (Add order, "store" channel). Saved straight away as paid. */
 export type AdminOfflineOrderInput = {
-  paymentMethod: "consignment" | "cash";
+  paymentMethod: "maya" | "consignment" | "cash";
   reference: string;
   firstName: string;
   lastName: string;
@@ -1416,6 +1424,7 @@ export type AdminOfflineOrderInput = {
   items: { id: string; qty: number }[];
   referralSlug: string;
   adminNotes: string;
+  fulfillment: OrderFulfillment;
 };
 
 export async function adminCreateOfflineOrder(input: AdminOfflineOrderInput): Promise<ShopOrder> {
@@ -1756,6 +1765,8 @@ function normalizeShopOrder(row: unknown): ShopOrder {
     subtotal,
     items: Array.isArray(order.items) ? (order.items as ShopOrderItem[]) : [],
     admin_notes: typeof order.admin_notes === "string" ? order.admin_notes : null,
+    sales_channel: order.sales_channel === "store" ? "store" : "online",
+    fulfillment: cleanFulfillment(order),
     created_at: String(order.created_at ?? ""),
     updated_at: String(order.updated_at ?? ""),
   };

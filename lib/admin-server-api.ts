@@ -7,6 +7,7 @@ import {
 import { PARTNER_SLUG_PATTERN, RESERVED_PARTNER_SLUGS } from "@/lib/referral";
 import type { AdminTestimonial, TestimonialStatus } from "@/lib/testimonials";
 import type { Prize, WheelPrize, WheelPrizeInput } from "@/lib/types";
+import { cleanFulfillment } from "@/lib/order-fulfillment";
 import type {
   AdminDoctorRegistration,
   AdminDoctorRegistrationUpdate,
@@ -129,6 +130,8 @@ function normalizeShopOrder(row: unknown): ShopOrder {
     subtotal,
     items: Array.isArray(order.items) ? (order.items as ShopOrderItem[]) : [],
     admin_notes: typeof order.admin_notes === "string" ? order.admin_notes : null,
+    sales_channel: order.sales_channel === "store" ? "store" : "online",
+    fulfillment: cleanFulfillment(order),
     created_at: String(order.created_at ?? ""),
     updated_at: String(order.updated_at ?? ""),
   };
@@ -531,7 +534,22 @@ export async function serverAdminUpdateShopOrder(
   });
 
   if (error) throw error;
-  return normalizeShopOrder(Array.isArray(data) ? data[0] : data);
+  const saved = normalizeShopOrder(Array.isArray(data) ? data[0] : data);
+  if (!update.fulfillment && !update.salesChannel) return saved;
+
+  // Fulfilment fields and the sales channel have no RPC parameters; the RPC above already
+  // checked the admin password, so the service-role client writes them directly.
+  const { data: extra, error: extraError } = await supabaseShop
+    .from("shop_orders")
+    .update({
+      ...(update.fulfillment ? cleanFulfillment(update.fulfillment) : {}),
+      ...(update.salesChannel ? { sales_channel: update.salesChannel } : {}),
+    })
+    .eq("id", saved.id)
+    .select("*")
+    .single();
+  if (extraError) throw extraError;
+  return normalizeShopOrder(extra);
 }
 
 // ─── Sequence ───────────────────────────────────────────────────────────────
