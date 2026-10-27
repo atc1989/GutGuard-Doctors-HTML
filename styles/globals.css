@@ -2360,6 +2360,11 @@
   grid-column: 1 / -1;
 }
 
+.admin-fulfillment-heading {
+  margin: 8px 0 0;
+  font-size: 14px;
+}
+
 /* Admin → Add order: product, qty and remove on one row. */
 .admin-offline-order-line {
   display: grid;

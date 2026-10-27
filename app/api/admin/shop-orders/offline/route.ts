@@ -7,10 +7,11 @@ import { loadCatalog, priceOrderLines } from "@/lib/catalog";
 import { getSupabaseAdmin, isSupabaseAdminConfigured, SHOP_SCHEMA } from "@/lib/supabase-admin";
 
 /**
- * Admin records a consignment or cash sale. It goes through the same create_shop_order as the
- * shop (order code, referral credit, self-referral check), then is marked paid with the
- * admin's reference - which fires partner points like a Maya payment. No shipping: the
- * address is free text and the total is the catalog price of the items.
+ * Admin records a sale by hand (Maya, consignment or cash; "store" channel). It goes through the
+ * same create_shop_order as the shop (order code, referral credit, self-referral check), then is
+ * marked paid with the admin's reference - which fires partner points like a checkout payment -
+ * and gets its fulfilment fields. No shipping: the address is free text and the total is the
+ * catalog price of the items.
  */
 export async function POST(req: NextRequest) {
   const adminPassword = await getAdminPasswordFromSession();
@@ -29,8 +30,8 @@ export async function POST(req: NextRequest) {
   }
 
   const text = (value: unknown) => String(value ?? "").trim();
-  if (input.paymentMethod !== "consignment" && input.paymentMethod !== "cash") {
-    return NextResponse.json({ error: "Choose Consignment or Cash." }, { status: 400 });
+  if (!["maya", "consignment", "cash"].includes(input.paymentMethod)) {
+    return NextResponse.json({ error: "Choose Maya, Consignment or Cash." }, { status: 400 });
   }
   const missing = [
     !text(input.firstName) && "first name",
@@ -84,6 +85,8 @@ export async function POST(req: NextRequest) {
       paymentStatus: "paid",
       mayaReference: text(input.reference),
       adminNotes: text(input.adminNotes),
+      fulfillment: input.fulfillment,
+      salesChannel: "store",
     });
 
     if (saved.email) {
