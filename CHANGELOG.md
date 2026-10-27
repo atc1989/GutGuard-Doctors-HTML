@@ -3,6 +3,7 @@
 User-visible changes only. Rules: see "Patch notes" in `AGENTS.md`.
 
 ## Unreleased
+- Admin email settings, email sequences, newsletters, SMS blasts, "log in as doctor" and paid order receipts work again (they had stopped with server errors after Supabase began giving the edge functions a different service key).
 - Shop payments: retries check earlier payments and reuse active checkout sessions, payment recovery survives failed saves, and missing payment receipts can be retried without charging again.
 - TikTok is removed everywhere: no TikTok username on the registration form or in Admin → Doctors, no Profile QR (old /dr/ links now open the home page), no Admin → TikTok Shop page, and the welcome and newsletter emails describe the GutGuard Partner Program instead of the TikTok Affiliate Program.
 - Partner dashboard: new Wallet page showing available, pending and withdrawn rebate balance, a withdrawal request form (GCash, Maya or bank; minimum ₱500, fixed ₱60 fee) and withdrawal history with status. Admin → Withdrawals lists requests; admins approve with the transfer reference or reject with a reason (the amount returns to the partner's wallet).

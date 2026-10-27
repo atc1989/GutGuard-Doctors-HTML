@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.106.2";
 import { serveWithCors } from "../_shared/cors.ts";
+import { isServiceRoleRequest } from "../_shared/service-auth.ts";
 
 const PROD_SITE_URL = (Deno.env.get("SHOP_SITE_URL") ?? "https://gutguard.ph").replace(/\/$/, "");
 const SANDBOX_SITE_URL = (Deno.env.get("SHOP_SANDBOX_SITE_URL") ?? PROD_SITE_URL).replace(/\/$/, "");
@@ -45,7 +46,7 @@ serveWithCors(async (req) => {
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
 
   try {
-    const isServiceRole = req.headers.get("Authorization") === `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`;
+    const isServiceRole = await isServiceRoleRequest(req);
     const { orderId, kind = "saved", schema } = (await req.json()) as RequestPayload;
     // The browser may only ask for the order-received email. The paid receipt is sent by the
     // Maya webhook route with the service role.
