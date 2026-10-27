@@ -24,6 +24,7 @@ type ShopOrder = {
   id: string;
   order_code: string;
   payment_method: string | null;
+  payment_status: string;
   customer_name: string | null;
   email: string | null;
   mobile: string | null;
@@ -66,13 +67,14 @@ serveWithCors(async (req) => {
     const { data, error } = await supabase
       .schema(dbSchema)
       .from("shop_orders")
-      .select("id, order_code, payment_method, customer_name, email, mobile, address, barangay, city, province, zip, subtotal, shipping_fee, total_amount, items, created_at")
+      .select("id, order_code, payment_method, payment_status, customer_name, email, mobile, address, barangay, city, province, zip, subtotal, shipping_fee, total_amount, items, created_at")
       .eq("id", orderId)
       .single();
 
     if (error || !data) return jsonResponse({ error: "Order not found" }, 404);
 
     const order = data as ShopOrder;
+    if (kind === "paid" && order.payment_status !== "paid") return jsonResponse({ error: "Order payment is not confirmed" }, 409);
     const email = (order.email ?? "").trim().toLowerCase();
     const subject =
       kind === "paid"
@@ -80,7 +82,7 @@ serveWithCors(async (req) => {
         : `We received your GutGuard order ${order.order_code}`;
 
     // Send each kind once per order, so a leaked order id cannot be used to mail-bomb the buyer.
-    const { data: alreadySent } = await supabase
+    const { data: alreadySent, error: sentLookupError } = await supabase
       .schema(dbSchema)
       .from("shop_order_email_sends")
       .select("order_id")
@@ -88,6 +90,7 @@ serveWithCors(async (req) => {
       .eq("subject", subject)
       .eq("status", "sent")
       .limit(1);
+    if (sentLookupError) throw new Error("Could not verify receipt delivery history");
     if (alreadySent?.length) return jsonResponse({ sent: false, duplicate: true });
 
     if (!isValidEmail(email)) {
@@ -107,6 +110,9 @@ serveWithCors(async (req) => {
       headers: {
         Authorization: `Bearer ${resendApiKey}`,
         "Content-Type": "application/json",
+        // Resend deduplicates overlapping requests/retries for 24 hours. The sent
+        // log above provides lasting deduplication after that provider window.
+        "Idempotency-Key": `shop-order/${dbSchema}/${orderId}/${kind}`,
       },
       body: JSON.stringify({
         from: fromEmail,
@@ -158,7 +164,7 @@ async function recordSendAttempt(
     schema: string;
   },
 ) {
-  await supabase.schema(input.schema).from("shop_order_email_sends").insert({
+  const { error } = await supabase.schema(input.schema).from("shop_order_email_sends").insert({
     order_id: input.orderId,
     email: input.email,
     subject: input.subject,
@@ -166,6 +172,7 @@ async function recordSendAttempt(
     resend_id: input.resendId ?? null,
     error_message: input.errorMessage ?? null,
   });
+  if (error) throw new Error("Could not record receipt delivery; retry required");
 }
 
 function renderEmail(order: ShopOrder, kind: EmailKind, dbSchema: string) {

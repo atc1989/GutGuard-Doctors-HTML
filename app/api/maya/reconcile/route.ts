@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getMayaPayment, isMayaConfigured, MayaApiError } from "@/lib/maya";
-import { applyPaymentToOrder } from "@/lib/maya-orders";
+import { isMayaConfigured, MayaApiError } from "@/lib/maya";
+import { applyPaymentToOrder, PAYMENT_ORDER_COLUMNS, sendPaidReceipt } from "@/lib/maya-orders";
+import { retrieveOrderPayment } from "@/lib/maya-recovery";
 import { getSupabaseAdmin, isSupabaseAdminConfigured } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -31,19 +32,19 @@ export async function POST(request: Request) {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("shop_orders")
-    .select("id, status, payment_status, maya_payment_id, maya_payment_status, maya_checkout_id")
+    .select(PAYMENT_ORDER_COLUMNS)
     .eq("order_code", orderCode)
     .single();
 
   if (error || !data) return NextResponse.json({ error: "Order not found." }, { status: 404 });
 
-  // Already settled, or no checkout was ever started - nothing to ask Maya about.
-  if (data.payment_status === "paid") return NextResponse.json({ paymentStatus: "paid", changed: false });
-  if (!data.maya_checkout_id) return NextResponse.json({ paymentStatus: data.payment_status, changed: false });
-
   try {
-    // For Maya Checkout the checkoutId is the payment id.
-    const payment = await getMayaPayment(data.maya_checkout_id);
+    if (data.payment_status === "paid") {
+      await sendPaidReceipt(supabase, data.id);
+      return NextResponse.json({ paymentStatus: "paid", changed: false });
+    }
+    const payment = await retrieveOrderPayment(data);
+    if (!payment) return NextResponse.json({ paymentStatus: data.payment_status, changed: false });
     const result = await applyPaymentToOrder(supabase, data, payment);
     return NextResponse.json({ paymentStatus: result.paymentStatus, changed: result.changed });
   } catch (caught) {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getMayaPayment, isMayaConfigured, MayaApiError } from "@/lib/maya";
-import { applyPaymentToOrder } from "@/lib/maya-orders";
+import { applyPaymentToOrder, PAYMENT_ORDER_COLUMNS } from "@/lib/maya-orders";
 import { getSupabaseAdmin, isSupabaseAdminConfigured } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     const findOrder = (code: string) =>
       supabase
         .from("shop_orders")
-        .select("id, status, payment_status, maya_payment_id, maya_payment_status")
+        .select(PAYMENT_ORDER_COLUMNS)
         .eq("order_code", code)
         .maybeSingle();
     let { data, error } = await findOrder(reference);
