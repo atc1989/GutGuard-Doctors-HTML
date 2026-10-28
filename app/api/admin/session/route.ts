@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getAdminPasswordFromSession } from "@/lib/admin-session";
+import { getAdminSession } from "@/lib/admin-session";
 
 export async function GET() {
-  const password = await getAdminPasswordFromSession();
-  return NextResponse.json({ authenticated: Boolean(password) });
+  const access = await getAdminSession();
+  return NextResponse.json(access ? { authenticated: true, ...access } : { authenticated: false });
 }

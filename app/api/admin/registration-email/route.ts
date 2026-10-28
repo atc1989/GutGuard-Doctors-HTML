@@ -8,9 +8,9 @@ import {
 } from "@/lib/admin-server-api";
 
 export async function GET() {
-  const adminPassword = await getAdminPasswordFromSession();
+  const adminPassword = await getAdminPasswordFromSession("referral-email");
   if (!adminPassword) {
-    return NextResponse.json({ error: "Unauthorized: Admin session expired." }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized: admin session expired, or this login can't open this section." }, { status: 401 });
   }
 
   try {
@@ -25,9 +25,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const adminPassword = await getAdminPasswordFromSession();
+  const adminPassword = await getAdminPasswordFromSession("referral-email");
   if (!adminPassword) {
-    return NextResponse.json({ error: "Unauthorized: Admin session expired." }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized: admin session expired, or this login can't open this section." }, { status: 401 });
   }
 
   try {

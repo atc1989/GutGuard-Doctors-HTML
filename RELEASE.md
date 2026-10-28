@@ -14,6 +14,7 @@ is done** — it would re-run every file, including the store-hierarchy backfill
 |---|---|
 | `ADMIN_PASSWORD` | set, and equal to `doctors.wheel_admin_settings.admin_password`. Unset = nobody can log in to `/admin` (no fallback any more). |
 | `ADMIN_SESSION_SECRET` | optional, long random string (signs admin cookies instead of the password) |
+| `ADMIN_STAFF` | optional staff logins limited to some admin sections (format in `.env.example`). Unset = only the `ADMIN_PASSWORD` owner login. Releasing the module-access change signs every admin out once. |
 | `UPSTASH_REDIS_REST_URL` / `_TOKEN` | set — without them OTP / admin-login rate limits and admin logout revocation are off |
 | `MAYA_API_BASE` | `https://pg.paymaya.com` with the **live** keys (sandbox base = test cards mark real orders paid) |
 | `NEXT_PUBLIC_SHOP_DB_SCHEMA` | `doctors` |

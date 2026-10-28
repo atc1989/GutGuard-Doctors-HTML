@@ -646,14 +646,17 @@ export async function adminLogout(): Promise<void> {
   await fetch("/api/admin/logout", { method: "POST" });
 }
 
-export async function checkAdminSession(): Promise<boolean> {
+/** Who is logged in to /admin: the owner, or a staff login limited to `modules` (nav slugs). */
+export type AdminSessionInfo = { name: string; owner: boolean; modules: string[] };
+
+export async function checkAdminSession(): Promise<AdminSessionInfo | null> {
   try {
     const res = await fetch("/api/admin/session");
-    if (!res.ok) return false;
+    if (!res.ok) return null;
     const data = await res.json();
-    return Boolean(data.authenticated);
+    return data.authenticated ? { name: data.name, owner: Boolean(data.owner), modules: data.modules ?? [] } : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
