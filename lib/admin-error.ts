@@ -4,7 +4,12 @@
 export function adminErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message;
   if (error && typeof error === "object") {
-    const { message, details, hint } = error as { message?: unknown; details?: unknown; hint?: unknown };
+    const { code, message, details, hint } = error as { code?: unknown; message?: unknown; details?: unknown; hint?: unknown };
+    // Partners sign in by email, so one email can only be on one partner row.
+    if (code === "23505" && typeof message === "string" && message.includes("doctor_registrations_email_key")) {
+      const email = typeof details === "string" ? details.match(/=\((.+)\)/)?.[1] : undefined;
+      return `${email ?? "That email"} already belongs to another partner. Search for it in Doctor Partners: if it is the same doctor, use that existing account instead of this code, or use a different email.`;
+    }
     if (typeof message === "string" && message) {
       return [message, details, hint].filter((part) => typeof part === "string" && part).join(" - ");
     }
@@ -18,6 +23,7 @@ export function adminErrorStatus(error: unknown): number {
   const code = error && typeof error === "object" ? (error as { code?: unknown }).code : undefined;
   if (code === "22023" || code === "23514" || code === "22P02") return 400;
   if (code === "P0002") return 404;
+  if (code === "23505") return 409; // duplicate, e.g. an email another partner already uses
   if (code === "42501" || code === "28000") return 403;
   return 500;
 }

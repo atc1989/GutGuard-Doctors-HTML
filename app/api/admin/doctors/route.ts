@@ -1,4 +1,4 @@
-import { adminErrorMessage } from "@/lib/admin-error";
+import { adminErrorMessage, adminErrorStatus } from "@/lib/admin-error";
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
 import {
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       { error: adminErrorMessage(error, "Failed to update doctor registration.") },
-      { status: 500 },
+      { status: adminErrorStatus(error) },
     );
   }
 }
