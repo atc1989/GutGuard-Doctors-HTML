@@ -24,6 +24,13 @@ begin
 end $$;
 create table doctors.milestone_unlocks (partner_id uuid, cycle_number int, milestone_pts int, rebate_amount numeric, status varchar(50) default 'unlocked', created_at timestamptz default now());
 create table sandbox.milestone_unlocks (like doctors.milestone_unlocks including defaults);
+create table doctors.shop_orders (
+  id uuid primary key default gen_random_uuid(), order_code text not null, payment_status text not null default 'pending',
+  subtotal numeric(12,2) not null default 0, referral_doctor_id uuid
+);
+create table sandbox.shop_orders (like doctors.shop_orders including defaults);
+create table doctors.partner_points (order_id uuid, partner_id uuid, points int, depth int, created_at timestamptz default now());
+create table sandbox.partner_points (like doctors.partner_points including defaults);
 
 insert into doctors.doctor_registrations (id, full_name, email) values
   ('00000000-0000-0000-0000-00000000000a', 'Dr A', 'a@x.ph'),
@@ -97,4 +104,63 @@ begin
   assert (sandbox.partner_wallet()->>'available')::numeric = 0, 'sandbox has its own rebates';
 
   raise notice 'partner wallet checks passed';
+end $$;
+
+-- ─── EARNINGS CHECKS (20261101000000_wallet_earnings_*) ──────────────────────
+-- A starts here with a PHP 18,000 rebate and PHP 500 withdrawn: PHP 17,500 available.
+do $$
+declare
+  w jsonb;
+  failed boolean;
+  o1 uuid;
+begin
+  perform set_config('request.jwt.claims', '{"email":"a@x.ph"}', false);
+
+  insert into doctors.shop_orders (order_code, subtotal, referral_doctor_id)
+  values ('GG-1', 3000, '00000000-0000-0000-0000-00000000000a') returning id into o1;
+  insert into doctors.shop_orders (order_code, subtotal) values ('GG-2', 5000);  -- no referrer
+  w := doctors.partner_wallet();
+  assert (w->>'commissions')::numeric = 0, 'nothing before the order is paid';
+
+  update doctors.shop_orders set payment_status = 'paid';
+  w := doctors.partner_wallet();
+  assert (w->>'commissions')::numeric = 300, '10% of the products subtotal: ' || w;
+  assert (w->>'available')::numeric = 17800, 'commission is withdrawable: ' || w;
+
+  update doctors.shop_orders set payment_status = 'refunded' where id = o1;
+  update doctors.shop_orders set payment_status = 'paid' where id = o1;
+  assert (doctors.partner_wallet()->>'commissions')::numeric = 300, 'paid twice credits once';
+
+  insert into doctors.partner_points (order_id, partner_id, points, depth) values
+    (o1, '00000000-0000-0000-0000-00000000000a', 340, 0),
+    (o1, '00000000-0000-0000-0000-00000000000a', 50, 1);  -- pass-up points do not convert
+  assert (doctors.partner_wallet()->>'direct_points')::int = 340, 'direct points only';
+
+  failed := false;
+  begin perform doctors.convert_partner_points(750); exception when others then failed := true; end;
+  assert failed, 'cannot convert more than you have';
+  failed := false;
+  begin perform doctors.convert_partner_points(299); exception when others then failed := true; end;
+  assert failed, 'only 300, 750 or 1,500';
+
+  assert (doctors.convert_partner_points(300)->>'amount')::numeric = 18000, '300 points = PHP 18,000';
+  w := doctors.partner_wallet();
+  assert (w->>'direct_points')::int = 40, 'only the converted points are used: ' || w;
+  assert (w->>'converted')::numeric = 18000 and (w->>'available')::numeric = 35800, 'conversion credited: ' || w;
+  assert jsonb_array_length(w->'credits') = 3, 'credits list commission, conversion, rebate: ' || w;
+
+  failed := false;
+  begin perform doctors.convert_partner_points(300); exception when others then failed := true; end;
+  assert failed, 'the same points cannot be converted twice';
+
+  perform set_config('request.jwt.claims', '{"email":"b@x.ph"}', false);
+  failed := false;
+  begin perform doctors.convert_partner_points(300); exception when others then failed := true; end;
+  assert failed, 'B cannot convert A''s points';
+
+  perform set_config('request.jwt.claims', '{"email":"a@x.ph"}', false);
+  assert (sandbox.partner_wallet()->>'commissions')::numeric = 0, 'sandbox has its own commissions';
+  assert not has_function_privilege('anon', 'doctors.convert_partner_points(integer)', 'execute'), 'anon cannot convert';
+
+  raise notice 'wallet earnings checks passed';
 end $$;

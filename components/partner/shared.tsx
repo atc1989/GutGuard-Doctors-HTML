@@ -23,6 +23,13 @@ export const QR_LOGO_PROPS = {
 /** Group target that one G-Points cycle counts towards. */
 export const CYCLE_TARGET = 1500;
 
+/** G-Points milestones and their cash value. Direct points convert at these levels (convert_partner_points). */
+export const MILESTONES = [
+  { pts: 300, rebate: 18000, label: "Initial movement milestone" },
+  { pts: 750, rebate: 70000, label: "Mid-level movement milestone" },
+  { pts: 1500, rebate: 150000, label: "Full cycle target milestone" },
+] as const;
+
 export const peso = (value: number) =>
   new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value);
 
