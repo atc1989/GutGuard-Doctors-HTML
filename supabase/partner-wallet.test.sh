@@ -26,4 +26,9 @@ sed -n '1,/^-- ─── CHECKS/p' partner-wallet.test.sql | $PSQL
 $PSQL < migrations/20261030000000_partner_wallet.sql
 # Twice: the migration must be safe to re-run.
 $PSQL < migrations/20261030000000_partner_wallet.sql
-sed -n '/^-- ─── CHECKS/,$p' partner-wallet.test.sql | $PSQL 2>&1 | grep -E 'NOTICE|ERROR'
+sed -n '/^-- ─── CHECKS/,/^-- ─── EARNINGS CHECKS/p' partner-wallet.test.sql | $PSQL 2>&1 | grep -E 'NOTICE|ERROR'
+for schema in sandbox doctors; do
+  $PSQL < "migrations/20261101000000_wallet_earnings_$schema.sql"
+  $PSQL < "migrations/20261101000000_wallet_earnings_$schema.sql"
+done
+sed -n '/^-- ─── EARNINGS CHECKS/,$p' partner-wallet.test.sql | $PSQL 2>&1 | grep -E 'NOTICE|ERROR'
