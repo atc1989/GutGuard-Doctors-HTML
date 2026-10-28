@@ -1,4 +1,4 @@
-import AdminWheelPage from "@/app/admin/wheel/page";
+import AdminWheelPage from "@/app/(admin)/admin/wheel/page";
 
 export const metadata = {
   title: "Shop Orders | GutGuard CRM",
