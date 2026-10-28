@@ -2360,6 +2360,11 @@
   grid-column: 1 / -1;
 }
 
+.admin-fulfillment-heading {
+  margin: 8px 0 0;
+  font-size: 14px;
+}
+
 /* Admin → Add order: product, qty and remove on one row. */
 .admin-offline-order-line {
   display: grid;
@@ -7396,6 +7401,10 @@
 .pp-wallet-summary dt { color: var(--ink-3); }
 .pp-wallet-summary .is-total { border-top: 1px solid var(--rule-soft); padding-top: 6px; font-weight: 800; }
 .pp-wallet-notice { color: #047857; font-size: 14px; font-weight: 700; }
+.pp-convert-tiers { display: flex; flex-wrap: wrap; gap: 8px; }
+.pp-convert-tiers button:disabled { opacity: 0.45; cursor: not-allowed; }
+.pp-convert-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border: 1px solid var(--rule); border-radius: var(--r-sm); padding: 12px 14px; }
+.pp-convert-confirm p { flex-basis: 100%; font-size: 14px; }
 .pp-log .partner-badge { margin-left: 6px; vertical-align: middle; }
 .partner-badge.rejected { border-color: rgba(157, 36, 48, 0.32); color: #9d2430; }
 

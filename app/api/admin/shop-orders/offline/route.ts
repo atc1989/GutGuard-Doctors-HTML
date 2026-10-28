@@ -1,16 +1,18 @@
 import { adminErrorMessage } from "@/lib/admin-error";
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
-import { serverAdminUpdateShopOrder } from "@/lib/admin-server-api";
+import { serverAdminGetShopOrder, serverAdminUpdateShopOrder } from "@/lib/admin-server-api";
 import type { AdminOfflineOrderInput } from "@/lib/api";
 import { loadCatalog, priceOrderLines } from "@/lib/catalog";
+import { cleanFulfillment } from "@/lib/order-fulfillment";
 import { getSupabaseAdmin, isSupabaseAdminConfigured, SHOP_SCHEMA } from "@/lib/supabase-admin";
 
 /**
- * Admin records a consignment or cash sale. It goes through the same create_shop_order as the
- * shop (order code, referral credit, self-referral check), then is marked paid with the
- * admin's reference - which fires partner points like a Maya payment. No shipping: the
- * address is free text and the total is the catalog price of the items.
+ * Admin records a sale by hand (Maya, consignment or cash; "store" channel). It goes through the
+ * same create_shop_order as the shop (order code, referral credit, self-referral check), then is
+ * marked paid with the admin's reference - which fires partner points like a checkout payment -
+ * and gets its fulfilment fields. No shipping: the address is free text and the total is the
+ * catalog price of the items.
  */
 export async function POST(req: NextRequest) {
   const adminPassword = await getAdminPasswordFromSession();
@@ -29,8 +31,8 @@ export async function POST(req: NextRequest) {
   }
 
   const text = (value: unknown) => String(value ?? "").trim();
-  if (input.paymentMethod !== "consignment" && input.paymentMethod !== "cash") {
-    return NextResponse.json({ error: "Choose Consignment or Cash." }, { status: 400 });
+  if (!["maya", "consignment", "cash"].includes(input.paymentMethod)) {
+    return NextResponse.json({ error: "Choose Maya, Consignment or Cash." }, { status: 400 });
   }
   const missing = [
     !text(input.firstName) && "first name",
@@ -77,14 +79,48 @@ export async function POST(req: NextRequest) {
     if (error) throw error;
     const created = (Array.isArray(data) ? data[0] : data) as { id?: string } | null;
     if (!created?.id) throw new Error("The order was not created.");
+    const orderId = created.id;
 
-    const saved = await serverAdminUpdateShopOrder(adminPassword, {
-      id: created.id,
-      status: "paid",
-      paymentStatus: "paid",
-      mayaReference: text(input.reference),
-      adminNotes: text(input.adminNotes),
-    });
+    // Fulfilment and channel go on while the order is still unpaid, and marking it paid (which
+    // awards partner points) is the last step. If either step fails, the half-made order is
+    // cancelled, so the admin can retry without leaving a second paid order behind.
+    let saved;
+    try {
+      const { error: fieldsError } = await supabase
+        .from("shop_orders")
+        .update({ ...cleanFulfillment(input.fulfillment), sales_channel: "store" })
+        .eq("id", orderId);
+      if (fieldsError) throw fieldsError;
+
+      saved = await serverAdminUpdateShopOrder(adminPassword, {
+        id: orderId,
+        status: "paid",
+        paymentStatus: "paid",
+        mayaReference: text(input.reference),
+        adminNotes: text(input.adminNotes),
+      });
+    } catch (stepError) {
+      // The paid step may have committed before the error (e.g. a dropped response): keep it then.
+      const { data: current } = await supabase
+        .from("shop_orders")
+        .select("payment_status")
+        .eq("id", orderId)
+        .maybeSingle();
+      if (current?.payment_status === "paid") {
+        saved = await serverAdminGetShopOrder(adminPassword, orderId);
+      } else {
+        const { error: cancelError } = await supabase
+          .from("shop_orders")
+          .update({
+            status: "cancelled",
+            payment_status: "failed",
+            admin_notes: [text(input.adminNotes), "Add order did not finish; cancelled."].filter(Boolean).join("\n"),
+          })
+          .eq("id", orderId);
+        if (cancelError) console.error("Could not cancel unfinished Add order", orderId, cancelError.message);
+        throw stepError;
+      }
+    }
 
     if (saved.email) {
       // Same receipt the Maya webhook sends; best-effort, the order already stands.

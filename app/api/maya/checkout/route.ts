@@ -5,6 +5,8 @@ import { verifyOrderAddress } from "@/lib/order-address";
 import { expectedShippingFee } from "@/lib/shipping";
 import { getSupabaseAdmin, isSupabaseAdminConfigured } from "@/lib/supabase-admin";
 import type { ShopOrderItem } from "@/lib/api";
+import { applyPaymentToOrder } from "@/lib/maya-orders";
+import { canReplaceCheckout, mayaStatus, retrieveOrderPayment } from "@/lib/maya-recovery";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,6 +35,12 @@ type OrderRow = {
   total_amount: number | string;
   items: ShopOrderItem[];
   payment_attempts: number | null;
+  maya_checkout_id: string | null;
+  maya_checkout_url: string | null;
+  maya_request_reference: string | null;
+  maya_payment_id: string | null;
+  maya_payment_status: string | null;
+  paid_at: string | null;
   created_at: string;
 };
 
@@ -54,7 +62,7 @@ export async function POST(request: Request) {
   const { data, error } = await supabase
     .from("shop_orders")
     .select(
-      "id, order_code, status, payment_status, payment_method, customer_name, first_name, last_name, email, mobile, address, city, province, province_code, city_municipality_code, barangay, barangay_code, zip, shipping_fee, subtotal, total_amount, items, payment_attempts, created_at",
+      "id, order_code, status, payment_status, payment_method, customer_name, first_name, last_name, email, mobile, address, city, province, province_code, city_municipality_code, barangay, barangay_code, zip, shipping_fee, subtotal, total_amount, items, payment_attempts, created_at, maya_checkout_id, maya_checkout_url, maya_request_reference, maya_payment_id, maya_payment_status, paid_at",
     )
     .eq("id", orderId)
     .single();
@@ -72,6 +80,41 @@ export async function POST(request: Request) {
   // Consignment/cash orders are settled offline and approved by an admin - never charge them on Maya.
   if (order.payment_method !== "maya") {
     return NextResponse.json({ error: "This order is not paid through Maya." }, { status: 409 });
+  }
+
+  if (order.payment_status === "refunded") {
+    return NextResponse.json({ error: "This order was refunded. Please place a new order." }, { status: 409 });
+  }
+
+  // Local pending/failed is not proof that Maya did not take payment. Even a 404
+  // or timeout is inconclusive and must not authorize a second checkout.
+  if (order.maya_checkout_id || order.maya_request_reference || order.payment_attempts) {
+    try {
+      const payment = await retrieveOrderPayment(order);
+      if (!payment) throw new Error("The previous payment attempt is still being verified. Please contact support before paying again.");
+      const result = await applyPaymentToOrder(supabase, order, payment);
+      if (result.paymentStatus === "paid") return NextResponse.json({ alreadyPaid: true, orderUrl });
+      const status = mayaStatus(payment);
+      if (["PENDING_PAYMENT", "PENDING_TOKEN"].includes(status) && order.maya_checkout_url) {
+        return NextResponse.json({ redirectUrl: order.maya_checkout_url, orderUrl });
+      }
+      if (!canReplaceCheckout(status)) {
+        throw new Error("Your previous payment is pending or needs review. Please contact support before paying again.");
+      }
+      // Payment application may have changed these fields. Use the fresh row for
+      // the conditional reservation below, rather than a stale pre-lookup snapshot.
+      const fresh = await supabase.from("shop_orders").select("*").eq("id", order.id).single();
+      if (fresh.error || !fresh.data) throw new Error("Could not verify the latest order state.");
+      if (fresh.data.payment_attempts !== order.payment_attempts || fresh.data.maya_request_reference !== order.maya_request_reference) {
+        throw new Error("Another payment attempt is already being started.");
+      }
+      Object.assign(order, fresh.data);
+      if (order.payment_status === "paid") return NextResponse.json({ alreadyPaid: true, orderUrl });
+    } catch {
+      return NextResponse.json({ error: "Your previous payment could not be cleared for a new attempt. Please check your order again or contact support before paying again." }, { status: 409 });
+    }
+  } else if (order.payment_status === "review") {
+    return NextResponse.json({ error: "Your payment is being reviewed. Please contact support before paying again." }, { status: 409 });
   }
 
   // Same reads and fallbacks as the shop, so both agree on every price.
@@ -102,6 +145,24 @@ export async function POST(request: Request) {
   const requestReferenceNumber = attempt === 1 ? order.order_code : `${order.order_code}-${attempt}`;
 
   try {
+    // Reserve in Postgres BEFORE the external call. This is a cross-instance
+    // compare-and-swap, not an in-memory lock. Never release an uncertain request:
+    // its durable reference lets reconciliation find a lost Maya response.
+    let claim = supabase.from("shop_orders").update({
+      payment_attempts: attempt,
+      maya_request_reference: requestReferenceNumber,
+      maya_checkout_id: null,
+      maya_checkout_url: null,
+      maya_payment_status: "CHECKOUT_CREATING",
+    }).eq("id", order.id).eq("payment_attempts", Number(order.payment_attempts) || 0)
+      .eq("status", order.status).eq("payment_status", order.payment_status);
+    claim = order.maya_payment_status === null
+      ? claim.is("maya_payment_status", null) : claim.eq("maya_payment_status", order.maya_payment_status);
+    const reservation = await claim.select("id").maybeSingle();
+    if (reservation.error || !reservation.data) {
+      return NextResponse.json({ error: "Payment is already being started or the order changed. Please check your order before trying again." }, { status: 409 });
+    }
+
     const checkout = await createMayaCheckout({
       totalAmount: {
         value: toMayaAmount(amounts.total),
@@ -143,15 +204,23 @@ export async function POST(request: Request) {
       metadata: {},
     });
 
-    await supabase
+    const saved = await supabase
       .from("shop_orders")
       .update({
         maya_checkout_id: checkout.checkoutId,
-        maya_request_reference: requestReferenceNumber,
-        maya_payment_status: "PENDING_PAYMENT",
-        payment_attempts: attempt,
+        maya_checkout_url: checkout.redirectUrl,
       })
-      .eq("id", order.id);
+      .eq("id", order.id)
+      .eq("payment_attempts", attempt)
+      .eq("maya_request_reference", requestReferenceNumber)
+      .select("id, payment_status").maybeSingle();
+    if (saved.error || !saved.data) {
+      throw new Error("Checkout details could not be saved. Please check your order or contact support before paying again.");
+    }
+    if (saved.data.payment_status === "paid") return NextResponse.json({ alreadyPaid: true, orderUrl });
+    if (saved.data.payment_status === "refunded") {
+      return NextResponse.json({ error: "This order was refunded. Please place a new order." }, { status: 409 });
+    }
 
     return NextResponse.json({ redirectUrl: checkout.redirectUrl, orderUrl });
   } catch (caught) {

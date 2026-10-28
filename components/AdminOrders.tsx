@@ -13,6 +13,7 @@ import {
   type ShopPaymentStatus,
 } from "@/lib/api";
 import { priceOrderLines, type Product, type Promo } from "@/lib/catalog";
+import { EMPTY_FULFILLMENT, TRACKING_STATUSES, type OrderFulfillment, type TrackingStatus } from "@/lib/order-fulfillment";
 
 const ORDER_STATUSES: ShopOrderStatus[] = [
   "pending_payment",
@@ -45,6 +46,7 @@ const EMPTY_OFFLINE_ORDER: AdminOfflineOrderInput = {
   items: [{ id: "", qty: 1 }],
   referralSlug: "",
   adminNotes: "",
+  fulfillment: EMPTY_FULFILLMENT,
 };
 
 export default function AdminOrders({ partners }: { partners: PartnerLike[] }) {
@@ -137,6 +139,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
         order.barangay,
         order.status,
         order.payment_method,
+        salesChannel(order),
         order.maya_reference ?? "",
         referralSource(order, partnerNames),
       ]
@@ -169,6 +172,12 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
         paymentStatus: selectedOrder.payment_status,
         mayaReference: selectedOrder.maya_reference ?? "",
         adminNotes: selectedOrder.admin_notes ?? "",
+        // Only when edited, so plain status saves never touch the fulfilment columns.
+        fulfillment:
+          JSON.stringify(selectedOrder.fulfillment) !==
+          JSON.stringify(orders.find((order) => order.id === selectedOrder.id)?.fulfillment)
+            ? selectedOrder.fulfillment
+            : undefined,
       });
       setOrders((current) => current.map((order) => (order.id === saved.id ? saved : order)));
       setSelectedOrder(saved);
@@ -181,7 +190,8 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
   }
 
   function openNewOrder() {
-    setNewOrder(EMPTY_OFFLINE_ORDER);
+    // Order time starts at "now"; the admin changes it when entering an older sale.
+    setNewOrder({ ...EMPTY_OFFLINE_ORDER, fulfillment: { ...EMPTY_FULFILLMENT, order_time: new Date().toISOString() } });
     setNewOrderError(null);
     if (catalog.products.length === 0) {
       loadShopCatalog()
@@ -270,6 +280,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                 <th>Customer</th>
                 <th>Mobile</th>
                 <th>Status</th>
+                <th>Payment</th>
                 <th>Came from</th>
                 <th>Total</th>
                 <th>Created</th>
@@ -288,6 +299,10 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                   <td>
                     {formatStatus(order.status)}
                     <span>{formatStatus(order.payment_status)}</span>
+                  </td>
+                  <td>
+                    {formatStatus(order.payment_method)}
+                    <span>{salesChannel(order)}</span>
                   </td>
                   <td>{referralSource(order, partnerNames, partnerStoreTypes)}</td>
                   <td>{formatPeso(order.total_amount)}</td>
@@ -336,7 +351,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                   ["Shipping fee", formatPeso(selectedOrder.shipping_fee)],
                   ["Total", formatPeso(selectedOrder.total_amount)],
                   ["Created", formatAdminDate(selectedOrder.created_at)],
-                  ["Payment method", formatStatus(selectedOrder.payment_method)],
+                  ["Payment method", `${formatStatus(selectedOrder.payment_method)} (${salesChannel(selectedOrder)})`],
                   ["Payment status", formatStatus(selectedOrder.payment_status)],
                   ["Maya status", selectedOrder.maya_payment_status ?? "--"],
                   ["Maya payment ID", selectedOrder.maya_payment_id ?? "--"],
@@ -431,6 +446,10 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                     onChange={(event) => setSelectedOrder({ ...selectedOrder, admin_notes: event.target.value })}
                   />
                 </label>
+                <FulfillmentFields
+                  value={selectedOrder.fulfillment}
+                  onChange={(fulfillment) => setSelectedOrder({ ...selectedOrder, fulfillment })}
+                />
               </div>
             </div>
 
@@ -485,17 +504,24 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                 >
                   <option value="consignment">Consignment</option>
                   <option value="cash">Cash</option>
+                  <option value="maya">Maya</option>
                 </select>
               </label>
               <label>
-                {newOrder.paymentMethod === "consignment" ? "Bank reference no." : "Reference no."}
+                {newOrder.paymentMethod === "consignment"
+                  ? "Bank reference no."
+                  : newOrder.paymentMethod === "maya"
+                    ? "Maya reference no."
+                    : "Reference no."}
                 <input
                   value={newOrder.reference}
                   required
                   placeholder={
                     newOrder.paymentMethod === "consignment"
                       ? "Reference on the bank deposit or transfer"
-                      : "Cash receipt or reference number"
+                      : newOrder.paymentMethod === "maya"
+                        ? "Reference on the Maya payment"
+                        : "Cash receipt or reference number"
                   }
                   onChange={(event) => setNewOrder({ ...newOrder, reference: event.target.value })}
                 />
@@ -614,6 +640,10 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                   onChange={(event) => setNewOrder({ ...newOrder, adminNotes: event.target.value })}
                 />
               </label>
+              <FulfillmentFields
+                value={newOrder.fulfillment}
+                onChange={(fulfillment) => setNewOrder({ ...newOrder, fulfillment })}
+              />
             </div>
 
             <div className="admin-modal-actions">
@@ -629,6 +659,84 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
       ) : null}
     </section>
   );
+}
+
+/** "Store" = added by an admin through Add order (any payment method); "Online" = shop checkout. */
+function salesChannel(order: ShopOrder) {
+  return order.sales_channel === "store" ? "Store" : "Online";
+}
+
+/** Order time, POF, courier and salesperson fields - shared by Add order and the order detail. */
+function FulfillmentFields({
+  value,
+  onChange,
+}: {
+  value: OrderFulfillment;
+  onChange: (value: OrderFulfillment) => void;
+}) {
+  const set = (patch: Partial<OrderFulfillment>) => onChange({ ...value, ...patch });
+  const timeInput = (label: string, key: "order_time" | "pof_time" | "pickup_time") => (
+    <label>
+      {label}
+      <input
+        type="datetime-local"
+        value={toLocalInput(value[key])}
+        onChange={(event) => set({ [key]: fromLocalInput(event.target.value) })}
+      />
+    </label>
+  );
+
+  return (
+    <>
+      <h3 className="admin-edit-wide admin-fulfillment-heading">Fulfilment</h3>
+      {timeInput("Order time", "order_time")}
+      {timeInput("POF time (proof of payment)", "pof_time")}
+      <label>
+        Tracking number
+        <input value={value.tracking_number ?? ""} onChange={(event) => set({ tracking_number: event.target.value })} />
+      </label>
+      {timeInput("Pick-up time", "pickup_time")}
+      <label>
+        Tracking status
+        <select
+          value={value.tracking_status ?? ""}
+          onChange={(event) => set({ tracking_status: (event.target.value || null) as TrackingStatus | null })}
+        >
+          <option value="">Not set</option>
+          {TRACKING_STATUSES.map((status) => (
+            <option key={status} value={status}>
+              {formatStatus(status)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Sales (salesperson)
+        <input value={value.salesperson ?? ""} onChange={(event) => set({ salesperson: event.target.value })} />
+      </label>
+      <label className="admin-edit-wide">
+        Bot message
+        <textarea
+          value={value.bot_message ?? ""}
+          rows={2}
+          onChange={(event) => set({ bot_message: event.target.value })}
+        />
+      </label>
+    </>
+  );
+}
+
+/** ISO timestamp -> the browser's local "YYYY-MM-DDTHH:mm" for <input type="datetime-local">. */
+function toLocalInput(iso: string | null) {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function fromLocalInput(value: string) {
+  return value ? new Date(value).toISOString() : null;
 }
 
 function Summary({ items }: { items: Array<[string, string]> }) {

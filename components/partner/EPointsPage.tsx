@@ -3,14 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, ChevronRight, Copy, Users, X } from "lucide-react";
-import { CYCLE_TARGET, EmptyState, PageHeader, Pagination, StatTile, formatDate, peso, useCopy, usePartner } from "./shared";
+import { getPartnerWallet } from "@/lib/api";
+import { CYCLE_TARGET, EmptyState, MILESTONES, PageHeader, Pagination, StatTile, formatDate, peso, useCopy, usePartner } from "./shared";
 import MainStoreEPointsPage from "./MainStoreEPoints";
-
-const MILESTONES = [
-  { pts: 300, rebate: 18000, label: "Initial movement milestone" },
-  { pts: 750, rebate: 70000, label: "Mid-level movement milestone" },
-  { pts: 1500, rebate: 150000, label: "Full cycle target milestone" },
-];
 
 // Each track runs its own 1,500-point cycle; milestones are measured inside the current cycle.
 function trackCycle(trackPoints: number) {
@@ -26,7 +21,12 @@ export default function EPointsPage() {
 function PartnerEPointsPage() {
   const { dashboard } = usePartner();
   const { points, rebates, point_sources: sources = [] } = dashboard;
-  const direct = trackCycle(points.own_points);
+  // Track A counts direct points not converted yet; they turn into cash on the Wallet page.
+  const [directPoints, setDirectPoints] = useState<number | null>(null);
+  useEffect(() => {
+    getPartnerWallet().then((wallet) => setDirectPoints(wallet.direct_points)).catch(() => setDirectPoints(points.own_points));
+  }, [points.own_points]);
+  const direct = directPoints ?? 0;
   const referred = trackCycle(points.passup_points);
   const { copied, copy } = useCopy();
   const [tab, setTab] = useState<"rebates" | "points">("rebates");
@@ -83,19 +83,19 @@ function PartnerEPointsPage() {
               </span>
             </div>
             <div className="pp-progress-labels">
-              <strong>{direct.inCycle} / {CYCLE_TARGET} Direct G-Points (Cycle {direct.cycle})</strong>
-              <span>{Math.round((direct.inCycle / CYCLE_TARGET) * 100)}%</span>
+              <strong>{directPoints === null ? "…" : direct} Direct G-Points ready to convert</strong>
+              <Link href="/partner/wallet" className="pp-more">Convert in Wallet <ChevronRight size={14} aria-hidden="true" /></Link>
             </div>
-            <div className="pp-progress" role="progressbar" aria-valuemin={0} aria-valuemax={CYCLE_TARGET} aria-valuenow={direct.inCycle} aria-label="Direct sales cycle progress">
-              <div style={{ width: `${(direct.inCycle / CYCLE_TARGET) * 100}%`, background: "var(--gold)" }} />
+            <div className="pp-progress" role="progressbar" aria-valuemin={0} aria-valuemax={CYCLE_TARGET} aria-valuenow={Math.min(direct, CYCLE_TARGET)} aria-label="Direct G-Points ready to convert">
+              <div style={{ width: `${(Math.min(Math.max(direct, 0), CYCLE_TARGET) / CYCLE_TARGET) * 100}%`, background: "var(--gold)" }} />
             </div>
 
             <div className="pp-milestones" style={{ marginTop: 16 }}>
               {MILESTONES.map((m) => {
-                const reached = direct.inCycle >= m.pts;
+                const reached = direct >= m.pts;
                 return (
                   <article key={`direct-${m.pts}`} className={reached ? "pp-milestone unlocked" : "pp-milestone"}>
-                    <span>{reached ? "✓ Milestone reached" : `🎯 ${m.pts} Direct Pts (${direct.inCycle} / ${m.pts} pts)`}</span>
+                    <span>{reached ? "✓ Ready to convert" : `🎯 ${m.pts} Direct Pts (${direct} / ${m.pts} pts)`}</span>
                     <strong>{peso(m.rebate)}</strong>
                     <small>{m.label}</small>
                   </article>
