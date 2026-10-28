@@ -3,6 +3,7 @@
 User-visible changes only. Rules: see "Patch notes" in `AGENTS.md`.
 
 ## Unreleased
+- Admin → Doctor Partners: giving a partner (or a new Partner Code) an email another partner already uses now says so in plain words and tells you to find that partner, instead of showing a database error.
 - Admin email settings, email sequences, newsletters, SMS blasts, "log in as doctor" and paid order receipts work again (they had stopped with server errors after Supabase began giving the edge functions a different service key).
 - Shop payments: retries check earlier payments and reuse active checkout sessions, payment recovery survives failed saves, and missing payment receipts can be retried without charging again.
 - TikTok is removed everywhere: no TikTok username on the registration form or in Admin → Doctors, no Profile QR (old /dr/ links now open the home page), no Admin → TikTok Shop page, and the welcome and newsletter emails describe the GutGuard Partner Program instead of the TikTok Affiliate Program.
