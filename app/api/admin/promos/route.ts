@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminErrorMessage } from "@/lib/admin-error";
 import { getAdminPasswordFromSession } from "@/lib/admin-session";
+import type { AdminModule } from "@/lib/admin-token";
 import { loadCatalog, MAX_PROMO_PERCENT, normalizePromo, PROMO_COLUMNS, type Product } from "@/lib/catalog";
 import { supabaseAdminShop } from "@/lib/supabase-admin";
 
@@ -8,16 +9,17 @@ import { supabaseAdminShop } from "@/lib/supabase-admin";
 // promos table in the shop schema (doctors, or sandbox on the mirror).
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
-async function guard() {
-  if (!(await getAdminPasswordFromSession())) {
-    return NextResponse.json({ error: "Unauthorized: Admin session expired." }, { status: 401 });
+// The Products page reads promos too (for price previews); only Promotions can change them.
+async function guard(...modules: AdminModule[]) {
+  if (!(await getAdminPasswordFromSession("promos", ...modules))) {
+    return NextResponse.json({ error: "Unauthorized: admin session expired, or this login can't open this section." }, { status: 401 });
   }
   if (!supabaseAdminShop) return NextResponse.json({ error: "Supabase is not configured." }, { status: 503 });
   return null;
 }
 
 export async function GET() {
-  const denied = await guard();
+  const denied = await guard("products");
   if (denied) return denied;
 
   const { data, error } = await supabaseAdminShop!

@@ -4,6 +4,7 @@ import { ChangeEvent, FormEvent, Suspense, useEffect, useMemo, useState } from "
 import { useSearchParams } from "next/navigation";
 import { QRCodeCanvas, QRCodeSVG } from "qrcode.react";
 import AdminOrders from "@/components/AdminOrders";
+import { useAdminAccess } from "@/components/admin/AdminShell";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { DownloadIcon } from "@/components/Icons";
 import { NAME_PREFIXES } from "@/lib/constants";
@@ -250,6 +251,7 @@ const TAB_HEADERS: Record<AdminWheelTab, { kicker: string; title: string; descri
 };
 
 function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
+  const { owner, can } = useAdminAccess();
   const searchParams = useSearchParams();
   const queryTab = searchParams.get("tab") as AdminWheelTab | null;
   const validTabs: AdminWheelTab[] = ["wheel", "doctors", "orders", "newsletter", "sms", "registrationEmail", "sequence"];
@@ -585,15 +587,17 @@ function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
       return fallback;
     };
 
+    // Staff logins only load the tabs they can open; the rest would be refused by the API.
+    const partnersNeeded = ["doctors", "orders", "newsletter", "sms"].some(can);
     const [loadedPrizes, loadedDoctors, loadedNewsletterHistory, loadedSmsHistory, loadedRegistrationEmail, loadedSequence] = await Promise.all([
-      api.getWheelPrizes(),
-      api.getDoctorRegistrations ? api.getDoctorRegistrations() : Promise.resolve([]),
-      api.getNewsletterSendHistory ? api.getNewsletterSendHistory() : Promise.resolve([]),
-      api.getSmsBlastHistory ? api.getSmsBlastHistory() : Promise.resolve([]),
-      api.getRegistrationEmailSettings
+      can("wheel") ? api.getWheelPrizes() : Promise.resolve([]),
+      partnersNeeded ? api.getDoctorRegistrations() : Promise.resolve([]),
+      can("newsletter") ? api.getNewsletterSendHistory() : Promise.resolve([]),
+      can("sms") ? api.getSmsBlastHistory() : Promise.resolve([]),
+      can("referral-email")
         ? api.getRegistrationEmailSettings().catch(showFailure(emptyRegistrationEmailSettings))
         : Promise.resolve(emptyRegistrationEmailSettings),
-      api.getSequenceSteps ? api.getSequenceSteps().catch(showFailure([])) : Promise.resolve([]),
+      can("sequence") ? api.getSequenceSteps().catch(showFailure([])) : Promise.resolve([]),
     ]);
     setPrizes(loadedPrizes.sort((a, b) => a.sort_order - b.sort_order));
     setDoctors(loadedDoctors);
@@ -605,7 +609,7 @@ function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
     setDoctorPage(1);
     setNewsletterPage(1);
     setSmsPage(1);
-    loadUnclaimedPassup();
+    if (can("doctors")) loadUnclaimedPassup();
   }
 
   async function refreshDoctors() {
@@ -1947,14 +1951,16 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
                       <button type="button" onClick={() => openDoctorEditor(doctor)}>
                         Edit
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => loginAsDoctor(doctor)}
-                        disabled={!doctor.email || impersonatingId === doctor.id}
-                        title={doctor.email ? "Open the partner portal as this doctor" : "No email on this registration"}
-                      >
-                        {impersonatingId === doctor.id ? "Opening…" : "Log in as"}
-                      </button>
+                      {owner ? (
+                        <button
+                          type="button"
+                          onClick={() => loginAsDoctor(doctor)}
+                          disabled={!doctor.email || impersonatingId === doctor.id}
+                          title={doctor.email ? "Open the partner portal as this doctor" : "No email on this registration"}
+                        >
+                          {impersonatingId === doctor.id ? "Opening…" : "Log in as"}
+                        </button>
+                      ) : null}
 
                       {(!doctor.store_type || doctor.store_type === "lifestyle") && (
                         <button

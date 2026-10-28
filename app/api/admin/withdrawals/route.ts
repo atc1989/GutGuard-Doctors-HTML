@@ -4,9 +4,9 @@ import { serverAdminListWithdrawals, serverAdminProcessWithdrawal } from "@/lib/
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const adminPassword = await getAdminPasswordFromSession();
+  const adminPassword = await getAdminPasswordFromSession("withdrawals");
   if (!adminPassword) {
-    return NextResponse.json({ error: "Unauthorized: Admin session expired." }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized: admin session expired, or this login can't open this section." }, { status: 401 });
   }
 
   try {
@@ -21,9 +21,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const adminPassword = await getAdminPasswordFromSession();
+  const adminPassword = await getAdminPasswordFromSession("withdrawals");
   if (!adminPassword) {
-    return NextResponse.json({ error: "Unauthorized: Admin session expired." }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized: admin session expired, or this login can't open this section." }, { status: 401 });
   }
 
   const body = await request.json().catch(() => ({}));

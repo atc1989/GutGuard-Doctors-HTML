@@ -4,7 +4,7 @@ import {
   ADMIN_SESSION_COOKIE,
   ADMIN_SESSION_MAX_AGE_S,
   createAdminSessionToken,
-  verifyAdminPassword,
+  matchAdminLogin,
 } from "@/lib/admin-session";
 
 export async function POST(req: NextRequest) {
@@ -20,12 +20,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Admin password is required." }, { status: 400 });
   }
 
-  const isValid = await verifyAdminPassword(password);
-  if (!isValid) {
+  const name = await matchAdminLogin(password);
+  if (!name) {
     return NextResponse.json({ error: "Invalid admin password." }, { status: 401 });
   }
 
-  const token = createAdminSessionToken();
+  const token = createAdminSessionToken(name);
   if (!token) return NextResponse.json({ error: "Admin login is not configured." }, { status: 503 });
   const cookieStore = await cookies();
   cookieStore.set(ADMIN_SESSION_COOKIE, token, {

@@ -65,8 +65,8 @@ const fullName = (row: Pick<PartnerRow, "name_prefix" | "full_name"> | undefined
  * admin and partners see the same numbers.
  */
 export async function GET() {
-  if (!(await getAdminPasswordFromSession())) {
-    return NextResponse.json({ error: "Unauthorized: Admin session expired." }, { status: 401 });
+  if (!(await getAdminPasswordFromSession("referred-shops"))) {
+    return NextResponse.json({ error: "Unauthorized: admin session expired, or this login can't open this section." }, { status: 401 });
   }
   if (!supabaseAdmin || !supabaseAdminShop) {
     return NextResponse.json({ error: "Supabase is not configured." }, { status: 503 });

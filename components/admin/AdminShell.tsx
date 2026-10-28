@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -28,7 +28,22 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { adminLogin, adminLogout, checkAdminSession } from "@/lib/api";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import { adminLogin, adminLogout, checkAdminSession, type AdminSessionInfo } from "@/lib/api";
+
+// Module = the nav slug after /admin/ (the server checks the same keys). The dashboard is open to all.
+const moduleOf = (path: string) => path.split("/")[2] || null;
+
+const AdminAccessContext = createContext<AdminSessionInfo | null>(null);
+
+/** What the logged-in admin may open. The API routes enforce this; the UI only hides what would fail. */
+export function useAdminAccess() {
+  const access = useContext(AdminAccessContext);
+  return {
+    owner: Boolean(access?.owner),
+    can: (slug: string) => Boolean(access && (access.owner || access.modules.includes(slug))),
+  };
+}
 
 type NavItem = {
   href: string;
@@ -88,7 +103,8 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [access, setAccess] = useState<AdminSessionInfo | null>(null);
+  const isAuthenticated = Boolean(access);
   const [password, setPassword] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,10 +112,9 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
   const checkAuth = useCallback(async () => {
     try {
-      const ok = await checkAdminSession();
-      setIsAuthenticated(ok);
+      setAccess(await checkAdminSession());
     } catch {
-      setIsAuthenticated(false);
+      setAccess(null);
     } finally {
       setIsChecking(false);
     }
@@ -122,7 +137,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     try {
       await adminLogin(password);
       setPassword("");
-      setIsAuthenticated(true);
+      await checkAuth();
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed. Check your password.");
@@ -135,11 +150,19 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     try {
       await adminLogout();
     } finally {
-      setIsAuthenticated(false);
+      setAccess(null);
       router.push("/admin");
       router.refresh();
     }
   };
+
+  const canOpen = (href: string) => {
+    const slug = moduleOf(href);
+    return !slug || Boolean(access?.owner || access?.modules.includes(slug));
+  };
+  const navGroups = NAV_GROUPS.map((group) => ({ ...group, items: group.items.filter((item) => canOpen(item.href)) })).filter(
+    (group) => group.items.length > 0,
+  );
 
   const isActive = (href: string) => {
     if (href === "/admin") return pathname === "/admin";
@@ -242,7 +265,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       </div>
 
       <nav className="admin-crm-nav" aria-label="CRM Navigation">
-        {NAV_GROUPS.map((group) => (
+        {navGroups.map((group) => (
           <div key={group.title} className="admin-crm-nav-group">
             <div className="admin-crm-group-header">{group.title}</div>
             <ul className="admin-crm-group-list">
@@ -270,7 +293,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       <div className="admin-crm-sidebar-footer">
         <div className="admin-crm-session-pill">
           <span className="admin-crm-pulse-dot" />
-          <span>Session Active</span>
+          <span>{access?.owner ? "Session Active" : `Signed in as ${access?.name}`}</span>
         </div>
 
         <div className="admin-crm-footer-links">
@@ -367,7 +390,17 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
         {/* Main Routed Content Area */}
         <main className="admin-crm-main">
-          {children}
+          <AdminAccessContext.Provider value={access}>
+            {canOpen(pathname) ? (
+              children
+            ) : (
+              <AdminPageHeader
+                kicker="No access"
+                title="This section isn't on your login"
+                description="Ask the owner to add it to your access."
+              />
+            )}
+          </AdminAccessContext.Provider>
         </main>
       </div>
     </div>
