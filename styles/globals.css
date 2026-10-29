@@ -7777,54 +7777,6 @@
 }
 
 /* Referral notification email */
-.admin-referral-toggle {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 4px 0 18px;
-  font-weight: 600;
-}
-
-.admin-referral-toggle input {
-  width: auto;
-}
-
-.admin-referral-tokens {
-  margin: 18px 0;
-  padding: 14px 16px;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  background: var(--bone-soft);
-}
-
-.admin-referral-tokens div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.admin-referral-tokens code {
-  padding: 3px 8px;
-  border: 1px solid var(--rule);
-  border-radius: 4px;
-  background: var(--bone);
-  font-size: 12px;
-}
-
-.admin-referral-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  padding-top: 16px;
-  border-top: 1px solid var(--rule-soft);
-}
-
-.admin-referral-actions input {
-  flex: 1 1 220px;
-  max-width: 320px;
-}
 
 /* Overview Dashboard */
 
