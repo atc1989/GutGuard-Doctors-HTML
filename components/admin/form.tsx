@@ -62,6 +62,7 @@ export function ConfirmDialog({
   confirmLabel,
   destructive,
   busy,
+  confirmDisabled,
   onConfirm,
   children,
 }: {
@@ -72,6 +73,8 @@ export function ConfirmDialog({
   confirmLabel: string;
   destructive?: boolean;
   busy?: boolean;
+  /** Keeps the confirm button off until something outside the browser form checks is chosen (e.g. a partner). */
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   children?: ReactNode;
 }) {
@@ -94,7 +97,7 @@ export function ConfirmDialog({
             <Button type="button" variant="ghost" size="sm" onClick={() => onOpenChange(false)} disabled={busy}>
               Cancel
             </Button>
-            <Button type="submit" size="sm" variant={destructive ? "destructive" : "default"} disabled={busy}>
+            <Button type="submit" size="sm" variant={destructive ? "destructive" : "default"} disabled={busy || confirmDisabled}>
               {busy ? "Working…" : confirmLabel}
             </Button>
           </DialogFooter>

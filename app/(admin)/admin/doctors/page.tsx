@@ -1,4 +1,4 @@
-import AdminWheelPage from "@/app/(admin)/admin/wheel/page";
+import DoctorPartners from "@/components/admin/DoctorPartners";
 
 export const metadata = {
   title: "Doctor Registrations | GutGuard CRM",
@@ -6,5 +6,5 @@ export const metadata = {
 };
 
 export default function DoctorsAdminPage() {
-  return <AdminWheelPage defaultTab="doctors" />;
+  return <DoctorPartners />;
 }

@@ -2,24 +2,10 @@
 
 import { ChangeEvent, FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { QRCodeCanvas, QRCodeSVG } from "qrcode.react";
 import AdminOrders from "@/components/admin/AdminOrders";
 import { useAdminAccess } from "@/components/admin/AdminShell";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
-import { DownloadIcon } from "@/components/Icons";
-import { NAME_PREFIXES } from "@/lib/constants";
-import { QR_LOGO_PROPS, getPartnerQrLink } from "@/components/partner/shared";
 import { formatPrefixedName } from "@/lib/validation";
-import { isSandboxShop } from "@/lib/supabase";
-import {
-  adminUpgradeToMainStore,
-  adminToggleReferralQr,
-  adminPromotePartner,
-  adminTransferStore,
-  adminListUnclaimedPassup,
-  adminAssignUnclaimedPassup,
-  type UnclaimedPassup,
-} from "@/lib/api";
 
 type AdminWheelPrize = {
   id?: string;
@@ -223,18 +209,7 @@ function getPrizeOdds(prize: AdminWheelPrize, activeWeightTotal: number) {
   return (prize.chance_weight / activeWeightTotal) * 100;
 }
 
-type DoctorQrMode = "shop" | "referral";
-
-/** Same links the partner's own share page prints, so posters match across views. */
-function getDoctorQrUrl(doctor: AdminDoctorRegistration, mode: DoctorQrMode) {
-  return doctor.id ? getPartnerQrLink(doctor, mode) : "";
-}
-
-function getDoctorQrElementId(doctorId: string, mode: DoctorQrMode) {
-  return `doctor-qr-${doctorId}-${mode}`;
-}
-
-export type AdminWheelTab = "wheel" | "doctors" | "orders" | "newsletter" | "sms" | "registrationEmail" | "sequence";
+export type AdminWheelTab = "wheel" | "orders" | "newsletter" | "sms" | "registrationEmail" | "sequence";
 
 export type AdminWheelPageProps = {
   defaultTab?: AdminWheelTab;
@@ -242,7 +217,6 @@ export type AdminWheelPageProps = {
 
 const TAB_HEADERS: Record<AdminWheelTab, { kicker: string; title: string; description: string }> = {
   wheel: { kicker: "Prize operations", title: "Wheel Prizes", description: "Spin odds, prize inventory and the QR codes partners hand out." },
-  doctors: { kicker: "Partner network", title: "Doctor Partners", description: "Registrations, store tiers and referral links for every partner clinic." },
   orders: { kicker: "Order queue", title: "Shop Orders", description: "Website orders, Maya payments and partner sales attribution." },
   newsletter: { kicker: "Marketing", title: "Newsletter", description: "Compose and send an email blast to selected partners." },
   sms: { kicker: "Marketing", title: "SMS Blast", description: "Send a short message to selected partners and review past sends." },
@@ -251,10 +225,10 @@ const TAB_HEADERS: Record<AdminWheelTab, { kicker: string; title: string; descri
 };
 
 function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
-  const { owner, can } = useAdminAccess();
+  const { can } = useAdminAccess();
   const searchParams = useSearchParams();
   const queryTab = searchParams.get("tab") as AdminWheelTab | null;
-  const validTabs: AdminWheelTab[] = ["wheel", "doctors", "orders", "newsletter", "sms", "registrationEmail", "sequence"];
+  const validTabs: AdminWheelTab[] = ["wheel", "orders", "newsletter", "sms", "registrationEmail", "sequence"];
   const initialTab = defaultTab || (queryTab && validTabs.includes(queryTab) ? queryTab : "wheel");
   const [activeTab, setActiveTab] = useState<AdminWheelTab>(initialTab);
 
@@ -267,22 +241,6 @@ function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
   }, [defaultTab, queryTab]);
   const [prizes, setPrizes] = useState<AdminWheelPrize[]>([]);
   const [doctors, setDoctors] = useState<AdminDoctorRegistration[]>([]);
-  const [doctorSearch, setDoctorSearch] = useState("");
-  const [doctorOriginFilter, setDoctorOriginFilter] = useState<"all" | "direct" | "referred">("all");
-  const [doctorStoreTypeFilter, setDoctorStoreTypeFilter] = useState<string>("all");
-  const [upgradingDoctor, setUpgradingDoctor] = useState<AdminDoctorRegistration | null>(null);
-  const [upgradeNote, setUpgradeNote] = useState("");
-  const [isUpgrading, setIsUpgrading] = useState(false);
-  const [unclaimedPassup, setUnclaimedPassup] = useState<Map<string, UnclaimedPassup>>(new Map());
-  const [pickTarget, setPickTarget] = useState<{ doctor: AdminDoctorRegistration; mode: "transfer" | "assign" } | null>(null);
-  const [pickPartnerId, setPickPartnerId] = useState("");
-  const [pickNote, setPickNote] = useState("");
-  const [isPicking, setIsPicking] = useState(false);
-  const [togglingQrDoctorId, setTogglingQrDoctorId] = useState<string | null>(null);
-  const [promotingDoctorId, setPromotingDoctorId] = useState<string | null>(null);
-  const [doctorPage, setDoctorPage] = useState(1);
-  const [doctorPageSize, setDoctorPageSize] = useState(10);
-  const [doctorQrModes, setDoctorQrModes] = useState<Record<string, DoctorQrMode>>({});
   const [newsletterSearch, setNewsletterSearch] = useState("");
   const [newsletterPage, setNewsletterPage] = useState(1);
   const [newsletterPageSize, setNewsletterPageSize] = useState(10);
@@ -333,13 +291,10 @@ function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
   const [resendingKey, setResendingKey] = useState<string | null>(null);
   const [isSequenceLoading, setIsSequenceLoading] = useState(false);
   const [sequenceStepFileName, setSequenceStepFileName] = useState("");
-  const [editingDoctor, setEditingDoctor] = useState<AdminDoctorRegistration | null>(null);
-  const [isDoctorSaving, setIsDoctorSaving] = useState(false);
   const [newPrize, setNewPrize] = useState<AdminWheelPrize>(emptyPrize);
   const [isLoading, setIsLoading] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [impersonatingId, setImpersonatingId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [newsletterToast, setNewsletterToast] = useState<{
@@ -355,52 +310,6 @@ function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
         return sum + prize.chance_weight;
       }, 0),
     [prizes],
-  );
-  const doctorMetrics = useMemo(() => {
-    const total = doctors.length;
-    const referred = doctors.filter((d) => Boolean(d.referred_by_partner_id || d.referrer_name)).length;
-    const direct = total - referred;
-    return { total, direct, referred };
-  }, [doctors]);
-  const filteredDoctors = useMemo(() => {
-    const query = doctorSearch.trim().toLowerCase();
-
-    return doctors.filter((doctor) => {
-      const isReferred = Boolean(doctor.referred_by_partner_id || doctor.referrer_name);
-      if (doctorOriginFilter === "direct" && isReferred) return false;
-      if (doctorOriginFilter === "referred" && !isReferred) return false;
-      if (doctorStoreTypeFilter !== "all" && (doctor.store_type || "affiliate") !== doctorStoreTypeFilter) {
-        return false;
-      }
-      if (!query) return true;
-
-      return [
-        doctor.full_name,
-        doctor.name_prefix,
-        doctor.email,
-        doctor.mobile,
-        doctor.routing_slug,
-        doctor.specialty,
-        doctor.practice_location,
-        doctor.where_did_you_find_us ?? "",
-        doctor.referrer_name ?? "",
-        doctor.referrer_prefix ?? "",
-        doctor.referrer_slug ?? "",
-        isReferred ? "referred" : "direct",
-        doctor.prize_label ?? "",
-        doctor.store_type ?? "",
-        doctor.partner_code ? String(doctor.partner_code) : "",
-        doctor.email ? "" : "pending",
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(query);
-    });
-  }, [doctorSearch, doctorOriginFilter, doctorStoreTypeFilter, doctors]);
-  const totalDoctorPages = Math.max(1, Math.ceil(filteredDoctors.length / doctorPageSize));
-  const visibleDoctors = filteredDoctors.slice(
-    (doctorPage - 1) * doctorPageSize,
-    doctorPage * doctorPageSize,
   );
   const filteredNewsletterDoctors = useMemo(() => {
     const query = newsletterSearch.trim().toLowerCase();
@@ -567,13 +476,6 @@ function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Kept out of loadAdminData's Promise.all so the page still loads before the RPC is deployed.
-  function loadUnclaimedPassup() {
-    adminListUnclaimedPassup()
-      .then((stores) => setUnclaimedPassup(new Map(stores.map((store) => [store.store_id, store]))))
-      .catch((caught) => console.warn("Unclaimed pass-up points unavailable:", caught));
-  }
-
   async function loadAdminData() {
     const api = await loadWheelApi();
     if (!api.getWheelPrizes) {
@@ -588,7 +490,7 @@ function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
     };
 
     // Staff logins only load the tabs they can open; the rest would be refused by the API.
-    const partnersNeeded = ["doctors", "orders", "newsletter", "sms"].some(can);
+    const partnersNeeded = ["newsletter", "sms"].some(can);
     const [loadedPrizes, loadedDoctors, loadedNewsletterHistory, loadedSmsHistory, loadedRegistrationEmail, loadedSequence] = await Promise.all([
       can("wheel") ? api.getWheelPrizes() : Promise.resolve([]),
       partnersNeeded ? api.getDoctorRegistrations() : Promise.resolve([]),
@@ -606,32 +508,8 @@ function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
     setRegistrationEmail(loadedRegistrationEmail);
     setRegistrationEmailFileName(loadedRegistrationEmail.html ? "Saved registration email HTML" : "");
     setSequenceSteps(loadedSequence.sort((a, b) => a.step_number - b.step_number));
-    setDoctorPage(1);
     setNewsletterPage(1);
     setSmsPage(1);
-    if (can("doctors")) loadUnclaimedPassup();
-  }
-
-  async function refreshDoctors() {
-    setError(null);
-    setNotice(null);
-    setIsLoading(true);
-
-    try {
-      const api = await loadWheelApi();
-      if (!api.getDoctorRegistrations) {
-        throw new Error("Missing getDoctorRegistrations helper in lib/api.ts.");
-      }
-
-      setDoctors(await api.getDoctorRegistrations());
-      loadUnclaimedPassup();
-      setDoctorPage(1);
-      setNotice("Doctor registrations refreshed.");
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to load doctor registrations.");
-    } finally {
-      setIsLoading(false);
-    }
   }
 
   async function refreshNewsletterHistory() {
@@ -1021,239 +899,6 @@ function AdminWheelPageContent({ defaultTab }: AdminWheelPageProps) {
     } finally {
       setIsSmsSending(false);
     }
-  }
-
-  function openDoctorEditor(doctor: AdminDoctorRegistration) {
-    setError(null);
-    setNotice(null);
-    setEditingDoctor({ ...doctor });
-  }
-
-  async function saveDoctorEdit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!editingDoctor) return;
-
-    setError(null);
-    setNotice(null);
-    setIsDoctorSaving(true);
-
-    try {
-      const api = await loadWheelApi();
-      if (!api.updateDoctorRegistration) {
-        throw new Error("Missing updateDoctorRegistration helper in lib/api.ts.");
-      }
-
-      const updatedDoctor = await api.updateDoctorRegistration({
-        id: editingDoctor.id,
-        name_prefix: editingDoctor.name_prefix.trim(),
-        full_name: editingDoctor.full_name.trim(),
-        email: editingDoctor.email.trim(),
-        mobile: editingDoctor.mobile.trim(),
-        specialty: editingDoctor.specialty.trim(),
-        practice_location: editingDoctor.practice_location.trim(),
-      });
-      setDoctors((current) =>
-        current.map((doctor) => (doctor.id === updatedDoctor.id ? { ...doctor, ...updatedDoctor } : doctor)),
-      );
-      setEditingDoctor(null);
-      setNotice("Doctor details updated.");
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to update doctor details.");
-    } finally {
-      setIsDoctorSaving(false);
-    }
-  }
-
-  async function toggleDoctorShopProtocol(doctor: AdminDoctorRegistration, show: boolean) {
-    setError(null);
-    setNotice(null);
-
-    try {
-      const api = await loadWheelApi();
-      if (!api.setDoctorShopProtocol) throw new Error("Missing setDoctorShopProtocol helper in lib/api.ts.");
-
-      const saved = await api.setDoctorShopProtocol(doctor.id, show);
-      setDoctors((current) =>
-        current.map((item) => (item.id === doctor.id ? { ...item, shop_show_protocol: saved } : item)),
-      );
-      setNotice(saved ? "Shop link now shows the Full Protocol." : "Shop link now shows Try First only.");
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to update shop link setting.");
-    }
-  }
-
-  async function copyDoctorQrUrl(url: string) {
-    setError(null);
-    setNotice(null);
-
-    try {
-      // Same as the partner pages' Share link: share sheet on phones, copy elsewhere.
-      if (navigator.share && window.matchMedia("(pointer: coarse)").matches) {
-        await navigator.share({ url }).catch(() => undefined);
-        return;
-      }
-      await navigator.clipboard.writeText(url);
-      setNotice("Doctor QR link copied.");
-    } catch {
-      setError("Unable to copy the QR link. Please copy it from the text field instead.");
-    }
-  }
-
-  async function loginAsDoctor(doctor: AdminDoctorRegistration) {
-    setError(null);
-    setNotice(null);
-
-    if (!doctor.email) {
-      setError("This doctor has no email address, so there is no account to open.");
-      return;
-    }
-    if (!window.confirm(`Open the partner portal as ${doctor.full_name || doctor.email}?
-
-This signs you in as them and is recorded in the impersonation log. Any partner session in this browser is replaced.`)) {
-      return;
-    }
-
-    setImpersonatingId(doctor.id);
-    try {
-      const api = await loadWheelApi();
-      if (!api.adminImpersonateDoctor) {
-        throw new Error("Missing adminImpersonateDoctor helper in lib/api.ts.");
-      }
-
-      const { actionLink } = await api.adminImpersonateDoctor(doctor.email);
-      // Opened rather than followed, so this admin tab keeps its own state.
-      window.open(actionLink, "_blank", "noopener,noreferrer");
-      setNotice(`Opened the partner portal as ${doctor.full_name || doctor.email}.`);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to open that partner account.");
-    } finally {
-      setImpersonatingId("");
-    }
-  }
-
-  async function handleToggleQr(doctor: AdminDoctorRegistration) {
-    const nextState = !doctor.referral_qr_enabled;
-    setTogglingQrDoctorId(doctor.id);
-    setError(null);
-    setNotice(null);
-    try {
-      await adminToggleReferralQr(doctor.id, nextState);
-      setDoctors((current) =>
-        current.map((d) => (d.id === doctor.id ? { ...d, referral_qr_enabled: nextState } : d)),
-      );
-      setNotice(`Referral QR ${nextState ? "enabled" : "disabled"} for ${doctor.full_name}.`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to toggle Referral QR.");
-    } finally {
-      setTogglingQrDoctorId(null);
-    }
-  }
-
-  async function handlePromote(doctor: AdminDoctorRegistration) {
-    if (!window.confirm(`Are you sure you want to promote ${doctor.full_name} from Affiliate to Lifestyle Store?`)) return;
-    setPromotingDoctorId(doctor.id);
-    setError(null);
-    setNotice(null);
-    try {
-      await adminPromotePartner(doctor.id, "Admin manual promotion");
-      setDoctors((current) =>
-        current.map((d) => (d.id === doctor.id ? { ...d, store_type: "lifestyle", referral_qr_enabled: true } : d)),
-      );
-      setNotice(`Promoted ${doctor.full_name} to Lifestyle Store!`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to promote partner.");
-    } finally {
-      setPromotingDoctorId(null);
-    }
-  }
-
-  async function handleConfirmUpgradeToMain() {
-    if (!upgradingDoctor) return;
-    setIsUpgrading(true);
-    setError(null);
-    setNotice(null);
-    try {
-      const res = await adminUpgradeToMainStore(upgradingDoctor.id, upgradeNote);
-      setDoctors((current) =>
-        current.map((d) => (d.id === upgradingDoctor.id ? { ...d, store_type: "main", main_store_id: null, referral_qr_enabled: true } : d)),
-      );
-      setNotice(`Upgraded ${upgradingDoctor.full_name} to Main Store! Transferred ${res.descendants_moved} descendant stores.`);
-      setUpgradingDoctor(null);
-      setUpgradeNote("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to upgrade store to Main Store.");
-    } finally {
-      setIsUpgrading(false);
-    }
-  }
-
-  function openPartnerPicker(doctor: AdminDoctorRegistration, mode: "transfer" | "assign") {
-    setPickTarget({ doctor, mode });
-    setPickPartnerId("");
-    setPickNote("");
-  }
-
-  async function handleConfirmPick() {
-    if (!pickTarget || !pickPartnerId) return;
-    const { doctor, mode } = pickTarget;
-    const partner = doctors.find((d) => d.id === pickPartnerId);
-    const partnerName = partner ? formatPrefixedName(partner.name_prefix, partner.full_name) : "the partner";
-    setIsPicking(true);
-    setError(null);
-    setNotice(null);
-    try {
-      if (mode === "transfer") {
-        const res = await adminTransferStore(doctor.id, pickPartnerId, pickNote);
-        setDoctors((current) =>
-          current.map((d) =>
-            d.id === doctor.id
-              ? {
-                  ...d,
-                  referred_by_partner_id: pickPartnerId,
-                  referrer_name: partner?.full_name ?? null,
-                  referrer_prefix: partner?.name_prefix ?? null,
-                  referrer_slug: partner?.routing_slug ?? null,
-                  main_store_id: res.main_store_id,
-                }
-              : d,
-          ),
-        );
-        setNotice(`Moved ${doctor.full_name} to ${partnerName}; ${isSandboxShop ? res.sandbox_points_moved : res.points_moved} pass-up points transferred.`);
-      } else {
-        const res = await adminAssignUnclaimedPassup(doctor.id, pickPartnerId, pickNote);
-        setUnclaimedPassup((current) => {
-          const next = new Map(current);
-          next.delete(doctor.id);
-          return next;
-        });
-        setNotice(`Gave ${res.points} pass-up points from ${doctor.full_name} (${res.orders} orders) to ${partnerName}.`);
-      }
-      setPickTarget(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save.");
-    } finally {
-      setIsPicking(false);
-    }
-  }
-
-  function downloadDoctorQr(doctor: AdminDoctorRegistration, qrUrl: string, mode: DoctorQrMode) {
-    setError(null);
-    setNotice(null);
-
-    const canvas = document.getElementById(`${getDoctorQrElementId(doctor.id, mode)}-png`);
-    if (!(canvas instanceof HTMLCanvasElement)) {
-      setError("Unable to find the QR code for download.");
-      return;
-    }
-
-    const link = document.createElement("a");
-
-    link.href = canvas.toDataURL("image/png");
-    link.download = `${doctor.routing_slug || slugifyDownloadName(doctor.full_name)}-${mode}-qr.png`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setNotice(`QR downloaded for ${doctor.full_name || qrUrl}.`);
   }
 
   function updatePrize(index: number, patch: Partial<AdminWheelPrize>) {
@@ -1668,526 +1313,6 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
             </form>
           </section>
         </>
-      ) : null}
-
-      {activeTab === "doctors" ? (
-        <section className="admin-wheel-panel">
-          <div className="admin-wheel-panel-head">
-            <div>
-              <p className="admin-wheel-kicker">Registered Doctors</p>
-              <h2>Doctor Directory</h2>
-              <div className="admin-doctor-metrics">
-                <span className="admin-metric-pill">
-                  Total: <strong>{doctorMetrics.total}</strong>
-                </span>
-                <span className="admin-metric-pill is-direct">
-                  Direct: <strong>{doctorMetrics.direct}</strong>
-                </span>
-                <span className="admin-metric-pill is-referred">
-                  Referred: <strong>{doctorMetrics.referred}</strong>
-                </span>
-              </div>
-            </div>
-            <div className="admin-doctor-actions">
-              <div className="admin-origin-filters" role="group" aria-label="Filter by registration origin">
-                <button
-                  type="button"
-                  className={doctorOriginFilter === "all" ? "active" : ""}
-                  onClick={() => {
-                    setDoctorOriginFilter("all");
-                    setDoctorPage(1);
-                  }}
-                >
-                  All ({doctorMetrics.total})
-                </button>
-                <button
-                  type="button"
-                  className={doctorOriginFilter === "direct" ? "active" : ""}
-                  onClick={() => {
-                    setDoctorOriginFilter("direct");
-                    setDoctorPage(1);
-                  }}
-                >
-                  Direct ({doctorMetrics.direct})
-                </button>
-                <button
-                  type="button"
-                  className={doctorOriginFilter === "referred" ? "active" : ""}
-                  onClick={() => {
-                    setDoctorOriginFilter("referred");
-                    setDoctorPage(1);
-                  }}
-                >
-                  Referred ({doctorMetrics.referred})
-                </button>
-              </div>
-              <label htmlFor="doctor-store-filter">
-                Store Type
-                <select
-                  id="doctor-store-filter"
-                  value={doctorStoreTypeFilter}
-                  onChange={(event) => {
-                    setDoctorStoreTypeFilter(event.target.value);
-                    setDoctorPage(1);
-                  }}
-                  style={{ padding: "6px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
-                >
-                  <option value="all">All Store Types</option>
-                  <option value="main">🏢 Main Stores</option>
-                  <option value="lifestyle">🛍️ Lifestyle Stores</option>
-                  <option value="affiliate">🌱 Affiliate Stores</option>
-                </select>
-              </label>
-              <label htmlFor="doctor-search">
-                Search
-                <input
-                  id="doctor-search"
-                  type="search"
-                  value={doctorSearch}
-                  placeholder="Name, email, referrer, source, clinic..."
-                  onChange={(event) => {
-                    setDoctorSearch(event.target.value);
-                    setDoctorPage(1);
-                  }}
-                />
-              </label>
-              <button type="button" onClick={refreshDoctors} disabled={isLoading}>
-                {isLoading ? "Refreshing" : "Refresh"}
-              </button>
-            </div>
-          </div>
-
-          <div className="admin-doctor-list">
-            {visibleDoctors.length > 0 ? (
-              visibleDoctors.map((doctor) => {
-                const qrMode = doctorQrModes[doctor.id] ?? "shop";
-                const qrUrl = getDoctorQrUrl(doctor, qrMode);
-
-                return (
-                  <article className="admin-doctor-row" key={doctor.id}>
-                    <div className="admin-doctor-primary">
-                      <strong>{formatPrefixedName(doctor.name_prefix, doctor.full_name) || "Unnamed doctor"}</strong>
-
-                      <div style={{ margin: "4px 0 8px", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-                        {doctor.partner_code ? (
-                          <span style={{ fontSize: "12px", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-                            #{doctor.partner_code}
-                          </span>
-                        ) : null}
-                        {/* No email = can't sign in yet: a code minted on /admin/codes, waiting for details. */}
-                        {doctor.email ? null : (
-                          <span style={{
-                            fontSize: "11px",
-                            fontWeight: 700,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.04em",
-                            padding: "2px 8px",
-                            borderRadius: "4px",
-                            background: "#fff7ed",
-                            color: "#9a3412",
-                            border: "1px solid #fed7aa",
-                          }}>
-                            Pending
-                          </span>
-                        )}
-                        <span style={{
-                          fontSize: "11px",
-                          fontWeight: 700,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.04em",
-                          padding: "2px 8px",
-                          borderRadius: "4px",
-                          background: doctor.store_type === "main" ? "#fef3c7" : doctor.store_type === "affiliate" ? "#ecfdf5" : "#eff6ff",
-                          color: doctor.store_type === "main" ? "#92400e" : doctor.store_type === "affiliate" ? "#065f46" : "#1e40af",
-                          border: `1px solid ${doctor.store_type === "main" ? "#fde047" : doctor.store_type === "affiliate" ? "#a7f3d0" : "#bfdbfe"}`
-                        }}>
-                          {doctor.store_type === "main" ? "🏢 Main Store" : doctor.store_type === "affiliate" ? "🌱 Affiliate Store" : "🛍️ Lifestyle Store"}
-                        </span>
-                        {doctor.store_type === "affiliate" && (
-                          <span style={{ fontSize: "11px", color: doctor.referral_qr_enabled ? "#16a34a" : "#64748b" }}>
-                            Referral QR: <strong>{doctor.referral_qr_enabled ? "Active" : "Locked"}</strong>
-                          </span>
-                        )}
-                        {unclaimedPassup.has(doctor.id) && (
-                          <span style={{ fontSize: "11px", color: "#b45309" }}>
-                            <strong>{unclaimedPassup.get(doctor.id)!.points}</strong> unclaimed pass-up pts ({unclaimedPassup.get(doctor.id)!.orders} orders)
-                          </span>
-                        )}
-                      </div>
-
-                      <div
-                        className="admin-doctor-qr-toggle"
-                        role="group"
-                        aria-label={`QR type for ${doctor.full_name || "doctor"}`}
-                      >
-                        <button
-                          type="button"
-                          className={qrMode === "shop" ? "active" : ""}
-                          aria-pressed={qrMode === "shop"}
-                          onClick={() => setDoctorQrModes((current) => ({ ...current, [doctor.id]: "shop" }))}
-                        >
-                          Shop referral
-                        </button>
-                        <button
-                          type="button"
-                          className={qrMode === "referral" ? "active" : ""}
-                          aria-pressed={qrMode === "referral"}
-                          onClick={() => setDoctorQrModes((current) => ({ ...current, [doctor.id]: "referral" }))}
-                        >
-                          Partner invite
-                        </button>
-                      </div>
-                      {qrMode === "shop" ? (
-                        <label className="admin-doctor-shop-protocol">
-                          <input
-                            type="checkbox"
-                            checked={doctor.shop_show_protocol === true}
-                            onChange={(event) => toggleDoctorShopProtocol(doctor, event.target.checked)}
-                          />
-                          Show Full Protocol in shop link
-                        </label>
-                      ) : null}
-                      {qrUrl ? (
-                        <div className="admin-doctor-qr">
-                          <QRCodeSVG
-                            id={getDoctorQrElementId(doctor.id, qrMode)}
-                            className="admin-doctor-qr-code"
-                            value={qrUrl}
-                            // Drawn at the download's size so the logo matches; CSS shows it at 108px.
-                            size={1024}
-                            {...QR_LOGO_PROPS}
-                            marginSize={2}
-                          />
-                          <QRCodeCanvas
-                            id={`${getDoctorQrElementId(doctor.id, qrMode)}-png`}
-                            hidden
-                            value={qrUrl}
-                            size={1024}
-                            {...QR_LOGO_PROPS}
-                            marginSize={2}
-                          />
-                          <div>
-                            <small>
-                              {qrMode === "shop" ? "Shop referral route" : "Partner registration invite"}
-                            </small>
-                            <code>{qrUrl}</code>
-                            <div className="admin-doctor-qr-actions">
-                              <button type="button" onClick={() => copyDoctorQrUrl(qrUrl)}>
-                                Share QR link
-                              </button>
-                              <button
-                                type="button"
-                                className="icon-only"
-                                title="Download QR code"
-                                aria-label={`Download QR code for ${doctor.full_name || "doctor"}`}
-                                onClick={() => downloadDoctorQr(doctor, qrUrl, qrMode)}
-                              >
-                                <DownloadIcon />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="admin-doctor-qr-missing">Run the QR redirect SQL to create this doctor&apos;s route.</p>
-                      )}
-                    </div>
-                    <dl className="admin-doctor-details">
-                      <div>
-                        <dt>Prefix</dt>
-                        <dd>{doctor.name_prefix || "--"}</dd>
-                      </div>
-                      <div>
-                        <dt>Email</dt>
-                        <dd>{doctor.email || "--"}</dd>
-                      </div>
-                      <div>
-                        <dt>Mobile</dt>
-                        <dd>{doctor.mobile || "--"}</dd>
-                      </div>
-                      <div>
-                        <dt>Specialty</dt>
-                        <dd>{doctor.specialty || "--"}</dd>
-                      </div>
-                      <div>
-                        <dt>Complete Clinic Address</dt>
-                        <dd>{doctor.practice_location || "--"}</dd>
-                      </div>
-                      <div>
-                        <dt>Origin</dt>
-                        <dd>
-                          {doctor.referrer_name ? (
-                            <button
-                              type="button"
-                              className="admin-origin-badge is-referred"
-                              title={`Click to filter by ${formatPrefixedName(doctor.referrer_prefix, doctor.referrer_name)}`}
-                              onClick={() => {
-                                setDoctorSearch(doctor.referrer_name || "");
-                                setDoctorPage(1);
-                              }}
-                            >
-                              Referred by {formatPrefixedName(doctor.referrer_prefix, doctor.referrer_name)}
-                            </button>
-                          ) : (
-                            <span className="admin-origin-badge is-direct">
-                              Direct registration
-                            </span>
-                          )}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Where found</dt>
-                        <dd>{doctor.where_did_you_find_us || "--"}</dd>
-                      </div>
-                      <div>
-                        <dt>Prize</dt>
-                        <dd>{doctor.prize_label || "Not spun"}</dd>
-                      </div>
-                      <div>
-                        <dt>Registered</dt>
-                        <dd>{formatAdminDate(doctor.created_at)}</dd>
-                      </div>
-                    </dl>
-                    <div className="admin-doctor-row-actions">
-                      <button type="button" onClick={() => openDoctorEditor(doctor)}>
-                        Edit
-                      </button>
-                      {owner ? (
-                        <button
-                          type="button"
-                          onClick={() => loginAsDoctor(doctor)}
-                          disabled={!doctor.email || impersonatingId === doctor.id}
-                          title={doctor.email ? "Open the partner portal as this doctor" : "No email on this registration"}
-                        >
-                          {impersonatingId === doctor.id ? "Opening…" : "Log in as"}
-                        </button>
-                      ) : null}
-
-                      {(!doctor.store_type || doctor.store_type === "lifestyle") && (
-                        <button
-                          type="button"
-                          style={{ background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" }}
-                          onClick={() => setUpgradingDoctor(doctor)}
-                          title="Upgrade this Lifestyle Store to an independent Main Store"
-                        >
-                          ⬆ Upgrade to Main
-                        </button>
-                      )}
-
-                      {doctor.store_type === "affiliate" && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleQr(doctor)}
-                            disabled={togglingQrDoctorId === doctor.id}
-                          >
-                            {togglingQrDoctorId === doctor.id ? "Updating…" : doctor.referral_qr_enabled ? "Disable QR" : "Enable QR"}
-                          </button>
-                          <button
-                            type="button"
-                            style={{ background: "#f0fdf4", color: "#166534", border: "1px solid #bbf7d0" }}
-                            onClick={() => handlePromote(doctor)}
-                            disabled={promotingDoctorId === doctor.id}
-                          >
-                            {promotingDoctorId === doctor.id ? "Promoting…" : "Promote to Lifestyle"}
-                          </button>
-                          <button type="button" onClick={() => openPartnerPicker(doctor, "transfer")}>
-                            Transfer
-                          </button>
-                        </>
-                      )}
-
-                      {unclaimedPassup.has(doctor.id) && (
-                        <button type="button" onClick={() => openPartnerPicker(doctor, "assign")}>
-                          Give points
-                        </button>
-                      )}
-                    </div>
-                  </article>
-                );
-              })
-            ) : (
-              <div className="admin-wheel-empty">
-                <p>{doctors.length > 0 ? "No doctors match that search." : "No doctor registrations found."}</p>
-              </div>
-            )}
-          </div>
-
-          {upgradingDoctor && (
-            <div className="admin-wheel-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="upgrade-main-title" style={{
-              position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
-              background: "rgba(0, 0, 0, 0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999
-            }}>
-              <div style={{ background: "#ffffff", padding: "24px", borderRadius: "12px", maxWidth: "480px", width: "90%", boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#b45309", marginBottom: "8px" }}>
-                  <span style={{ fontSize: "20px" }}>⚠️</span>
-                  <h3 id="upgrade-main-title" style={{ margin: 0, fontSize: "18px", fontWeight: 700 }}>
-                    Upgrade to Main Store (Breakaway)
-                  </h3>
-                </div>
-                <p style={{ fontSize: "14px", lineHeight: 1.5, color: "#334155", margin: "8px 0" }}>
-                  You are about to upgrade <strong>{upgradingDoctor.full_name}</strong> to an independent <strong>Main Store</strong>.
-                </p>
-                <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "8px", padding: "12px", fontSize: "13px", color: "#92400e", marginBottom: "16px" }}>
-                  <p style={{ margin: "0 0 6px", fontWeight: 700 }}>Breakaway Impact:</p>
-                  <ul style={{ margin: 0, paddingLeft: "18px" }}>
-                    <li>Severs the referral link to their former upline Main Store.</li>
-                    <li>All downstream descendant stores in their referral tree transfer under this new Main Store.</li>
-                    <li>Former upline Main Store completely loses visibility to this subtree.</li>
-                  </ul>
-                </div>
-                <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "4px" }}>
-                  Admin Note (Optional)
-                  <textarea
-                    value={upgradeNote}
-                    onChange={(e) => setUpgradeNote(e.target.value)}
-                    placeholder="Reason for upgrading to Main Store..."
-                    style={{ width: "100%", height: "60px", padding: "8px", marginTop: "4px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px", boxSizing: "border-box" }}
-                  />
-                </label>
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "16px" }}>
-                  <button type="button" onClick={() => setUpgradingDoctor(null)} disabled={isUpgrading} style={{ padding: "8px 16px", borderRadius: "6px", border: "1px solid #cbd5e1", background: "#f8fafc" }}>
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    style={{ background: "#d97706", color: "#ffffff", fontWeight: 700, border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer" }}
-                    onClick={handleConfirmUpgradeToMain}
-                    disabled={isUpgrading}
-                  >
-                    {isUpgrading ? "Upgrading…" : "Confirm Upgrade & Breakaway"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {pickTarget && (
-            <div className="admin-wheel-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="pick-partner-title" style={{
-              position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
-              background: "rgba(0, 0, 0, 0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999
-            }}>
-              <div style={{ background: "#ffffff", padding: "24px", borderRadius: "12px", maxWidth: "480px", width: "90%", boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)" }}>
-                <h3 id="pick-partner-title" style={{ margin: "0 0 8px", fontSize: "18px", fontWeight: 700 }}>
-                  {pickTarget.mode === "transfer" ? "Transfer Affiliate Store" : "Give Unclaimed Pass-up Points"}
-                </h3>
-                <p style={{ fontSize: "14px", lineHeight: 1.5, color: "#334155", margin: "8px 0" }}>
-                  {pickTarget.mode === "transfer" ? (
-                    <>
-                      <strong>{pickTarget.doctor.full_name}</strong> is currently referred by{" "}
-                      <strong>
-                        {pickTarget.doctor.referrer_name
-                          ? formatPrefixedName(pickTarget.doctor.referrer_prefix, pickTarget.doctor.referrer_name)
-                          : "no one (direct registration)"}
-                      </strong>
-                      .
-                    </>
-                  ) : (
-                    <>
-                      <strong>{unclaimedPassup.get(pickTarget.doctor.id)?.points ?? 0}</strong> pass-up points from{" "}
-                      {unclaimedPassup.get(pickTarget.doctor.id)?.orders ?? 0} orders by <strong>{pickTarget.doctor.full_name}</strong> went to no one because the store had no upline when they were earned.
-                    </>
-                  )}
-                </p>
-                <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "8px", padding: "12px", fontSize: "13px", color: "#92400e", marginBottom: "16px" }}>
-                  {pickTarget.mode === "transfer"
-                    ? "The new upline gets this store's future pass-up points, and the pass-up points the old upline already earned from it move to the new upline. The store moves under the new upline's Main Store."
-                    : pickTarget.doctor.referred_by_partner_id
-                      ? "The points go to the partner you pick. The store's upline does not change; its future sales already pay that upline."
-                      : "The points go to the partner you pick. The store's upline does not change, so its future sales stay unclaimed."}
-                </div>
-                <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "12px" }}>
-                  {pickTarget.mode === "transfer" ? "New upline" : "Give to"}
-                  <select
-                    value={pickPartnerId}
-                    onChange={(e) => setPickPartnerId(e.target.value)}
-                    style={{ width: "100%", padding: "8px", marginTop: "4px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px" }}
-                  >
-                    <option value="">Choose a partner…</option>
-                    {doctors
-                      .filter(
-                        (d) =>
-                          d.id !== pickTarget.doctor.id &&
-                          (pickTarget.mode === "assign" || d.id !== pickTarget.doctor.referred_by_partner_id),
-                      )
-                      .sort((a, b) => a.full_name.localeCompare(b.full_name))
-                      .map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {formatPrefixedName(d.name_prefix, d.full_name)}
-                          {d.partner_code ? ` · #${d.partner_code}` : ""}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-                <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "4px" }}>
-                  Admin Note (Optional)
-                  <textarea
-                    value={pickNote}
-                    onChange={(e) => setPickNote(e.target.value)}
-                    placeholder="Reason..."
-                    style={{ width: "100%", height: "60px", padding: "8px", marginTop: "4px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px", boxSizing: "border-box" }}
-                  />
-                </label>
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "16px" }}>
-                  <button type="button" onClick={() => setPickTarget(null)} disabled={isPicking} style={{ padding: "8px 16px", borderRadius: "6px", border: "1px solid #cbd5e1", background: "#f8fafc" }}>
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    style={{ background: "#d97706", color: "#ffffff", fontWeight: 700, border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer" }}
-                    onClick={handleConfirmPick}
-                    disabled={isPicking || !pickPartnerId}
-                  >
-                    {isPicking ? "Saving…" : pickTarget.mode === "transfer" ? "Confirm Transfer" : "Give Points"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="admin-pagination">
-            <p>
-              Showing {visibleDoctors.length > 0 ? (doctorPage - 1) * doctorPageSize + 1 : 0}
-              {"-"}
-              {Math.min(doctorPage * doctorPageSize, filteredDoctors.length)} of {filteredDoctors.length}
-            </p>
-            <div className="admin-pagination-controls">
-              <label htmlFor="doctor-page-size">
-                Show
-                <select
-                  id="doctor-page-size"
-                  value={doctorPageSize}
-                  onChange={(event) => {
-                    setDoctorPageSize(Number(event.target.value));
-                    setDoctorPage(1);
-                  }}
-                >
-                  {PAGE_SIZE_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button
-                type="button"
-                onClick={() => setDoctorPage((current) => Math.max(1, current - 1))}
-                disabled={doctorPage <= 1}
-              >
-                Previous
-              </button>
-              <span>
-                Page {doctorPage} of {totalDoctorPages}
-              </span>
-              <button
-                type="button"
-                onClick={() => setDoctorPage((current) => Math.min(totalDoctorPages, current + 1))}
-                disabled={doctorPage >= totalDoctorPages}
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        </section>
       ) : null}
 
       {activeTab === "orders" ? <AdminOrders /> : null}
@@ -3354,98 +2479,6 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
         </div>
       ) : null}
 
-      {editingDoctor ? (
-        <div className="admin-modal-backdrop" role="presentation">
-          <form className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="doctor-edit-title" onSubmit={saveDoctorEdit}>
-            <div className="admin-modal-head">
-              <div>
-                <p className="admin-wheel-kicker">Edit Doctor</p>
-                <h2 id="doctor-edit-title">Registration Details</h2>
-              </div>
-              <button type="button" onClick={() => setEditingDoctor(null)}>
-                Close
-              </button>
-            </div>
-            <div className="admin-edit-grid">
-              <label>
-                Prefix
-                <select
-                  value={editingDoctor.name_prefix || ""}
-                  onChange={(event) => setEditingDoctor({ ...editingDoctor, name_prefix: event.target.value })}
-                >
-                  <option value="">Select prefix</option>
-                  {NAME_PREFIXES.map((prefix) => (
-                    <option key={prefix} value={prefix}>
-                      {prefix}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Name
-                <input
-                  required
-                  value={editingDoctor.full_name}
-                  onChange={(event) => setEditingDoctor({ ...editingDoctor, full_name: event.target.value })}
-                />
-              </label>
-              <label>
-                Email
-                <input
-                  type="email"
-                  value={editingDoctor.email}
-                  onChange={(event) => setEditingDoctor({ ...editingDoctor, email: event.target.value })}
-                />
-              </label>
-              <label>
-                Mobile
-                <input
-                  required
-                  value={editingDoctor.mobile}
-                  onChange={(event) => setEditingDoctor({ ...editingDoctor, mobile: event.target.value })}
-                />
-              </label>
-              <label>
-                Routing slug
-                <input
-                  value={editingDoctor.routing_slug || ""}
-                  onChange={(event) =>
-                    setEditingDoctor({
-                      ...editingDoctor,
-                      routing_slug: event.target.value.trim().toLowerCase(),
-                    })
-                  }
-                  placeholder="e.g. icsps"
-                />
-              </label>
-              <label>
-                Specialty
-                <input
-                  value={editingDoctor.specialty}
-                  onChange={(event) => setEditingDoctor({ ...editingDoctor, specialty: event.target.value })}
-                />
-              </label>
-              <label>
-                Complete Clinic Address
-                <input
-                  required
-                  value={editingDoctor.practice_location}
-                  onChange={(event) => setEditingDoctor({ ...editingDoctor, practice_location: event.target.value })}
-                />
-              </label>
-            </div>
-            <div className="admin-modal-actions">
-              <button type="button" onClick={() => setEditingDoctor(null)}>
-                Cancel
-              </button>
-              <button type="submit" disabled={isDoctorSaving}>
-                {isDoctorSaving ? "Saving" : "Save changes"}
-              </button>
-            </div>
-          </form>
-        </div>
-      ) : null}
-
       {previewStep ? (
         <div
           className="admin-modal-backdrop"
@@ -3613,16 +2646,6 @@ function fileToBase64(file: File) {
     reader.onerror = () => reject(new Error(`${file.name} could not be read.`));
     reader.readAsDataURL(file);
   });
-}
-
-function slugifyDownloadName(value: string | null | undefined) {
-  const slug = (value ?? "doctor")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-
-  return slug || "doctor";
 }
 
 function escapeHtml(value: string) {

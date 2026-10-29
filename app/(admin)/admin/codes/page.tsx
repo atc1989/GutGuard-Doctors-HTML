@@ -1,16 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { QRCodeCanvas, QRCodeSVG } from "qrcode.react";
-import { Download, Plus, RefreshCw, Share2 } from "lucide-react";
+import { Plus, RefreshCw } from "lucide-react";
 import { Alert, PageBody } from "@/components/admin/blocks";
 import { DataTable } from "@/components/admin/data-table/data-table";
 import { RowActions } from "@/components/admin/data-table/row-actions";
 import { ConfirmDialog, EditSheet, Field } from "@/components/admin/form";
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
-import { QR_LOGO_PROPS, getPartnerQrLink, useCopy } from "@/components/partner/shared";
+import { PartnerQrCard } from "@/components/admin/partner-qr";
+import { getPartnerQrLink, useCopy } from "@/components/partner/shared";
 import type { AdminDoctorRegistration } from "@/lib/api";
 
 type PendingPartner = {
@@ -22,7 +22,6 @@ type PendingPartner = {
   code_source?: string;
 };
 
-const QR_RENDER_PX = 1024;
 const day = (value: string) =>
   new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
 const searchText = (partner: PendingPartner) => [partner.partner_code, partner.code_note, partner.code_source].join(" ");
@@ -228,8 +227,8 @@ export default function AdminCodesPage() {
           }
         >
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <CodeQr partner={selected} mode="shop" label="Shop" />
-            <CodeQr partner={selected} mode="referral" label="Join" />
+            <PartnerQrCard partner={selected} mode="shop" label="Shop" fileName={`gutguard-shop-${selected.partner_code}.png`} />
+            <PartnerQrCard partner={selected} mode="referral" label="Join" fileName={`gutguard-join-${selected.partner_code}.png`} />
           </div>
           <p className="text-xs text-muted-foreground">
             Sales and sign-ups through these QRs are credited to #{selected.partner_code} from the first scan. To let the
@@ -268,40 +267,3 @@ export default function AdminCodesPage() {
   );
 }
 
-function CodeQr({ partner, mode, label }: { partner: PendingPartner; mode: "shop" | "referral"; label: string }) {
-  const link = getPartnerQrLink(partner, mode);
-  const canvasRef = useRef<HTMLDivElement>(null);
-  const { copied, share } = useCopy();
-
-  function download() {
-    const canvas = canvasRef.current?.querySelector("canvas");
-    if (!canvas) return;
-    const anchor = document.createElement("a");
-    anchor.href = canvas.toDataURL("image/png");
-    anchor.download = `gutguard-${label.toLowerCase()}-${partner.partner_code}.png`;
-    anchor.click();
-  }
-
-  return (
-    <figure className="flex min-w-0 flex-col gap-3 rounded-lg border border-border p-4">
-      <figcaption className="text-[13px] font-medium">{label}</figcaption>
-      <QRCodeSVG value={link} size={QR_RENDER_PX} {...QR_LOGO_PROPS} marginSize={4} style={{ width: "100%", height: "auto" }} />
-      <div ref={canvasRef} hidden>
-        <QRCodeCanvas value={link} size={QR_RENDER_PX} {...QR_LOGO_PROPS} marginSize={4} />
-      </div>
-      <code className="truncate rounded-md bg-chrome px-2 py-1 text-xs" title={link}>
-        {link}
-      </code>
-      <div className="flex gap-2">
-        <Button type="button" variant="outline" size="sm" className="flex-1 shadow-none" onClick={() => share(link)}>
-          <Share2 strokeWidth={1.5} />
-          {copied ? "Copied" : "Share link"}
-        </Button>
-        <Button type="button" variant="outline" size="sm" className="flex-1 shadow-none" onClick={download}>
-          <Download strokeWidth={1.5} />
-          Download PNG
-        </Button>
-      </div>
-    </figure>
-  );
-}

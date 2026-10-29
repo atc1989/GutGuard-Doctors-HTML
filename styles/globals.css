@@ -1439,116 +1439,6 @@
   gap: 12px;
 }
 
-.admin-doctor-metrics {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.admin-metric-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: var(--paper-2, #ece8de);
-  border: 1px solid var(--rule, #dcd7cc);
-  font-size: 11px;
-  color: var(--ink-2, #555);
-}
-
-.admin-metric-pill strong {
-  font-weight: 700;
-  color: var(--ink, #111);
-}
-
-.admin-metric-pill.is-direct {
-  background: rgba(46, 125, 50, 0.08);
-  border-color: rgba(46, 125, 50, 0.2);
-  color: #2e7d32;
-}
-
-.admin-metric-pill.is-direct strong {
-  color: #1b5e20;
-}
-
-.admin-metric-pill.is-referred {
-  background: rgba(21, 101, 192, 0.08);
-  border-color: rgba(21, 101, 192, 0.2);
-  color: #1565c0;
-}
-
-.admin-metric-pill.is-referred strong {
-  color: #0d47a1;
-}
-
-.admin-origin-filters {
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid var(--rule, #dcd7cc);
-  border-radius: 6px;
-  overflow: hidden;
-  background: var(--paper, #faf8f5);
-}
-
-.admin-origin-filters button {
-  padding: 8px 12px;
-  border: none;
-  background: transparent;
-  color: var(--ink-2, #666);
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.admin-origin-filters button + button {
-  border-left: 1px solid var(--rule, #dcd7cc);
-}
-
-.admin-origin-filters button:hover {
-  background: rgba(0, 0, 0, 0.04);
-}
-
-.admin-origin-filters button.active {
-  background: var(--ink, #111);
-  color: #fff;
-}
-
-.admin-origin-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 650;
-  line-height: 1.4;
-  text-decoration: none;
-  border: 1px solid transparent;
-}
-
-.admin-origin-badge.is-direct {
-  background: rgba(0, 0, 0, 0.05);
-  color: var(--ink-2, #555);
-  border-color: rgba(0, 0, 0, 0.08);
-}
-
-.admin-origin-badge.is-referred {
-  background: rgba(21, 101, 192, 0.08);
-  color: #1565c0;
-  border-color: rgba(21, 101, 192, 0.2);
-  cursor: pointer;
-  font-family: inherit;
-  transition: background 0.15s;
-}
-
-.admin-origin-badge.is-referred:hover {
-  background: rgba(21, 101, 192, 0.16);
-  text-decoration: underline;
-}
-
 .admin-doctor-actions label {
   display: flex;
   flex-direction: column;
@@ -1572,141 +1462,6 @@
 .admin-doctor-row.newsletter {
   align-items: center;
   grid-template-columns: minmax(260px, 0.9fr) minmax(0, 1.5fr);
-}
-
-.admin-doctor-row-actions {
-  display: flex;
-  align-items: start;
-  justify-content: end;
-}
-
-.admin-doctor-row-actions button {
-  min-height: 36px;
-  padding: 9px 13px;
-}
-
-.admin-doctor-primary {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-}
-
-.admin-doctor-primary strong {
-  font-family: var(--serif);
-  font-size: 26px;
-  font-weight: 400;
-  line-height: 1.05;
-  color: var(--ink);
-  overflow-wrap: anywhere;
-}
-
-.admin-doctor-primary span {
-  color: var(--blue);
-  font-size: 13px;
-  font-weight: 800;
-  overflow-wrap: anywhere;
-}
-
-.admin-doctor-qr {
-  display: grid;
-  grid-template-columns: 108px minmax(0, 1fr);
-  align-items: start;
-  gap: 12px;
-  margin-top: 8px;
-}
-
-.admin-doctor-qr-toggle {
-  display: inline-flex;
-  align-self: flex-start;
-  border: 1px solid var(--rule);
-  padding: 3px;
-  background: var(--bone-soft);
-}
-
-.admin-doctor-qr-toggle button {
-  min-height: 30px;
-  border: 0;
-  padding: 6px 10px;
-  background: transparent;
-  color: var(--ink-3);
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.admin-doctor-qr-toggle button.active {
-  background: var(--ink);
-  color: var(--bone);
-}
-
-.admin-doctor-shop-protocol {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--ink-3);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.admin-doctor-qr-code {
-  width: 108px;
-  height: 108px;
-  background: #fff;
-  border: 1px solid var(--rule);
-}
-
-.admin-doctor-qr small,
-.admin-doctor-qr-missing {
-  display: block;
-  color: var(--ink-3);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  line-height: 1.35;
-  text-transform: uppercase;
-}
-
-.admin-doctor-qr code {
-  display: block;
-  margin: 6px 0 8px;
-  color: var(--ink-2);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
-
-.admin-doctor-qr-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.admin-doctor-qr-actions button {
-  min-height: 32px;
-  padding: 7px 10px;
-  font-size: 12px;
-}
-
-.admin-doctor-qr-actions .icon-only {
-  display: inline-flex;
-  width: 32px;
-  min-width: 32px;
-  align-items: center;
-  justify-content: center;
-  padding: 7px;
-}
-
-.admin-doctor-qr-actions .icon-only svg {
-  width: 16px;
-  height: 16px;
-}
-
-.admin-doctor-qr-missing {
-  margin-top: 8px;
-  text-transform: none;
 }
 
 .admin-doctor-details {
@@ -1865,8 +1620,7 @@
   padding: 12px;
 }
 
-.admin-newsletter-upload label,
-.admin-edit-grid label {
+.admin-newsletter-upload label {
   display: flex;
   flex-direction: column;
   gap: 7px;
@@ -2350,12 +2104,6 @@
   font-weight: 700;
 }
 
-.admin-edit-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
 /* Admin → Add order: product, qty and remove on one row. */
 
 .admin-table-row-actions button {
@@ -2498,8 +2246,7 @@
 
   .admin-newsletter-upload,
   .admin-registration-email-grid,
-  .admin-registration-email-actions,
-  .admin-edit-grid {
+  .admin-registration-email-actions {
     grid-template-columns: 1fr;
   }
 
