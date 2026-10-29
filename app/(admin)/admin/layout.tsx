@@ -1,11 +1,14 @@
 import type { Viewport } from "next";
 import { Suspense } from "react";
-import { Fraunces } from "next/font/google";
+import { Fraunces, Inter } from "next/font/google";
 import AdminShell from "@/components/admin/AdminShell";
-// ponytail: the admin is its own root layout (no site chrome) but still borrows the site's
-// stylesheet until the Tailwind restyle replaces it page by page. Drop this import last.
-import "@/styles/globals.css";
+// Tailwind + shadcn theme, with the site's globals.css layered underneath for the admin pages
+// that haven't been restyled yet (see the header of styles/admin.css).
+import "@/styles/admin.css";
 
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+
+// ponytail: only the un-restyled pages still use the serif; drop with the legacy import.
 const fraunces = Fraunces({
   subsets: ["latin"],
   style: ["normal", "italic"],
@@ -29,7 +32,7 @@ export const viewport: Viewport = {
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={fraunces.variable}>
+    <html lang="en" className={`${inter.variable} ${fraunces.variable}`}>
       <body>
         <Suspense fallback={null}>
           <AdminShell>{children}</AdminShell>

@@ -3,7 +3,8 @@
 User-visible changes only. Rules: see "Patch notes" in `AGENTS.md`.
 
 ## Unreleased
-- Admin: staff can get their own login that only opens the sections they are given (for example Shop Orders and Product Catalog); the menu shows only those sections, and only the owner login can "Log in as" a partner. Everyone is signed out of Admin once when this goes live.
+- Admin has a new, simpler look for the sign-in page and the frame around every page: a light gray side menu with shorter section names (Orders, Products, Doctor partners…), a top bar with the page name and a "Sandbox" tag on the test site, and Live shop and Sign out at the bottom of the menu. The pages themselves keep their old look for now.
+- Admin: staff can get their own login that only opens the sections they are given (for example Orders and Products); the menu shows only those sections, and only the owner login can "Log in as" a partner. Everyone is signed out of Admin once when this goes live.
 - Admin email settings, email sequences, newsletters, SMS blasts, "log in as doctor" and paid order receipts work again (they had stopped with server errors after Supabase began giving the edge functions a different service key).
 - Shop payments: retries check earlier payments and reuse active checkout sessions, payment recovery survives failed saves, and missing payment receipts can be retried without charging again.
 - TikTok is removed everywhere: no TikTok username on the registration form or in Admin → Doctors, no Profile QR (old /dr/ links now open the home page), no Admin → TikTok Shop page, and the welcome and newsletter emails describe the GutGuard Partner Program instead of the TikTok Affiliate Program.
