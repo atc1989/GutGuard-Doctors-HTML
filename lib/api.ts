@@ -1156,12 +1156,28 @@ export type PartnerWithdrawal = {
   created_at: string;
   processed_at: string | null;
 };
+export type WalletCredit = {
+  type: "commission" | "conversion" | "rebate";
+  amount: number;
+  /** Commission: the order and its products subtotal. */
+  order_code?: string;
+  subtotal?: number;
+  /** Conversion / rebate: the G-Points it came from. */
+  points?: number;
+  created_at: string;
+};
 export type PartnerWallet = {
   earned: number;
+  rebates: number;
+  commissions: number;
+  converted: number;
+  /** Direct G-Points not converted yet. */
+  direct_points: number;
   pending: number;
   withdrawn: number;
   available: number;
   withdrawals: PartnerWithdrawal[];
+  credits: WalletCredit[];
 };
 
 export async function getPartnerWallet(): Promise<PartnerWallet> {
@@ -1169,7 +1185,15 @@ export async function getPartnerWallet(): Promise<PartnerWallet> {
 
   const { data, error } = await supabaseShop.rpc("partner_wallet");
   if (error) throw error;
-  return data as PartnerWallet;
+  // The earnings fields arrive with 20261101000000_wallet_earnings_*; default them until it runs.
+  return { rebates: 0, commissions: 0, converted: 0, direct_points: 0, credits: [], ...(data as Partial<PartnerWallet>) } as PartnerWallet;
+}
+
+export async function convertPartnerPoints(points: 300 | 750 | 1500): Promise<void> {
+  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
+
+  const { error } = await supabaseShop.rpc("convert_partner_points", { p_points: points });
+  if (error) throw error;
 }
 
 export async function requestPartnerWithdrawal(input: {
