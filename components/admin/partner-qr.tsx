@@ -51,14 +51,14 @@ export function PartnerQrCard({
       <code className="truncate rounded-md bg-chrome px-2 py-1 text-xs" title={link}>
         {link}
       </code>
-      <div className="flex gap-2">
-        <Button type="button" variant="outline" size="sm" className="flex-1 shadow-none" onClick={() => share(link)}>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant="outline" size="sm" className="flex-1 shadow-none" title="Share link" onClick={() => share(link)}>
           <Share2 strokeWidth={1.5} />
-          {copied ? "Copied" : "Share link"}
+          {copied ? "Copied" : "Share"}
         </Button>
-        <Button type="button" variant="outline" size="sm" className="flex-1 shadow-none" onClick={download}>
+        <Button type="button" variant="outline" size="sm" className="flex-1 shadow-none" title="Download PNG" onClick={download}>
           <Download strokeWidth={1.5} />
-          Download PNG
+          Download
         </Button>
       </div>
       {children}
