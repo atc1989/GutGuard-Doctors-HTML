@@ -3,54 +3,6 @@
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { useAdminAccess } from "@/components/admin/AdminShell";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
-import { formatPrefixedName } from "@/lib/validation";
-
-type AdminDoctorRegistration = {
-  id: string;
-  full_name: string;
-  name_prefix: string;
-  email: string;
-  mobile: string;
-  routing_slug: string;
-  specialty: string;
-  practice_location: string;
-  where_did_you_find_us?: string;
-  referred_by_partner_id?: string | null;
-  referrer_name?: string | null;
-  referrer_prefix?: string | null;
-  referrer_slug?: string | null;
-  store_type?: "affiliate" | "lifestyle" | "main";
-  referral_qr_enabled?: boolean;
-  main_store_id?: string | null;
-  promoted_at?: string | null;
-  promoted_by?: string | null;
-  created_at: string;
-  prize_label?: string | null;
-  prize_claimed_at?: string | null;
-  shop_show_protocol?: boolean;
-  partner_code?: number | null;
-};
-
-type SmsSendHistory = {
-  id: string;
-  doctor_id: string;
-  sms_campaign_id?: string | null;
-  sms_campaign_title?: string | null;
-  mobile: string;
-  message: string;
-  status: "sent" | "failed" | "skipped";
-  provider_message_id?: string | null;
-  error_message?: string | null;
-  sent_at: string;
-};
-
-type SmsSendResult = {
-  doctorId: string;
-  mobile: string;
-  status: "sent" | "failed" | "skipped";
-  providerMessageId?: string | null;
-  error?: string | null;
-};
 
 type RegistrationEmailAttachment = {
   id?: string;
@@ -99,21 +51,10 @@ type SequenceProgress = {
   email_sequence_sends: { sent_at: string; clicked_at: string | null; status: string; step_id: string }[];
 };
 
-const PAGE_SIZE_OPTIONS = [10, 20, 100];
 const PUBLIC_SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://partners.gutguard.ph").replace(
   /\/$/,
   "",
 );
-const SMS_PLACEHOLDER_TOKENS = [
-  "{{doctor_name}}",
-  "{{name_prefix}}",
-  "{{prefixed_name}}",
-  "{{doctor_mobile}}",
-  "{{specialty}}",
-  "{{clinic_location}}",
-  "{{registered_at}}",
-  "{{prize_label}}",
-];
 const REGISTRATION_EMAIL_TOKENS = [
   "{{doctor_name}}",
   "{{name_prefix}}",
@@ -138,29 +79,16 @@ async function loadWheelApi() {
   return import("@/lib/api");
 }
 
-// SMS blast and Email sequence still share this older page; each route picks its tab.
-export type AdminMessagingTab = "sms" | "registrationEmail" | "sequence";
+// Email sequence still uses this older page; each route picks its tab.
+export type AdminMessagingTab = "registrationEmail" | "sequence";
 
 const TAB_HEADERS: Record<AdminMessagingTab, { kicker: string; title: string; description: string }> = {
-  sms: { kicker: "Marketing", title: "SMS Blast", description: "Send a short message to selected partners and review past sends." },
   sequence: { kicker: "Automation", title: "Email Sequence", description: "The onboarding emails new partners receive, in order." },
   registrationEmail: { kicker: "Automation", title: "Registration Email", description: "Replaced by Email Sequence." },
 };
 
 export default function AdminMessaging({ tab: activeTab }: { tab: AdminMessagingTab }) {
   const { can } = useAdminAccess();
-  const [doctors, setDoctors] = useState<AdminDoctorRegistration[]>([]);
-  const [smsSearch, setSmsSearch] = useState("");
-  const [smsPage, setSmsPage] = useState(1);
-  const [smsPageSize, setSmsPageSize] = useState(10);
-  const [selectedSmsDoctorIds, setSelectedSmsDoctorIds] = useState<string[]>([]);
-  const [smsHistory, setSmsHistory] = useState<SmsSendHistory[]>([]);
-  const [smsResults, setSmsResults] = useState<SmsSendResult[]>([]);
-  const [isSmsSending, setIsSmsSending] = useState(false);
-  const [showSmsConfirm, setShowSmsConfirm] = useState(false);
-  const [smsTitle, setSmsTitle] = useState("");
-  const [smsMessage, setSmsMessage] = useState("");
-  const [smsHistoryDoctorId, setSmsHistoryDoctorId] = useState<string | null>(null);
   const [registrationEmail, setRegistrationEmail] = useState<RegistrationEmailSettings>(emptyRegistrationEmailSettings);
   const [registrationEmailFileName, setRegistrationEmailFileName] = useState("");
   const [registrationEmailFileError, setRegistrationEmailFileError] = useState<string | null>(null);
@@ -186,77 +114,8 @@ export default function AdminMessaging({ tab: activeTab }: { tab: AdminMessaging
   const [resendingKey, setResendingKey] = useState<string | null>(null);
   const [isSequenceLoading, setIsSequenceLoading] = useState(false);
   const [sequenceStepFileName, setSequenceStepFileName] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [newsletterToast, setNewsletterToast] = useState<{
-    tone: "success" | "error";
-    title: string;
-    message: string;
-  } | null>(null);
-
-  const filteredSmsDoctors = useMemo(() => {
-    const query = smsSearch.trim().toLowerCase();
-    const withMobile = doctors.filter((doctor) => normalizeSmsMobile(doctor.mobile));
-    if (!query) return withMobile;
-
-    return withMobile.filter((doctor) =>
-      [
-        doctor.full_name,
-        doctor.name_prefix,
-        doctor.email,
-        doctor.mobile,
-        doctor.specialty,
-        doctor.practice_location,
-        doctor.prize_label ?? "",
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(query),
-    );
-  }, [smsSearch, doctors]);
-  const totalSmsPages = Math.max(1, Math.ceil(filteredSmsDoctors.length / smsPageSize));
-  const visibleSmsDoctors = filteredSmsDoctors.slice(
-    (smsPage - 1) * smsPageSize,
-    smsPage * smsPageSize,
-  );
-  const selectedSmsDoctors = useMemo(
-    () => doctors.filter((doctor) => selectedSmsDoctorIds.includes(doctor.id)),
-    [doctors, selectedSmsDoctorIds],
-  );
-  const latestSmsByDoctor = useMemo(() => {
-    return smsHistory.reduce<Record<string, SmsSendHistory>>((current, item) => {
-      const existing = current[item.doctor_id];
-      if (!existing || new Date(item.sent_at).getTime() > new Date(existing.sent_at).getTime()) {
-        current[item.doctor_id] = item;
-      }
-      return current;
-    }, {});
-  }, [smsHistory]);
-  const smsHistoryByDoctor = useMemo(() => {
-    return smsHistory.reduce<Record<string, SmsSendHistory[]>>((current, item) => {
-      current[item.doctor_id] = [...(current[item.doctor_id] ?? []), item].sort(
-        (a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime(),
-      );
-      return current;
-    }, {});
-  }, [smsHistory]);
-  const smsHistoryDoctor = smsHistoryDoctorId ? doctors.find((doctor) => doctor.id === smsHistoryDoctorId) : null;
-  const smsHistoryItems = smsHistoryDoctorId ? smsHistoryByDoctor[smsHistoryDoctorId] ?? [] : [];
-  const detectedSmsPlaceholders = useMemo(() => {
-    return Array.from(new Set(smsMessage.match(/\{\{\s*[a-zA-Z0-9_]+\s*\}\}/g) ?? [])).map((token) =>
-      token.replace(/\s+/g, ""),
-    );
-  }, [smsMessage]);
-  const visibleSmsSelectedCount = visibleSmsDoctors.filter((doctor) =>
-    selectedSmsDoctorIds.includes(doctor.id),
-  ).length;
-  const allVisibleSmsSelected =
-    visibleSmsDoctors.length > 0 && visibleSmsSelectedCount === visibleSmsDoctors.length;
-  const smsSegmentInfo = useMemo(() => getSmsSegmentInfo(smsMessage), [smsMessage]);
-  const smsPreview = useMemo(() => renderSmsPreview(smsMessage), [smsMessage]);
-  const canSendSms =
-    selectedSmsDoctorIds.length > 0 && smsTitle.trim().length > 0 && smsMessage.trim().length > 0;
   const detectedRegistrationEmailPlaceholders = useMemo(() => {
     const source = `${registrationEmail.html}\n${registrationEmail.bodyText}`;
     return Array.from(new Set(source.match(/\{\{\s*[a-zA-Z0-9_]+\s*\}\}/g) ?? [])).map((token) =>
@@ -277,22 +136,9 @@ export default function AdminMessaging({ tab: activeTab }: { tab: AdminMessaging
     registrationEmailHasBody &&
     registrationEmailTestAddress.trim().length > 0;
 
-  useEffect(() => {
-    if (!newsletterToast) return;
-
-    const timeout = window.setTimeout(() => {
-      setNewsletterToast(null);
-    }, 5200);
-
-    return () => window.clearTimeout(timeout);
-  }, [newsletterToast]);
-
   // AdminShell only renders this page once the admin session is valid.
   useEffect(() => {
-    setIsLoading(true);
-    loadAdminData()
-      .catch((caught) => setError(caught instanceof Error ? caught.message : "Unable to load admin data."))
-      .finally(() => setIsLoading(false));
+    loadAdminData().catch((caught) => setError(caught instanceof Error ? caught.message : "Unable to load admin data."));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -306,48 +152,15 @@ export default function AdminMessaging({ tab: activeTab }: { tab: AdminMessaging
     };
 
     // Staff logins only load the tabs they can open; the rest would be refused by the API.
-    const partnersNeeded = can("sms");
-    const [loadedDoctors, loadedSmsHistory, loadedRegistrationEmail, loadedSequence] = await Promise.all([
-      partnersNeeded ? api.getDoctorRegistrations() : Promise.resolve([]),
-      can("sms") ? api.getSmsBlastHistory() : Promise.resolve([]),
+    const [loadedRegistrationEmail, loadedSequence] = await Promise.all([
       can("referral-email")
         ? api.getRegistrationEmailSettings().catch(showFailure(emptyRegistrationEmailSettings))
         : Promise.resolve(emptyRegistrationEmailSettings),
       can("sequence") ? api.getSequenceSteps().catch(showFailure([])) : Promise.resolve([]),
     ]);
-    setDoctors(loadedDoctors);
-    setSmsHistory(loadedSmsHistory);
     setRegistrationEmail(loadedRegistrationEmail);
     setRegistrationEmailFileName(loadedRegistrationEmail.html ? "Saved registration email HTML" : "");
     setSequenceSteps(loadedSequence.sort((a, b) => a.step_number - b.step_number));
-    setSmsPage(1);
-  }
-
-  async function refreshSmsHistory() {
-    const api = await loadWheelApi();
-    if (!api.getSmsBlastHistory) return;
-    setSmsHistory(await api.getSmsBlastHistory());
-  }
-
-  function toggleSmsDoctor(doctorId: string) {
-    setShowSmsConfirm(false);
-    setSelectedSmsDoctorIds((current) =>
-      current.includes(doctorId)
-        ? current.filter((id) => id !== doctorId)
-        : [...current, doctorId],
-    );
-  }
-
-  function toggleVisibleSmsDoctors() {
-    setShowSmsConfirm(false);
-    const visibleIds = visibleSmsDoctors.map((doctor) => doctor.id);
-    setSelectedSmsDoctorIds((current) => {
-      if (visibleIds.every((id) => current.includes(id))) {
-        return current.filter((id) => !visibleIds.includes(id));
-      }
-
-      return Array.from(new Set([...current, ...visibleIds]));
-    });
   }
 
   async function handleRegistrationEmailUpload(event: ChangeEvent<HTMLInputElement>) {
@@ -549,57 +362,6 @@ export default function AdminMessaging({ tab: activeTab }: { tab: AdminMessaging
     }
   }
 
-  async function handleSmsSend() {
-    if (!canSendSms) {
-      setError("Enter a campaign title, write an SMS message, and select at least one mobile-ready recipient.");
-      return;
-    }
-
-    setShowSmsConfirm(true);
-  }
-
-  async function confirmSmsSend() {
-    if (!canSendSms) return;
-
-    setError(null);
-    setNotice(null);
-    setSmsResults([]);
-    setIsSmsSending(true);
-
-    try {
-      const api = await loadWheelApi();
-      if (!api.sendSmsBlast) {
-        throw new Error("Missing sendSmsBlast helper in lib/api.ts.");
-      }
-
-      const response = await api.sendSmsBlast(selectedSmsDoctorIds,
-        smsTitle.trim(),
-        smsMessage.trim(),
-      );
-      setSmsResults(response.results);
-      setNewsletterToast({
-        tone: "success",
-        title: "SMS blast complete",
-        message: `SMS blast complete: ${response.sent} sent, ${response.failed} failed, ${response.skipped} skipped.`,
-      });
-      setNotice(
-        `SMS blast complete: ${response.sent} sent, ${response.failed} failed, ${response.skipped} skipped.`,
-      );
-      setShowSmsConfirm(false);
-      await refreshSmsHistory();
-    } catch (caught) {
-      const message = caught instanceof Error ? caught.message : "Unable to send SMS blast.";
-      setError(message);
-      setNewsletterToast({
-        tone: "error",
-        title: "SMS blast failed",
-        message,
-      });
-    } finally {
-      setIsSmsSending(false);
-    }
-  }
-
   async function handleResendStep(doctorId: string, stepNumber: number, key: string) {
     setError(null);
     setResendingKey(key);
@@ -758,255 +520,6 @@ export default function AdminMessaging({ tab: activeTab }: { tab: AdminMessaging
 
       {error ? <div className="admin-wheel-alert error">{error}</div> : null}
       {notice ? <div className="admin-wheel-alert">{notice}</div> : null}
-      {newsletterToast ? (
-        <div className={`admin-toast ${newsletterToast.tone}`} role="status" aria-live="polite">
-          <div>
-            <strong>{newsletterToast.title}</strong>
-            <span>{newsletterToast.message}</span>
-          </div>
-          <button type="button" onClick={() => setNewsletterToast(null)} aria-label="Dismiss notification">
-            Close
-          </button>
-        </div>
-      ) : null}
-
-      {activeTab === "sms" ? (
-        <section className="admin-wheel-panel">
-          <div className="admin-wheel-panel-head">
-            <div>
-              <p className="admin-wheel-kicker">Bulk SMS</p>
-              <h2>SMS Blast</h2>
-            </div>
-            <div className="admin-registration-email-status">
-              <span>Provider ready</span>
-              <p>
-                {selectedSmsDoctorIds.length} selected / {smsSegmentInfo.segments} estimated segment
-                {smsSegmentInfo.segments === 1 ? "" : "s"}
-              </p>
-            </div>
-          </div>
-
-          <div className="admin-registration-email-grid admin-sms-grid">
-            <div className="admin-registration-email-main">
-              <label htmlFor="sms-title">
-                Campaign title
-                <input
-                  id="sms-title"
-                  value={smsTitle}
-                  placeholder="GutGuard Doctors SMS"
-                  onChange={(event) => {
-                    setSmsTitle(event.target.value);
-                    setShowSmsConfirm(false);
-                  }}
-                />
-              </label>
-              <label htmlFor="sms-message">
-                SMS message
-                <textarea
-                  id="sms-message"
-                  value={smsMessage}
-                  placeholder="Hi {{doctor_name}}, your GutGuard update..."
-                  onChange={(event) => {
-                    setSmsMessage(event.target.value);
-                    setShowSmsConfirm(false);
-                  }}
-                />
-              </label>
-              <p className="admin-sms-provider-note">
-                Provider-ready only. Configure an SMS gateway before live sending.
-              </p>
-            </div>
-
-            <aside className="admin-registration-email-side">
-              <div className="admin-newsletter-placeholder-box admin-sms-side-box">
-                <p>SMS provider is not configured yet.</p>
-                <div className="admin-sms-metrics" aria-live="polite">
-                  <strong>{smsSegmentInfo.characters}</strong>
-                  <span>characters</span>
-                  <strong>{smsSegmentInfo.segments}</strong>
-                  <span>estimated SMS segment{smsSegmentInfo.segments === 1 ? "" : "s"}</span>
-                </div>
-                <span>Available placeholders</span>
-                <div>
-                  {SMS_PLACEHOLDER_TOKENS.map((token) => (
-                    <code key={token}>{token}</code>
-                  ))}
-                </div>
-                {detectedSmsPlaceholders.length > 0 ? (
-                  <>
-                    <span>Detected in message</span>
-                    <div>
-                      {detectedSmsPlaceholders.map((token) => (
-                        <code key={token}>{token}</code>
-                      ))}
-                    </div>
-                  </>
-                ) : null}
-                {smsMessage.trim().length > 0 ? (
-                  <>
-                    <span>Preview</span>
-                    <p>{smsPreview}</p>
-                  </>
-                ) : null}
-              </div>
-            </aside>
-          </div>
-
-          <div className="admin-registration-email-actions admin-sms-recipient-actions">
-            <label htmlFor="sms-search">
-              Search recipients
-              <input
-                id="sms-search"
-                type="search"
-                value={smsSearch}
-                placeholder="Name, mobile, clinic..."
-                onChange={(event) => {
-                  setSmsSearch(event.target.value);
-                  setSmsPage(1);
-                }}
-              />
-            </label>
-            <button type="button" onClick={refreshSmsHistory} disabled={isLoading}>
-              Refresh history
-            </button>
-            <button
-              type="button"
-              onClick={handleSmsSend}
-              disabled={isSmsSending || !canSendSms}
-            >
-              {isSmsSending ? "Sending" : "Review and send"}
-            </button>
-          </div>
-
-          <div className="admin-newsletter-toolbar">
-            <label className="admin-newsletter-select-all">
-              <input
-                type="checkbox"
-                checked={allVisibleSmsSelected}
-                onChange={toggleVisibleSmsDoctors}
-              />
-              Select visible recipients
-            </label>
-            <div className="admin-newsletter-sendbox">
-              <p>{selectedSmsDoctorIds.length} selected</p>
-            </div>
-          </div>
-
-          {selectedSmsDoctors.length > 0 ? (
-            <div className="admin-newsletter-selected">
-              <p>Selected mobiles</p>
-              <div>
-                {selectedSmsDoctors.map((doctor) => (
-                  <span key={doctor.id}>{normalizeSmsMobile(doctor.mobile) || doctor.mobile}</span>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          <div className="admin-doctor-list">
-            {visibleSmsDoctors.length > 0 ? (
-              visibleSmsDoctors.map((doctor) => {
-                const latestSend = latestSmsByDoctor[doctor.id];
-                const doctorHistory = smsHistoryByDoctor[doctor.id] ?? [];
-                const latestResult = smsResults.find((result) => result.doctorId === doctor.id);
-
-                return (
-                  <article className="admin-doctor-row newsletter" key={doctor.id}>
-                    <label className="admin-newsletter-recipient">
-                      <input
-                        type="checkbox"
-                        checked={selectedSmsDoctorIds.includes(doctor.id)}
-                        onChange={() => toggleSmsDoctor(doctor.id)}
-                      />
-                      <span>
-                        <strong>{formatPrefixedName(doctor.name_prefix, doctor.full_name) || "Unnamed doctor"}</strong>
-                        <em>{normalizeSmsMobile(doctor.mobile) || doctor.mobile}</em>
-                      </span>
-                    </label>
-                    <dl className="admin-doctor-details">
-                      <div>
-                        <dt>City address</dt>
-                        <dd>{doctor.practice_location || "--"}</dd>
-                      </div>
-                      <div>
-                        <dt>Last SMS</dt>
-                        <dd>
-                          {doctorHistory.length > 1 ? (
-                            <button
-                              className="admin-history-link"
-                              type="button"
-                              onClick={() => setSmsHistoryDoctorId(doctor.id)}
-                            >
-                              {doctorHistory.length} SMS blasts sent
-                            </button>
-                          ) : latestSend ? (
-                            `${latestSend.sms_campaign_title || "SMS blast"} - ${formatAdminDate(latestSend.sent_at)}`
-                          ) : (
-                            "Never sent"
-                          )}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Send result</dt>
-                        <dd>{latestResult ? formatSmsResult(latestResult) : "--"}</dd>
-                      </div>
-                    </dl>
-                  </article>
-                );
-              })
-            ) : (
-              <div className="admin-wheel-empty">
-                <p>No mobile-ready doctors match that search.</p>
-              </div>
-            )}
-          </div>
-
-          <div className="admin-pagination">
-            <p>
-              Showing {visibleSmsDoctors.length > 0 ? (smsPage - 1) * smsPageSize + 1 : 0}
-              {"-"}
-              {Math.min(smsPage * smsPageSize, filteredSmsDoctors.length)} of {filteredSmsDoctors.length}
-            </p>
-            <div className="admin-pagination-controls">
-              <label htmlFor="sms-page-size">
-                Show
-                <select
-                  id="sms-page-size"
-                  value={smsPageSize}
-                  onChange={(event) => {
-                    setSmsPageSize(Number(event.target.value));
-                    setSmsPage(1);
-                  }}
-                >
-                  {PAGE_SIZE_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button
-                type="button"
-                onClick={() => setSmsPage((current) => Math.max(1, current - 1))}
-                disabled={smsPage <= 1}
-              >
-                Previous
-              </button>
-              <span>
-                Page {smsPage} of {totalSmsPages}
-              </span>
-              <button
-                type="button"
-                onClick={() => setSmsPage((current) => Math.min(totalSmsPages, current + 1))}
-                disabled={smsPage >= totalSmsPages}
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        </section>
-      ) : null}
-
       {activeTab === "registrationEmail" ? (
         <section className="admin-wheel-panel">
           <div className="admin-wheel-panel-head">
@@ -1542,83 +1055,6 @@ export default function AdminMessaging({ tab: activeTab }: { tab: AdminMessaging
         </div>
       ) : null}
 
-      {showSmsConfirm ? (
-        <div className="admin-modal-backdrop" role="presentation">
-          <section className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="sms-confirm-title">
-            <div className="admin-modal-head">
-              <div>
-                <p className="admin-wheel-kicker">Confirm SMS Blast</p>
-                <h2 id="sms-confirm-title">Send to {selectedSmsDoctors.length} doctors</h2>
-              </div>
-              <button type="button" onClick={() => setShowSmsConfirm(false)}>
-                Close
-              </button>
-            </div>
-            <div className="admin-modal-body">
-              <dl className="admin-confirm-summary">
-                <div>
-                  <dt>Campaign</dt>
-                  <dd>{smsTitle}</dd>
-                </div>
-                <div>
-                  <dt>Segments</dt>
-                  <dd>
-                    {smsSegmentInfo.characters} characters / {smsSegmentInfo.segments} estimated segment
-                    {smsSegmentInfo.segments === 1 ? "" : "s"}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Message</dt>
-                  <dd>{smsPreview}</dd>
-                </div>
-              </dl>
-              <p className="admin-sms-compliance">Only send to doctors who agreed to receive updates.</p>
-              <div className="admin-email-list">
-                {selectedSmsDoctors.map((doctor) => (
-                  <span key={doctor.id}>{normalizeSmsMobile(doctor.mobile) || doctor.mobile}</span>
-                ))}
-              </div>
-            </div>
-            <div className="admin-modal-actions">
-              <button type="button" onClick={() => setShowSmsConfirm(false)}>
-                Cancel
-              </button>
-              <button type="button" onClick={confirmSmsSend} disabled={isSmsSending}>
-                {isSmsSending ? "Sending" : "Send SMS blast"}
-              </button>
-            </div>
-          </section>
-        </div>
-      ) : null}
-
-      {smsHistoryDoctor ? (
-        <div className="admin-modal-backdrop" role="presentation">
-          <section className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="sms-history-title">
-            <div className="admin-modal-head">
-              <div>
-                <p className="admin-wheel-kicker">SMS History</p>
-                <h2 id="sms-history-title">{smsHistoryDoctor.full_name || "Unnamed doctor"}</h2>
-              </div>
-              <button type="button" onClick={() => setSmsHistoryDoctorId(null)}>
-                Close
-              </button>
-            </div>
-            <div className="admin-history-list">
-              {smsHistoryItems.map((item) => (
-                <article key={item.id}>
-                  <strong>{item.sms_campaign_title || "SMS blast"}</strong>
-                  <span>
-                    {item.status} - {formatAdminDate(item.sent_at)}
-                  </span>
-                  <p>{item.message}</p>
-                  {item.error_message ? <p>{item.error_message}</p> : null}
-                </article>
-              ))}
-            </div>
-          </section>
-        </div>
-      ) : null}
-
       {previewStep ? (
         <div
           className="admin-modal-backdrop"
@@ -1669,50 +1105,6 @@ function formatAdminDate(value: string) {
     hour: "numeric",
     minute: "2-digit",
   }).format(date);
-}
-
-function formatSmsResult(result: SmsSendResult) {
-  if (result.status === "sent") return "Sent";
-  if (result.status === "skipped") return `Skipped${result.error ? ` - ${result.error}` : ""}`;
-  return `Failed${result.error ? ` - ${result.error}` : ""}`;
-}
-
-function renderSmsPreview(message: string) {
-  const replacements: Record<string, string> = {
-    doctor_name: "Maria Santos",
-    name_prefix: "Dr.",
-    prefixed_name: "Dr. Maria Santos",
-    doctor_mobile: "+639171234567",
-    specialty: "Internal Medicine",
-    clinic_location: "Makati City",
-    registered_at: "Jun 12, 2026",
-    prize_label: "GutGuard Tote",
-  };
-
-  return message.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, key: string) => {
-    if (!(key in replacements)) return match;
-    return replacements[key];
-  });
-}
-
-function getSmsSegmentInfo(message: string) {
-  const usesUnicode = /[^\u0000-\u007f]/.test(message);
-  const singleLimit = usesUnicode ? 70 : 160;
-  const multipartLimit = usesUnicode ? 67 : 153;
-  const characters = message.length;
-
-  return {
-    characters,
-    segments: characters <= singleLimit ? Math.max(1, characters === 0 ? 0 : 1) : Math.ceil(characters / multipartLimit),
-  };
-}
-
-function normalizeSmsMobile(value: string | null | undefined) {
-  const digits = (value ?? "").replace(/\D/g, "");
-  if (/^09\d{9}$/.test(digits)) return `+63${digits.slice(1)}`;
-  if (/^639\d{9}$/.test(digits)) return `+${digits}`;
-  if (/^9\d{9}$/.test(digits)) return `+63${digits}`;
-  return "";
 }
 
 function renderRegistrationEmailPreview(html: string) {

@@ -1,4 +1,4 @@
-import AdminMessaging from "@/components/admin/AdminMessaging";
+import SmsBlast from "@/components/admin/SmsBlast";
 
 export const metadata = {
   title: "SMS Blast | GutGuard CRM",
@@ -6,5 +6,5 @@ export const metadata = {
 };
 
 export default function SmsAdminPage() {
-  return <AdminMessaging tab="sms" />;
+  return <SmsBlast />;
 }
