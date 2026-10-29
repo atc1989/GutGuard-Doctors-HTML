@@ -12,6 +12,7 @@ import {
   type ShopOrderStatus,
   type ShopPaymentStatus,
 } from "@/lib/api";
+import { useAdminAccess } from "@/components/admin/AdminShell";
 import { priceOrderLines, type Product, type Promo } from "@/lib/catalog";
 import { EMPTY_FULFILLMENT, TRACKING_STATUSES, type OrderFulfillment, type TrackingStatus } from "@/lib/order-fulfillment";
 
@@ -55,6 +56,7 @@ export default function AdminOrders({ partners }: { partners: PartnerLike[] }) {
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isImpersonating, setIsImpersonating] = useState(false);
+  const { owner } = useAdminAccess();
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -457,7 +459,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
               <button type="button" onClick={() => setSelectedOrder(null)}>
                 Cancel
               </button>
-              {referralPartnerEmail ? (
+              {referralPartnerEmail && owner ? (
                 <button
                   type="button"
                   onClick={() => loginAsReferralPartner(referralPartnerEmail)}

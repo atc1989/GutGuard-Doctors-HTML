@@ -9,8 +9,8 @@ import { supabaseAdminShop } from "@/lib/supabase-admin";
 // products are never created or deleted here (see Obsidian "Future Changes/Add Product").
 
 async function guard() {
-  if (!(await getAdminPasswordFromSession())) {
-    return NextResponse.json({ error: "Unauthorized: Admin session expired." }, { status: 401 });
+  if (!(await getAdminPasswordFromSession("products"))) {
+    return NextResponse.json({ error: "Unauthorized: admin session expired, or this login can't open this section." }, { status: 401 });
   }
   if (!supabaseAdminShop) return NextResponse.json({ error: "Supabase is not configured." }, { status: 503 });
   return null;

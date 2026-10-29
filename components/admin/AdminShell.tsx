@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -8,6 +8,7 @@ import {
   ChevronRight,
   ExternalLink,
   Gift,
+  KeyRound,
   LayoutDashboard,
   ListOrdered,
   LoaderCircle,
@@ -24,11 +25,27 @@ import {
   Star,
   Store,
   Tag,
+  UserRound,
   Users,
   Wallet,
   X,
 } from "lucide-react";
-import { adminLogin, adminLogout, checkAdminSession } from "@/lib/api";
+import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import { adminLogin, adminLogout, checkAdminSession, type AdminSessionInfo } from "@/lib/api";
+
+// Module = the nav slug after /admin/ (the server checks the same keys). The dashboard is open to all.
+const moduleOf = (path: string) => path.split("/")[2] || null;
+
+const AdminAccessContext = createContext<AdminSessionInfo | null>(null);
+
+/** What the logged-in admin may open. The API routes enforce this; the UI only hides what would fail. */
+export function useAdminAccess() {
+  const access = useContext(AdminAccessContext);
+  return {
+    owner: Boolean(access?.owner),
+    can: (slug: string) => Boolean(access && (access.owner || access.modules.includes(slug))),
+  };
+}
 
 type NavItem = {
   href: string;
@@ -42,7 +59,7 @@ type NavGroup = {
   items: NavItem[];
 };
 
-const NAV_GROUPS: NavGroup[] = [
+export const NAV_GROUPS: NavGroup[] = [
   {
     title: "Overview",
     items: [
@@ -82,13 +99,20 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/admin/testimonials", label: "Testimonials", icon: Star },
     ],
   },
+  {
+    // "staff" is never a staff module, so canOpen shows this to the super admin only.
+    title: "Settings",
+    items: [{ href: "/admin/staff", label: "Staff Accounts", icon: KeyRound }],
+  },
 ];
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [access, setAccess] = useState<AdminSessionInfo | null>(null);
+  const isAuthenticated = Boolean(access);
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,10 +120,9 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
   const checkAuth = useCallback(async () => {
     try {
-      const ok = await checkAdminSession();
-      setIsAuthenticated(ok);
+      setAccess(await checkAdminSession());
     } catch {
-      setIsAuthenticated(false);
+      setAccess(null);
     } finally {
       setIsChecking(false);
     }
@@ -116,13 +139,13 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!password.trim()) return;
+    if (!username.trim() || !password.trim()) return;
     setLoggingIn(true);
     setError(null);
     try {
-      await adminLogin(password);
+      await adminLogin(username, password);
       setPassword("");
-      setIsAuthenticated(true);
+      await checkAuth();
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed. Check your password.");
@@ -135,11 +158,19 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     try {
       await adminLogout();
     } finally {
-      setIsAuthenticated(false);
+      setAccess(null);
       router.push("/admin");
       router.refresh();
     }
   };
+
+  const canOpen = (href: string) => {
+    const slug = moduleOf(href);
+    return !slug || Boolean(access?.owner || access?.modules.includes(slug));
+  };
+  const navGroups = NAV_GROUPS.map((group) => ({ ...group, items: group.items.filter((item) => canOpen(item.href)) })).filter(
+    (group) => group.items.length > 0,
+  );
 
   const isActive = (href: string) => {
     if (href === "/admin") return pathname === "/admin";
@@ -178,14 +209,32 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             </div>
             <p className="admin-crm-login-kicker">GutGuard Philippines</p>
             <h1>Operations CRM</h1>
-            <p className="admin-crm-login-sub">Enter administrator password to access the operational controls.</p>
+            <p className="admin-crm-login-sub">Sign in with your admin username and password.</p>
           </div>
 
           <form onSubmit={handleLogin} className="admin-crm-login-form">
             {error && <div className="admin-crm-login-error" role="alert">{error}</div>}
 
             <div className="admin-crm-field">
-              <label htmlFor="admin-password">Administrator Password</label>
+              <label htmlFor="admin-username">Username</label>
+              <div className="admin-crm-input-wrap">
+                <UserRound size={17} className="admin-crm-field-icon" />
+                <input
+                  id="admin-username"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  disabled={loggingIn}
+                  autoFocus
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="admin-crm-field">
+              <label htmlFor="admin-password">Password</label>
               <div className="admin-crm-input-wrap">
                 <Lock size={17} className="admin-crm-field-icon" />
                 <input
@@ -196,13 +245,12 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={loggingIn}
-                  autoFocus
                   required
                 />
               </div>
             </div>
 
-            <button type="submit" className="admin-crm-primary-btn" disabled={loggingIn || !password.trim()}>
+            <button type="submit" className="admin-crm-primary-btn" disabled={loggingIn || !username.trim() || !password.trim()}>
               {loggingIn ? (
                 <>
                   <LoaderCircle size={18} className="admin-crm-spinner" />
@@ -242,7 +290,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       </div>
 
       <nav className="admin-crm-nav" aria-label="CRM Navigation">
-        {NAV_GROUPS.map((group) => (
+        {navGroups.map((group) => (
           <div key={group.title} className="admin-crm-nav-group">
             <div className="admin-crm-group-header">{group.title}</div>
             <ul className="admin-crm-group-list">
@@ -270,7 +318,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       <div className="admin-crm-sidebar-footer">
         <div className="admin-crm-session-pill">
           <span className="admin-crm-pulse-dot" />
-          <span>Session Active</span>
+          <span>{access?.owner ? "Session Active" : `Signed in as ${access?.name}`}</span>
         </div>
 
         <div className="admin-crm-footer-links">
@@ -367,7 +415,17 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
         {/* Main Routed Content Area */}
         <main className="admin-crm-main">
-          {children}
+          <AdminAccessContext.Provider value={access}>
+            {canOpen(pathname) ? (
+              children
+            ) : (
+              <AdminPageHeader
+                kicker="No access"
+                title="This section isn't on your login"
+                description="Ask the owner to add it to your access."
+              />
+            )}
+          </AdminAccessContext.Provider>
         </main>
       </div>
     </div>
