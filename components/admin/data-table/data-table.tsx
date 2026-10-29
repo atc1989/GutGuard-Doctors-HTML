@@ -47,7 +47,8 @@ declare module "@tanstack/react-table" {
 // Faceted filters store the chosen values as a string array.
 const inValues: FilterFn<unknown> = (row, id, values: string[]) => values.includes(String(row.getValue(id) ?? ""));
 
-const PAGE_SIZES = [20, 50, 100];
+const PAGE_SIZES = [10, 20, 50, 100];
+const DEFAULT_PAGE_SIZE = 20;
 
 export type Facet = { column: string; title: string; labels?: Record<string, string> };
 
@@ -142,7 +143,7 @@ export function DataTable<TData>({
     initialState: {
       sorting: initialSort,
       columnVisibility: Object.fromEntries(initialHidden.map((id) => [id, false])),
-      pagination: { pageIndex: 0, pageSize: PAGE_SIZES[0] },
+      pagination: { pageIndex: 0, pageSize: DEFAULT_PAGE_SIZE },
     },
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -322,7 +323,8 @@ export function DataTable<TData>({
         </div>
       </div>
 
-      {total > PAGE_SIZES[0] && (
+      {/* Hidden while everything fits on one page at the default size; stays once someone picks 10. */}
+      {(total > DEFAULT_PAGE_SIZE || pageSize < DEFAULT_PAGE_SIZE) && (
       <div className="flex flex-wrap items-center justify-between gap-3 text-[13px] text-muted-foreground">
         <span className="tabular-nums">
           {total === 0
