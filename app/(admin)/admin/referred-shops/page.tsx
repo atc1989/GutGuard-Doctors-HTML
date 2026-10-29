@@ -1,53 +1,44 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import { useEffect, useMemo, useState } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
+import { RefreshCw, ShoppingBag, Store, UserPlus, Wallet } from "lucide-react";
 import type { AdminShop } from "@/app/api/admin/referred-shops/route";
-import { downloadCsv } from "@/lib/csv";
+import { Alert, FilterTabs, MetricCell, MetricStrip, PageBody, Section } from "@/components/admin/blocks";
+import { CellStack, DataTable } from "@/components/admin/data-table/data-table";
+import { RowActions } from "@/components/admin/data-table/row-actions";
+import { DetailList, EditSheet } from "@/components/admin/form";
+import { Badge } from "@/components/admin/ui/badge";
+import { Button } from "@/components/admin/ui/button";
 
 const peso = (value: number) =>
   new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value);
 const day = (value: string) =>
   new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
+const count = (value: number) => value.toLocaleString("en-PH");
 
 const STORE_TYPES: Record<string, string> = { main: "Main Store", lifestyle: "Lifestyle", affiliate: "Affiliate" };
 const storeLabel = (type: string) => STORE_TYPES[type] ?? type;
+const referrerLabel = (shop: AdminShop) => shop.referrerName || (shop.referrerId ? "Unnamed partner" : "Direct sign-up");
 
-type Sort = "newest" | "sales" | "orders" | "name";
+type Tab = "all" | "referred" | "direct";
+const TAB_MATCH: Record<Tab, (shop: AdminShop) => boolean> = {
+  all: () => true,
+  referred: (shop) => Boolean(shop.referrerId),
+  direct: (shop) => !shop.referrerId,
+};
 
-function csvRows(shops: AdminShop[]) {
-  const header = ["Shop / owner", "Clinic address", "Mobile", "Email", "Store type", "Referred by", "Main store", "Joined", "Orders", "Paid sales (PHP)"];
-  const rows = shops.map((shop) => [
-    shop.name,
-    shop.address,
-    shop.mobile,
-    shop.email,
-    storeLabel(shop.storeType),
-    shop.referrerName || "Direct sign-up",
-    shop.mainStoreName,
-    shop.joinedAt.slice(0, 10),
-    String(shop.orders),
-    String(shop.sales),
-  ]);
-  return [header, ...rows];
-}
+const searchText = (shop: AdminShop) =>
+  [shop.name, shop.specialty, shop.address, shop.referrerName, shop.mobile, shop.email, shop.mainStoreName].join(" ");
 
 export default function AdminReferredShopsPage() {
-  const [loaded, setLoaded] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [shops, setShops] = useState<AdminShop[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [referrer, setReferrer] = useState("all");
-  const [storeType, setStoreType] = useState("all");
-  const [sort, setSort] = useState<Sort>("newest");
-  const [grouped, setGrouped] = useState(false);
-
-  // AdminShell only renders this page once the admin session is valid.
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const [tab, setTab] = useState<Tab>("all");
+  const [selected, setSelected] = useState<AdminShop | null>(null);
+  // Separate from `selected` so the panel keeps its content while it slides out.
+  const [panelOpen, setPanelOpen] = useState(false);
 
   async function load() {
     setIsLoading(true);
@@ -57,7 +48,6 @@ export default function AdminReferredShopsPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Could not load shops.");
       setShops(data.shops);
-      setLoaded(true);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load shops.");
     } finally {
@@ -65,200 +55,194 @@ export default function AdminReferredShopsPage() {
     }
   }
 
+  // AdminShell only renders this page once the admin session is valid.
+  useEffect(() => {
+    load();
+  }, []);
 
-  const referrers = useMemo(() => {
-    const names = new Map<string, string>();
-    for (const shop of shops) if (shop.referrerId) names.set(shop.referrerId, shop.referrerName || "Unnamed partner");
-    return [...names.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  const open = (shop: AdminShop) => {
+    setSelected(shop);
+    setPanelOpen(true);
+  };
+
+  const metrics = useMemo(() => {
+    const referred = shops.filter((shop) => shop.referrerId);
+    return {
+      direct: shops.length - referred.length,
+      referred: referred.length,
+      referrers: new Set(referred.map((shop) => shop.referrerId)).size,
+      orders: shops.reduce((sum, shop) => sum + shop.orders, 0),
+      withOrders: shops.filter((shop) => shop.orders > 0).length,
+      sales: shops.reduce((sum, shop) => sum + shop.sales, 0),
+      withSales: shops.filter((shop) => shop.sales > 0).length,
+    };
   }, [shops]);
 
-  const visible = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const list = shops.filter((shop) => {
-      if (storeType !== "all" && shop.storeType !== storeType) return false;
-      if (referrer === "direct" && shop.referrerId) return false;
-      if (referrer === "referred" && !shop.referrerId) return false;
-      if (!["all", "direct", "referred"].includes(referrer) && shop.referrerId !== referrer) return false;
-      if (!q) return true;
-      return [shop.name, shop.address, shop.referrerName, shop.mobile, shop.email].some((field) =>
-        field.toLowerCase().includes(q),
-      );
-    });
-    return list.sort((a, b) => {
-      if (sort === "sales") return b.sales - a.sales;
-      if (sort === "orders") return b.orders - a.orders;
-      if (sort === "name") return a.name.localeCompare(b.name);
-      return b.joinedAt.localeCompare(a.joinedAt);
-    });
-  }, [shops, search, referrer, storeType, sort]);
+  const rows = useMemo(() => shops.filter(TAB_MATCH[tab]), [shops, tab]);
 
-  // Group view: referrer -> their shops, biggest network first; direct sign-ups last.
-  const groups = useMemo(() => {
-    const map = new Map<string, { name: string; shops: AdminShop[] }>();
-    for (const shop of visible) {
-      const key = shop.referrerId ?? "direct";
-      const entry = map.get(key) ?? { name: shop.referrerName || (shop.referrerId ? "Unnamed partner" : "Direct sign-up"), shops: [] };
-      entry.shops.push(shop);
-      map.set(key, entry);
-    }
-    return [...map.entries()].sort(([a, x], [b, y]) =>
-      a === "direct" ? 1 : b === "direct" ? -1 : y.shops.length - x.shops.length,
-    );
-  }, [visible]);
-
-  const exportCsv = () => downloadCsv("gutguard-shops", csvRows(visible));
-
-  const referredCount = shops.filter((shop) => shop.referrerId).length;
-  const totals = visible.reduce((sum, shop) => ({ orders: sum.orders + shop.orders, sales: sum.sales + shop.sales }), {
-    orders: 0,
-    sales: 0,
-  });
-
-  const table = (rows: AdminShop[]) => (
-    <div className="admin-shops-table-wrap">
-      <table className="admin-shops-table">
-        <thead>
-          <tr>
-            <th>Shop / owner</th>
-            <th>Clinic address</th>
-            <th>Contact</th>
-            <th>Store type</th>
-            <th>Referred by</th>
-            <th>Main store</th>
-            <th>Joined</th>
-            <th className="num">Orders</th>
-            <th className="num">Paid sales</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((shop) => (
-            <tr key={shop.id}>
-              <td>
-                <strong>{shop.name || "Unnamed partner"}</strong>
-                {shop.specialty ? <small>{shop.specialty}</small> : null}
-              </td>
-              <td>{shop.address || "--"}</td>
-              <td>
-                {shop.mobile || "--"}
-                {shop.email ? <small>{shop.email}</small> : null}
-              </td>
-              <td>{storeLabel(shop.storeType)}</td>
-              <td>
-                {shop.referrerName || <span className="muted">Direct sign-up</span>}
-                {shop.referrerStoreType ? <small>{storeLabel(shop.referrerStoreType)}</small> : null}
-              </td>
-              <td>{shop.mainStoreName || "--"}</td>
-              <td>{day(shop.joinedAt)}</td>
-              <td className="num">{shop.orders}</td>
-              <td className="num">{peso(shop.sales)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+  const columns = useMemo<ColumnDef<AdminShop, unknown>[]>(
+    () => [
+      {
+        id: "name",
+        accessorFn: (shop) => shop.name || "Unnamed partner",
+        meta: { label: "Shop / owner" },
+        cell: ({ row }) => <CellStack title={row.original.name || "Unnamed partner"} sub={row.original.specialty || undefined} />,
+      },
+      { id: "address", accessorKey: "address", meta: { label: "Clinic address" } },
+      { id: "mobile", accessorKey: "mobile", meta: { label: "Mobile" } },
+      { id: "email", accessorKey: "email", meta: { label: "Email" } },
+      {
+        id: "storeType",
+        accessorFn: (shop) => storeLabel(shop.storeType),
+        meta: { label: "Store type" },
+        cell: ({ getValue }) => <Badge>{String(getValue())}</Badge>,
+      },
+      {
+        id: "referrer",
+        accessorFn: referrerLabel,
+        meta: { label: "Referred by" },
+        cell: ({ row }) =>
+          row.original.referrerId ? (
+            <CellStack
+              title={referrerLabel(row.original)}
+              sub={row.original.referrerStoreType ? storeLabel(row.original.referrerStoreType) : undefined}
+            />
+          ) : (
+            <span className="text-subtle-foreground">Direct sign-up</span>
+          ),
+      },
+      { id: "mainStore", accessorKey: "mainStoreName", meta: { label: "Main store" } },
+      {
+        id: "joined",
+        accessorKey: "joinedAt",
+        meta: { label: "Joined", csv: (shop) => shop.joinedAt.slice(0, 10) },
+        cell: ({ row }) => <span className="whitespace-nowrap">{day(row.original.joinedAt)}</span>,
+      },
+      { id: "orders", accessorKey: "orders", meta: { label: "Orders", align: "right" } },
+      {
+        id: "sales",
+        accessorKey: "sales",
+        meta: { label: "Paid sales (PHP)", align: "right" },
+        cell: ({ row }) => peso(row.original.sales),
+      },
+      {
+        id: "actions",
+        enableSorting: false,
+        enableHiding: false,
+        cell: ({ row }) => (
+          <div className="flex justify-end">
+            <RowActions label={`Actions for ${row.original.name || "shop"}`} actions={[{ label: "View details", onSelect: () => open(row.original) }]} />
+          </div>
+        ),
+      },
+    ],
+    [],
   );
 
   return (
-    <div className="admin-wheel-shell admin-shop-orders-shell">
-      <AdminPageHeader
-        kicker="Partner network"
-        title="Referred Clinics"
-        description="Clinics referred by partners, and who referred them."
-      >
-        <button type="button" className="admin-overview-action-btn" onClick={load} disabled={isLoading}>
-          {isLoading ? "Loading" : "Refresh"}
-        </button>
-      </AdminPageHeader>
+    <>
+      <MetricStrip>
+        <MetricCell label="Shops" icon={Store} loading={isLoading} value={count(shops.length)} footer={["Direct sign-ups", count(metrics.direct)]} />
+        <MetricCell
+          label="Joined by referral"
+          icon={UserPlus}
+          loading={isLoading}
+          value={count(metrics.referred)}
+          footer={["Referring partners", count(metrics.referrers)]}
+        />
+        <MetricCell
+          label="Orders through shop links"
+          icon={ShoppingBag}
+          loading={isLoading}
+          value={count(metrics.orders)}
+          footer={["Shops with orders", count(metrics.withOrders)]}
+        />
+        <MetricCell label="Paid sales" icon={Wallet} loading={isLoading} value={peso(metrics.sales)} footer={["Shops with sales", count(metrics.withSales)]} />
+      </MetricStrip>
 
-      {error ? <div className="admin-wheel-alert error">{error}</div> : null}
+      <PageBody>
+        {error ? <Alert tone="error">{error}</Alert> : null}
 
-      {loaded ? (
-        <section className="admin-wheel-panel">
-          <div className="admin-wheel-panel-head">
-            <div>
-              <p className="admin-wheel-kicker">Directory</p>
-              <h2>All shops</h2>
-            </div>
-            <p>
-              Every partner shop with its owner, clinic address and who referred it. Orders count every order through
-              the shop&apos;s own link; paid sales count paid orders only - the same numbers partners see.
-            </p>
-          </div>
+        <Section
+          actions={
+            <FilterTabs
+              label="Filter shops by how they joined"
+              value={tab}
+              onChange={setTab}
+              tabs={[
+                { value: "all", label: "All", count: shops.length },
+                { value: "referred", label: "Referred", count: metrics.referred },
+                { value: "direct", label: "Direct", count: metrics.direct },
+              ]}
+            />
+          }
+        >
+          <DataTable
+            data={rows}
+            columns={columns}
+            loading={isLoading && shops.length === 0}
+            searchText={searchText}
+            searchPlaceholder="Search shops"
+            facets={[
+              { column: "storeType", title: "Store type" },
+              { column: "referrer", title: "Referred by" },
+            ]}
+            exportName="gutguard-shops"
+            onRowClick={open}
+            initialSort={[{ id: "joined", desc: true }]}
+            initialHidden={["address", "mobile", "email", "mainStore"]}
+            emptyText="No shops yet."
+            actions={
+              <Button variant="outline" size="icon-sm" onClick={load} disabled={isLoading} aria-label="Refresh shops" title="Refresh shops" className="rounded-lg shadow-none">
+                <RefreshCw className={isLoading ? "animate-spin" : undefined} strokeWidth={1.5} />
+              </Button>
+            }
+          />
+          <p className="text-xs text-muted-foreground">
+            Orders count every order through the shop&apos;s own link; paid sales count paid orders only, the same numbers partners see.
+          </p>
+        </Section>
+      </PageBody>
 
-          <div className="admin-shops-toolbar">
-            <label>
-              Search
-              <input
-                type="search"
-                value={search}
-                placeholder="Name, address, referrer, mobile"
-                onChange={(event) => setSearch(event.target.value)}
-              />
-            </label>
-            <label>
-              Referred by
-              <select value={referrer} onChange={(event) => setReferrer(event.target.value)}>
-                <option value="all">Everyone</option>
-                <option value="referred">Referred shops only</option>
-                <option value="direct">Direct sign-ups only</option>
-                {referrers.map(([id, name]) => (
-                  <option key={id} value={id}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Store type
-              <select value={storeType} onChange={(event) => setStoreType(event.target.value)}>
-                <option value="all">All types</option>
-                {Object.entries(STORE_TYPES).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Sort
-              <select value={sort} onChange={(event) => setSort(event.target.value as Sort)}>
-                <option value="newest">Newest first</option>
-                <option value="sales">Highest sales</option>
-                <option value="orders">Most orders</option>
-                <option value="name">Name A-Z</option>
-              </select>
-            </label>
-          </div>
-
-          <div className="admin-shops-actions">
-            <label className="admin-wheel-toggle">
-              <input type="checkbox" checked={grouped} onChange={(event) => setGrouped(event.target.checked)} />
-              Group by referrer
-            </label>
-            <span>
-              {visible.length} shops · {totals.orders} orders · {peso(totals.sales)} paid sales
-            </span>
-            <button type="button" onClick={exportCsv} disabled={visible.length === 0}>
-              Download CSV
-            </button>
-          </div>
-
-          {visible.length === 0 ? (
-            <p className="admin-wheel-empty">No shops match.</p>
-          ) : grouped ? (
-            groups.map(([key, group]) => (
-              <div className="admin-shops-group" key={key}>
-                <h3>
-                  {group.name} <span>· {group.shops.length} shops</span>
-                </h3>
-                {table(group.shops)}
-              </div>
-            ))
-          ) : (
-            table(visible)
-          )}
-        </section>
+      {selected ? (
+        <EditSheet
+          open={panelOpen}
+          onOpenChange={setPanelOpen}
+          title={selected.name || "Unnamed partner"}
+          description={[storeLabel(selected.storeType), selected.specialty].filter(Boolean).join(" · ")}
+          onSubmit={(event) => event.preventDefault()}
+          footer={
+            <Button type="button" variant="ghost" size="sm" onClick={() => setPanelOpen(false)}>
+              Close
+            </Button>
+          }
+        >
+          <DetailList
+            title="Contact"
+            items={[
+              ["Mobile", selected.mobile],
+              ["Email", selected.email],
+              ["Clinic address", selected.address],
+            ]}
+          />
+          <DetailList
+            title="Network"
+            items={[
+              ["Store type", storeLabel(selected.storeType)],
+              ["Referred by", selected.referrerId ? `${referrerLabel(selected)}${selected.referrerStoreType ? ` · ${storeLabel(selected.referrerStoreType)}` : ""}` : "Direct sign-up"],
+              ["Main store", selected.mainStoreName],
+              ["Joined", day(selected.joinedAt)],
+            ]}
+          />
+          <DetailList
+            title="Sales through the shop link"
+            items={[
+              ["Orders", count(selected.orders)],
+              ["Paid sales", peso(selected.sales)],
+            ]}
+          />
+        </EditSheet>
       ) : null}
-    </div>
+    </>
   );
 }

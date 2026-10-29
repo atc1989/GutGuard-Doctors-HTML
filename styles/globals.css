@@ -7919,18 +7919,6 @@
   text-transform: uppercase;
 }
 
-.admin-shops-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 16px 0;
-  color: var(--ink-3);
-  font-size: 13px;
-  font-weight: 700;
-}
-
 .admin-shops-table-wrap {
   overflow-x: auto;
   border: 1px solid var(--rule);
@@ -8101,20 +8089,6 @@
 
 .admin-shops-table .muted {
   color: var(--ink-3);
-}
-
-.admin-shops-group + .admin-shops-group {
-  margin-top: 22px;
-}
-
-.admin-shops-group h3 {
-  margin: 0 0 8px;
-  font-size: 15px;
-}
-
-.admin-shops-group h3 span {
-  color: var(--ink-3);
-  font-weight: 600;
 }
 
 @media (max-width: 860px) {
