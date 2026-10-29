@@ -667,7 +667,8 @@ export async function adminListWheelPrizes(): Promise<WheelPrize[]> {
     throw new Error(data.error || "Failed to load wheel prizes.");
   }
   const data = await res.json();
-  return ((data.prizes ?? []) as PrizeRow[]).map(mapWheelPrizeRow);
+  // The route already maps the rows (serverAdminListWheelPrizes); mapping again reset every field.
+  return (data.prizes ?? []) as WheelPrize[];
 }
 
 export async function adminSaveWheelPrize(
@@ -683,7 +684,7 @@ export async function adminSaveWheelPrize(
     throw new Error(data.error || "Failed to save wheel prize.");
   }
   const data = await res.json();
-  return mapWheelPrizeRow((Array.isArray(data.prize) ? data.prize[0] : data.prize) as PrizeRow);
+  return data.prize as WheelPrize;
 }
 
 export async function getWheelPrizes(): Promise<AdminWheelPrize[]> {

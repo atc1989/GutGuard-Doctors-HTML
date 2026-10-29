@@ -1,4 +1,4 @@
-import AdminWheelPage from "@/app/(admin)/admin/wheel/page";
+import AdminMessaging from "@/components/admin/AdminMessaging";
 
 export const metadata = {
   title: "Newsletter Broadcast | GutGuard CRM",
@@ -6,5 +6,5 @@ export const metadata = {
 };
 
 export default function NewsletterAdminPage() {
-  return <AdminWheelPage defaultTab="newsletter" />;
+  return <AdminMessaging tab="newsletter" />;
 }
