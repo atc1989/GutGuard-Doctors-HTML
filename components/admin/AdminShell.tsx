@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import AdminLogin from "@/components/admin/AdminLogin";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import { Badge } from "@/components/admin/ui/badge";
 import { Button } from "@/components/admin/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/admin/ui/sheet";
 import { adminLogout, checkAdminSession, type AdminSessionInfo } from "@/lib/api";
@@ -231,11 +232,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             </Sheet>
             <h1 className="m-0 max-w-none font-sans text-base font-medium leading-6 tracking-normal text-foreground">{currentLabel}</h1>
           </div>
-          {isSandboxShop && (
-            <span className="inline-flex h-[22px] items-center rounded border border-border bg-background px-1.5 text-xs text-foreground">
-              Sandbox
-            </span>
-          )}
+          {isSandboxShop && <Badge>Sandbox</Badge>}
         </header>
 
         {/* admin-crm-main stays: un-restyled pages still size themselves with ".admin-crm-main …" rules. */}
