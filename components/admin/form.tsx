@@ -49,7 +49,11 @@ export function EditSheet({
   );
 }
 
-/** Small "are you sure?" window. `destructive` makes the confirm button red. */
+/**
+ * Small "are you sure?" window. `destructive` makes the confirm button red. `children` go
+ * between the text and the buttons (e.g. a required reference field); the window is a form, so
+ * the browser checks required fields before `onConfirm` runs.
+ */
 export function ConfirmDialog({
   open,
   onOpenChange,
@@ -59,6 +63,7 @@ export function ConfirmDialog({
   destructive,
   busy,
   onConfirm,
+  children,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -68,22 +73,32 @@ export function ConfirmDialog({
   destructive?: boolean;
   busy?: boolean;
   onConfirm: () => void;
+  children?: ReactNode;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton={false} className="max-w-sm gap-5 rounded-xl border-border p-5 font-sans text-foreground shadow-[0_8px_32px_-8px_rgb(0_0_0/0.16)]">
-        <DialogHeader className="gap-1 text-left">
-          <DialogTitle className="text-base font-medium">{title}</DialogTitle>
-          {description ? <DialogDescription className="text-[13px]">{description}</DialogDescription> : null}
-        </DialogHeader>
-        <DialogFooter className="gap-2">
-          <Button type="button" variant="ghost" size="sm" onClick={() => onOpenChange(false)} disabled={busy}>
-            Cancel
-          </Button>
-          <Button type="button" size="sm" variant={destructive ? "destructive" : "default"} onClick={onConfirm} disabled={busy}>
-            {busy ? "Working…" : confirmLabel}
-          </Button>
-        </DialogFooter>
+      <DialogContent showCloseButton={false} className="max-w-sm rounded-xl border-border p-5 font-sans text-foreground shadow-[0_8px_32px_-8px_rgb(0_0_0/0.16)]">
+        <form
+          className="flex flex-col gap-5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onConfirm();
+          }}
+        >
+          <DialogHeader className="gap-1 text-left">
+            <DialogTitle className="text-base font-medium">{title}</DialogTitle>
+            {description ? <DialogDescription className="text-[13px]">{description}</DialogDescription> : null}
+          </DialogHeader>
+          {children}
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="ghost" size="sm" onClick={() => onOpenChange(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button type="submit" size="sm" variant={destructive ? "destructive" : "default"} disabled={busy}>
+              {busy ? "Working…" : confirmLabel}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

@@ -1,8 +1,19 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
-import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import { useEffect, useMemo, useState } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
+import { Check, CircleCheck, CircleX, Clock, Copy, RefreshCw, Wallet } from "lucide-react";
+import { Alert, FilterTabs, MetricCell, MetricStrip, PageBody, Section, StatusDot } from "@/components/admin/blocks";
+import { CellStack, DataTable } from "@/components/admin/data-table/data-table";
+import { RowActions } from "@/components/admin/data-table/row-actions";
+import { ConfirmDialog, DetailList, EditSheet, Field } from "@/components/admin/form";
+import { Button } from "@/components/admin/ui/button";
+import { Input } from "@/components/admin/ui/input";
+import { Textarea } from "@/components/admin/ui/textarea";
 import type { AdminWithdrawal } from "@/lib/admin-server-api";
+
+type Status = AdminWithdrawal["status"];
+type Tab = Status | "all";
 
 const money = (value: number) =>
   new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 2 }).format(value);
@@ -10,23 +21,35 @@ const when = (value: string) =>
   new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(value));
 
 const METHODS: Record<string, string> = { gcash: "GCash", maya: "Maya", bank: "Bank" };
-type Filter = "pending" | "approved" | "rejected" | "all";
+const STATUS_VIEW: Record<Status, [string, "amber" | "green" | "gray"]> = {
+  pending: ["Pending", "amber"],
+  approved: ["Approved", "green"],
+  rejected: ["Rejected", "gray"],
+};
+
+const net = (item: AdminWithdrawal) => item.amount - item.fee;
+const payTo = (item: AdminWithdrawal) => (item.method === "bank" ? `Bank · ${item.bank_name}` : METHODS[item.method] ?? item.method);
+const account = (item: AdminWithdrawal) => [item.account_name, item.account_number].filter(Boolean).join(" · ");
+const partnerName = (item: AdminWithdrawal) => item.partner_name || "Unnamed partner";
+const searchText = (item: AdminWithdrawal) =>
+  [item.partner_name, item.partner_email, item.partner_mobile, item.account_name, item.account_number, item.bank_name, item.reference].join(" ");
 
 /** Partners request payouts from /partner/wallet; admin sends the money, then approves here with the reference. */
 export default function AdminWithdrawalsPage() {
-  const [loaded, setLoaded] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[]>([]);
-  const [filter, setFilter] = useState<Filter>("pending");
+  const [tab, setTab] = useState<Tab>("pending");
   const [error, setError] = useState<string | null>(null);
-  const [acting, setActing] = useState<{ id: string; status: "approved" | "rejected" } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  // Details panel; the open flag is separate so it keeps its content while sliding out.
+  const [selected, setSelected] = useState<AdminWithdrawal | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+  // Approve / reject window and its required field (transfer reference or reason).
+  const [acting, setActing] = useState<{ item: AdminWithdrawal; status: "approved" | "rejected" } | null>(null);
+  const [actingOpen, setActingOpen] = useState(false);
   const [input, setInput] = useState("");
-
-  // AdminShell only renders this page once the admin session is valid.
-  useEffect(() => {
-    load();
-  }, []);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   async function load(clearError = true) {
     setIsLoading(true);
@@ -36,7 +59,6 @@ export default function AdminWithdrawalsPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Could not load withdrawals.");
       setWithdrawals(data.withdrawals);
-      setLoaded(true);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load withdrawals.");
     } finally {
@@ -44,14 +66,28 @@ export default function AdminWithdrawalsPage() {
     }
   }
 
-  // Inline form, not window.prompt: in-app browsers and some phones block prompts.
-  async function process(event: FormEvent, item: AdminWithdrawal) {
-    event.preventDefault();
-    if (!acting || !input.trim()) return;
-    const { status } = acting;
+  // AdminShell only renders this page once the admin session is valid.
+  useEffect(() => {
+    load();
+  }, []);
 
-    setBusyId(item.id);
+  const open = (item: AdminWithdrawal) => {
+    setSelected(item);
+    setPanelOpen(true);
+    setCopied(false);
+  };
+  const startAction = (item: AdminWithdrawal, status: "approved" | "rejected") => {
+    setActing({ item, status });
+    setActingOpen(true);
+    setInput("");
+  };
+
+  async function process() {
+    if (!acting || !input.trim()) return;
+    const { item, status } = acting;
+    setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       const res = await fetch("/api/admin/withdrawals", {
         method: "POST",
@@ -60,135 +96,296 @@ export default function AdminWithdrawalsPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Could not update the withdrawal.");
-      setActing(null);
+      setNotice(status === "approved" ? `Approved ${money(net(item))} to ${partnerName(item)}.` : `Rejected ${partnerName(item)}'s withdrawal.`);
+      setActingOpen(false);
+      setPanelOpen(false);
       await load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not update the withdrawal.");
+      setActingOpen(false);
       // The row may have changed meanwhile (another admin, a double submit), so show what is true now.
       await load(false);
     } finally {
-      setBusyId(null);
+      setBusy(false);
     }
   }
 
-  const visible = filter === "all" ? withdrawals : withdrawals.filter((item) => item.status === filter);
-  const pendingTotal = withdrawals.filter((item) => item.status === "pending").reduce((sum, item) => sum + item.amount - item.fee, 0);
+  async function copyAccount(value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  const metrics = useMemo(() => {
+    const by = (status: Status) => withdrawals.filter((item) => item.status === status);
+    const thisMonth = new Date().getFullYear() * 12 + new Date().getMonth();
+    const approved = by("approved");
+    return {
+      pending: by("pending"),
+      approved,
+      rejected: by("rejected"),
+      approvedThisMonth: approved.filter((item) => {
+        const at = new Date(item.processed_at ?? item.created_at);
+        return at.getFullYear() * 12 + at.getMonth() === thisMonth;
+      }).length,
+      paidOut: approved.reduce((sum, item) => sum + net(item), 0),
+      fees: approved.reduce((sum, item) => sum + item.fee, 0),
+    };
+  }, [withdrawals]);
+
+  const rows = useMemo(() => (tab === "all" ? withdrawals : withdrawals.filter((item) => item.status === tab)), [withdrawals, tab]);
+
+  const columns = useMemo<ColumnDef<AdminWithdrawal, unknown>[]>(
+    () => [
+      {
+        id: "partner",
+        accessorFn: partnerName,
+        meta: { label: "Partner" },
+        cell: ({ row }) => <CellStack title={partnerName(row.original)} sub={row.original.partner_mobile || row.original.partner_email || undefined} />,
+      },
+      {
+        id: "requested",
+        accessorKey: "created_at",
+        meta: { label: "Requested", csv: (item) => item.created_at },
+        cell: ({ row }) => <span className="whitespace-nowrap">{when(row.original.created_at)}</span>,
+      },
+      { id: "amount", accessorKey: "amount", meta: { label: "Amount", align: "right" }, cell: ({ row }) => money(row.original.amount) },
+      { id: "fee", accessorKey: "fee", meta: { label: "Fee", align: "right" }, cell: ({ row }) => money(row.original.fee) },
+      {
+        id: "send",
+        accessorFn: net,
+        meta: { label: "Send", align: "right" },
+        cell: ({ row }) => (
+          <CellStack title={money(net(row.original))} sub={`${money(row.original.amount)} − ${money(row.original.fee)}`} />
+        ),
+      },
+      {
+        id: "method",
+        accessorFn: (item) => METHODS[item.method] ?? item.method,
+        meta: { label: "Pay to", csv: (item) => `${payTo(item)} · ${account(item)}` },
+        cell: ({ row }) => <CellStack title={payTo(row.original)} sub={account(row.original) || undefined} />,
+      },
+      {
+        id: "status",
+        accessorFn: (item) => STATUS_VIEW[item.status]?.[0] ?? item.status,
+        meta: { label: "Status" },
+        cell: ({ row }) => {
+          const [label, tone] = STATUS_VIEW[row.original.status] ?? [row.original.status, "gray"];
+          return (
+            <CellStack
+              title={<StatusDot tone={tone}>{label}</StatusDot>}
+              sub={row.original.processed_at ? when(row.original.processed_at) : undefined}
+            />
+          );
+        },
+      },
+      { id: "reference", accessorKey: "reference", meta: { label: "Reference" } },
+      { id: "note", accessorKey: "admin_note", meta: { label: "Admin note" } },
+      {
+        id: "actions",
+        enableSorting: false,
+        enableHiding: false,
+        cell: ({ row }) => (
+          <div className="flex justify-end">
+            <RowActions
+              label={`Actions for ${partnerName(row.original)}'s withdrawal`}
+              actions={[
+                { label: "View details", onSelect: () => open(row.original) },
+                ...(row.original.status === "pending"
+                  ? [
+                      { label: "Approve", onSelect: () => startAction(row.original, "approved") },
+                      { label: "Reject", destructive: true, onSelect: () => startAction(row.original, "rejected") },
+                    ]
+                  : []),
+              ]}
+            />
+          </div>
+        ),
+      },
+    ],
+    [],
+  );
 
   return (
-    <div className="admin-wheel-shell admin-shop-orders-shell">
-      <AdminPageHeader kicker="Partner payouts" title="Withdrawals" description="Rebate withdrawal requests from partners.">
-        <button type="button" className="admin-overview-action-btn" onClick={() => load()} disabled={isLoading}>
-          {isLoading ? "Loading" : "Refresh"}
-        </button>
-      </AdminPageHeader>
+    <>
+      <MetricStrip>
+        <MetricCell
+          label="Pending"
+          icon={Clock}
+          loading={isLoading}
+          value={metrics.pending.length}
+          footer={["To send", money(metrics.pending.reduce((sum, item) => sum + net(item), 0))]}
+        />
+        <MetricCell label="Approved" icon={CircleCheck} loading={isLoading} value={metrics.approved.length} footer={["This month", metrics.approvedThisMonth]} />
+        <MetricCell
+          label="Rejected"
+          icon={CircleX}
+          loading={isLoading}
+          value={metrics.rejected.length}
+          footer={["Returned to wallets", money(metrics.rejected.reduce((sum, item) => sum + item.amount, 0))]}
+        />
+        <MetricCell label="Paid out" icon={Wallet} loading={isLoading} value={money(metrics.paidOut)} footer={["Fees kept", money(metrics.fees)]} />
+      </MetricStrip>
 
-      {error ? <div className="admin-wheel-alert error">{error}</div> : null}
+      <PageBody>
+        {error ? <Alert tone="error">{error}</Alert> : null}
+        {notice ? <Alert>{notice}</Alert> : null}
 
-      {loaded ? (
-        <section className="admin-wheel-panel">
-          <div className="admin-wheel-panel-head">
-            <div>
-              <p className="admin-wheel-kicker">Requests</p>
-              <h2>{withdrawals.filter((item) => item.status === "pending").length} pending · {money(pendingTotal)} to send</h2>
-            </div>
-            <p>
-              Send the net amount to the partner&apos;s account first, then approve with the transfer reference. Rejecting
-              returns the full amount to the partner&apos;s wallet.
-            </p>
-          </div>
+        <Section
+          actions={
+            <FilterTabs
+              label="Filter withdrawals by status"
+              value={tab}
+              onChange={setTab}
+              tabs={[
+                { value: "pending" as Tab, label: "Pending", count: metrics.pending.length },
+                { value: "approved" as Tab, label: "Approved", count: metrics.approved.length },
+                { value: "rejected" as Tab, label: "Rejected", count: metrics.rejected.length },
+                { value: "all" as Tab, label: "All", count: withdrawals.length },
+              ]}
+            />
+          }
+        >
+          <DataTable
+            data={rows}
+            columns={columns}
+            loading={isLoading && withdrawals.length === 0}
+            searchText={searchText}
+            searchPlaceholder="Search withdrawals"
+            facets={[{ column: "method", title: "Method" }]}
+            exportName="gutguard-withdrawals"
+            onRowClick={open}
+            initialSort={[{ id: "requested", desc: true }]}
+            initialHidden={["amount", "fee", "reference", "note"]}
+            emptyText={tab === "all" ? "No withdrawals yet." : `No ${tab} withdrawals.`}
+            actions={
+              <Button variant="outline" size="icon-sm" onClick={() => load()} disabled={isLoading} aria-label="Refresh withdrawals" title="Refresh withdrawals" className="rounded-lg shadow-none">
+                <RefreshCw className={isLoading ? "animate-spin" : undefined} strokeWidth={1.5} />
+              </Button>
+            }
+          />
+        </Section>
+      </PageBody>
 
-          <div className="admin-shops-toolbar">
-            <label>
-              Status
-              <select value={filter} onChange={(event) => setFilter(event.target.value as Filter)}>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-                <option value="all">All</option>
-              </select>
-            </label>
-          </div>
-
-          {visible.length ? (
-            <div className="admin-shops-table-wrap">
-              <table className="admin-shops-table">
-                <thead>
-                  <tr>
-                    <th>Partner</th>
-                    <th>Requested</th>
-                    <th className="num">Amount</th>
-                    <th className="num">Fee</th>
-                    <th className="num">Send</th>
-                    <th>Pay to</th>
-                    <th>Status</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {visible.map((item) => (
-                    <tr key={item.id}>
-                      <td>
-                        <strong>{item.partner_name || "Unnamed partner"}</strong>
-                        <small>{item.partner_mobile || item.partner_email}</small>
-                      </td>
-                      <td>{when(item.created_at)}</td>
-                      <td className="num">{money(item.amount)}</td>
-                      <td className="num">{money(item.fee)}</td>
-                      <td className="num"><strong>{money(item.amount - item.fee)}</strong></td>
-                      <td>
-                        <strong>{item.method === "bank" ? `${METHODS.bank} · ${item.bank_name}` : METHODS[item.method]}</strong>
-                        <small>{item.account_name}</small>
-                        <small>{item.account_number}</small>
-                      </td>
-                      <td>
-                        {item.status}
-                        {item.processed_at ? <small>{when(item.processed_at)}</small> : null}
-                        {item.reference ? <small>Ref: {item.reference}</small> : null}
-                        {item.admin_note ? <small>{item.admin_note}</small> : null}
-                      </td>
-                      <td>
-                        {item.status !== "pending" ? null : acting?.id === item.id ? (
-                          <form onSubmit={(event) => process(event, item)} style={{ display: "grid", gap: 6, minWidth: 220 }}>
-                            <label>
-                              {acting.status === "approved"
-                                ? `Send ${money(item.amount - item.fee)} first, then enter the transfer reference`
-                                : "Reason for rejecting (the partner sees this)"}
-                              <input
-                                autoFocus required maxLength={acting.status === "approved" ? 120 : 500}
-                                value={input} onChange={(event) => setInput(event.target.value)}
-                                aria-label={acting.status === "approved" ? "Transfer reference" : "Rejection reason"}
-                              />
-                            </label>
-                            <div style={{ display: "flex", gap: 8 }}>
-                              <button type="submit" className="admin-overview-action-btn" disabled={busyId === item.id}>
-                                {acting.status === "approved" ? "Confirm approve" : "Confirm reject"}
-                              </button>
-                              <button type="button" className="admin-overview-action-btn" disabled={busyId === item.id} onClick={() => setActing(null)}>
-                                Cancel
-                              </button>
-                            </div>
-                          </form>
-                        ) : (
-                          <div style={{ display: "flex", gap: 8 }}>
-                            <button type="button" className="admin-overview-action-btn" onClick={() => { setActing({ id: item.id, status: "approved" }); setInput(""); }}>
-                              Approve
-                            </button>
-                            <button type="button" className="admin-overview-action-btn" onClick={() => { setActing({ id: item.id, status: "rejected" }); setInput(""); }}>
-                              Reject
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="muted">No {filter === "all" ? "" : `${filter} `}withdrawals.</p>
-          )}
-        </section>
+      {selected ? (
+        <EditSheet
+          open={panelOpen}
+          onOpenChange={setPanelOpen}
+          title={partnerName(selected)}
+          description={
+            <span className="inline-flex flex-wrap items-center gap-x-3">
+              {when(selected.created_at)}
+              <StatusDot tone={STATUS_VIEW[selected.status]?.[1] ?? "gray"}>{STATUS_VIEW[selected.status]?.[0] ?? selected.status}</StatusDot>
+            </span>
+          }
+          onSubmit={(event) => event.preventDefault()}
+          footer={
+            selected.status === "pending" ? (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => startAction(selected, "rejected")}
+                  className="mr-auto text-[13px] font-normal text-down hover:bg-down/5 hover:text-down"
+                >
+                  Reject
+                </Button>
+                <Button type="button" size="sm" onClick={() => startAction(selected, "approved")}>
+                  Approve
+                </Button>
+              </>
+            ) : (
+              <Button type="button" variant="ghost" size="sm" onClick={() => setPanelOpen(false)}>
+                Close
+              </Button>
+            )
+          }
+        >
+          <DetailList
+            title="Partner"
+            items={[
+              ["Name", partnerName(selected)],
+              ["Mobile", selected.partner_mobile],
+              ["Email", selected.partner_email],
+            ]}
+          />
+          <DetailList
+            title="Payout"
+            items={[
+              ["Amount", money(selected.amount)],
+              ["Fee", money(selected.fee)],
+              ["Send", <span key="send" className="font-medium">{money(net(selected))}</span>],
+              ["Method", payTo(selected)],
+              ["Account name", selected.account_name],
+              [
+                "Account number",
+                selected.account_number ? (
+                  <span key="account" className="inline-flex items-center gap-2">
+                    <span className="tabular-nums">{selected.account_number}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={() => copyAccount(selected.account_number)}
+                      aria-label={copied ? "Account number copied" : "Copy account number"}
+                      title={copied ? "Copied" : "Copy"}
+                      className="text-muted-foreground"
+                    >
+                      {copied ? <Check strokeWidth={1.5} /> : <Copy strokeWidth={1.5} />}
+                    </Button>
+                  </span>
+                ) : (
+                  ""
+                ),
+              ],
+            ]}
+          />
+          <DetailList
+            title="Status"
+            items={[
+              ["Status", STATUS_VIEW[selected.status]?.[0] ?? selected.status],
+              ["Processed", selected.processed_at ? when(selected.processed_at) : ""],
+              ["Reference", selected.reference],
+              ["Note", selected.admin_note],
+            ]}
+          />
+        </EditSheet>
       ) : null}
-    </div>
+
+      <ConfirmDialog
+        open={actingOpen}
+        onOpenChange={setActingOpen}
+        title={
+          acting?.status === "approved"
+            ? `Approve ${money(net(acting.item))} to ${partnerName(acting.item)}?`
+            : "Reject this withdrawal?"
+        }
+        description={
+          acting?.status === "approved"
+            ? `Send ${money(net(acting.item))} to ${payTo(acting.item)} · ${account(acting.item)} first, then enter the transfer reference.`
+            : acting
+              ? `The full ${money(acting.item.amount)} goes back to the partner's wallet.`
+              : undefined
+        }
+        confirmLabel={acting?.status === "approved" ? "Approve" : "Reject"}
+        destructive={acting?.status === "rejected"}
+        busy={busy}
+        onConfirm={process}
+      >
+        {acting?.status === "approved" ? (
+          <Field label="Transfer reference" htmlFor="withdrawal-reference">
+            <Input id="withdrawal-reference" value={input} required maxLength={120} onChange={(event) => setInput(event.target.value)} autoFocus />
+          </Field>
+        ) : acting ? (
+          <Field label="Reason" htmlFor="withdrawal-reason" hint="The partner sees this.">
+            <Textarea id="withdrawal-reason" value={input} required maxLength={500} rows={3} onChange={(event) => setInput(event.target.value)} autoFocus />
+          </Field>
+        ) : null}
+      </ConfirmDialog>
+    </>
   );
 }

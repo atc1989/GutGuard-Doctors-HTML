@@ -7902,27 +7902,6 @@
 /* Admin products */
 
 /* Admin referred shops */
-.admin-shops-toolbar {
-  display: grid;
-  grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(150px, 1fr));
-  gap: 12px;
-}
-
-.admin-shops-toolbar label {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  color: var(--ink-3);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.admin-shops-table-wrap {
-  overflow-x: auto;
-  border: 1px solid var(--rule);
-}
 
 /* /admin/codes: mint a partner code and its two QRs. */
 .admin-codes-confirm {
@@ -8048,59 +8027,6 @@
 .admin-codes-field small {
   color: var(--ink-3);
   font-weight: 400;
-}
-
-.admin-shops-table {
-  width: 100%;
-  min-width: 1100px;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.admin-shops-table th {
-  position: sticky;
-  top: 0;
-  padding: 10px 12px;
-  background: var(--bone-soft);
-  color: var(--ink-3);
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.1em;
-  text-align: left;
-  text-transform: uppercase;
-}
-
-.admin-shops-table td {
-  padding: 10px 12px;
-  border-top: 1px solid var(--rule-soft);
-  vertical-align: top;
-}
-
-.admin-shops-table td small {
-  display: block;
-  margin-top: 2px;
-  color: var(--ink-3);
-}
-
-.admin-shops-table .num {
-  text-align: right;
-  white-space: nowrap;
-}
-
-.admin-shops-table .muted {
-  color: var(--ink-3);
-}
-
-@media (max-width: 860px) {
-  .admin-shops-toolbar {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-@media (max-width: 520px) {
-  .admin-shops-toolbar {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* ── Full Protocol redesign (boss's mockup, 13 October 2026): package cards, Compare sheet and
