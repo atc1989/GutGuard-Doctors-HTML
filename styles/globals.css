@@ -1149,17 +1149,6 @@
   color: var(--blue);
 }
 
-.admin-wheel-auth {
-  display: grid;
-  grid-template-columns: 160px minmax(0, 1fr);
-  gap: 18px;
-  align-items: end;
-  margin: 28px 0;
-  padding-bottom: 28px;
-  border-bottom: 1px solid var(--rule);
-}
-
-.admin-wheel-auth label,
 .admin-wheel-prize label,
 .admin-wheel-create label {
   display: flex;
@@ -1170,12 +1159,6 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink-3);
-}
-
-.admin-wheel-auth-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 132px;
-  gap: 12px;
 }
 
 .admin-hidden-username {
@@ -2221,10 +2204,6 @@
     grid-template-columns: 1fr auto;
   }
 
-  .admin-wheel-auth {
-    grid-template-columns: 1fr;
-  }
-
   .admin-wheel-prize {
     grid-template-columns: 1fr;
   }
@@ -2260,7 +2239,6 @@
     padding: 18px;
   }
 
-  .admin-wheel-auth-row,
   .admin-wheel-prize-footer,
   .admin-wheel-grid,
   .admin-doctor-details,
@@ -2993,14 +2971,6 @@
   max-width: 44ch;
   color: var(--ink-3);
   font-weight: 700;
-}
-
-.admin-shop-orders-shell .admin-table-table-wrap {
-  overflow-x: visible;
-}
-
-.admin-shop-orders-shell {
-  max-width: 1360px;
 }
 
 /* Came from: a partner's full name, so it needs more room than the Maya ref it replaced. */
@@ -5858,65 +5828,6 @@
 }
 
 /* --- moderation queue --- */
-
-.tm-admin-list {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.tm-admin-row {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 20px;
-  border: 1px solid var(--rule);
-  border-left: 3px solid var(--gold);
-  border-radius: var(--r-md);
-  background: var(--paper);
-}
-
-.tm-admin-row.approved {
-  border-left-color: #2F7D4F;
-}
-
-.tm-admin-row.rejected {
-  border-left-color: #A0A0AE;
-  opacity: 0.65;
-}
-
-.tm-admin-meta {
-  display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
-  align-items: baseline;
-  color: var(--ink-3);
-  font-size: 13px;
-}
-
-.tm-admin-meta strong {
-  color: var(--ink);
-  font-size: 15px;
-}
-
-.tm-admin-status {
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--gold-text);
-}
-
-.tm-admin-row blockquote {
-  font-family: var(--serif);
-  font-size: 17px;
-  line-height: 1.5;
-  white-space: pre-line;
-}
-
-.tm-admin-row .tm-strip {
-  max-width: 460px;
-}
 
 .tm-hero-grid {
   display: grid;
