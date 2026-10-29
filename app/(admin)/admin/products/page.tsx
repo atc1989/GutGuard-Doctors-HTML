@@ -5,6 +5,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { RefreshCw } from "lucide-react";
 import { Alert, FilterTabs, PageBody, Section, StatusDot } from "@/components/admin/blocks";
 import { CellStack, DataTable } from "@/components/admin/data-table/data-table";
+import { RowActions } from "@/components/admin/data-table/row-actions";
 import { EditSheet, Field } from "@/components/admin/form";
 import { Badge } from "@/components/admin/ui/badge";
 import { Button } from "@/components/admin/ui/button";
@@ -53,6 +54,8 @@ export default function AdminProductsPage() {
   const [tab, setTab] = useState<ProductStatus>("active");
   const [editing, setEditing] = useState<AdminProduct | null>(null);
   const [draft, setDraft] = useState<AdminProduct | null>(null);
+  // Separate from draft so the panel keeps its content while it slides out.
+  const [panelOpen, setPanelOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -77,7 +80,6 @@ export default function AdminProductsPage() {
   // AdminShell only renders this page once the admin session is valid.
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const now = useMemo(() => new Date(), []);
@@ -86,13 +88,28 @@ export default function AdminProductsPage() {
   const open = (product: AdminProduct) => {
     setEditing(product);
     setDraft(product);
+    setPanelOpen(true);
+    setError(null);
     setNotice(null);
   };
-  const close = () => {
-    setEditing(null);
-    setDraft(null);
-  };
+  const close = () => setPanelOpen(false);
   const edit = (patch: Partial<AdminProduct>) => setDraft((current) => (current ? { ...current, ...patch } : current));
+
+  /** Quick show/hide from a row's ⋯ menu: same save as the panel, only the status changes. */
+  async function setStatus(product: AdminProduct, status: ProductStatus) {
+    setIsSaving(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const { product: saved } = await request<{ product: AdminProduct }>("/api/admin/products", { ...product, status });
+      setProducts((current) => current.map((row) => (row.id === saved.id ? saved : row)));
+      setNotice(status === "active" ? `${saved.name} is back in the shop.` : `${saved.name} is hidden from the shop.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not update the product.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -177,8 +194,26 @@ export default function AdminProductsPage() {
         meta: { label: "Last changed" },
         cell: ({ row }) => (row.original.updatedAt ? new Date(row.original.updatedAt).toLocaleString("en-PH") : "Never"),
       },
+      {
+        id: "actions",
+        enableSorting: false,
+        enableHiding: false,
+        cell: ({ row }) => (
+          <div className="flex justify-end">
+            <RowActions
+              label={`Actions for ${row.original.name}`}
+              actions={[
+                { label: "Edit", onSelect: () => open(row.original) },
+                row.original.status === "active"
+                  ? { label: "Hide from shop", disabled: isSaving, onSelect: () => setStatus(row.original, "hidden") }
+                  : { label: "Show in shop", disabled: isSaving, onSelect: () => setStatus(row.original, "active") },
+              ]}
+            />
+          </div>
+        ),
+      },
     ],
-    [livePromos, now],
+    [livePromos, now, isSaving],
   );
 
   const priceChanged = Boolean(editing && draft && draft.price !== editing.price);
@@ -186,7 +221,7 @@ export default function AdminProductsPage() {
 
   return (
     <PageBody>
-      {error && !editing ? <Alert tone="error">{error}</Alert> : null}
+      {error && !panelOpen ? <Alert tone="error">{error}</Alert> : null}
       {notice ? <Alert>{notice}</Alert> : null}
 
       <Section
@@ -221,7 +256,7 @@ export default function AdminProductsPage() {
 
       {draft && editing ? (
         <EditSheet
-          open
+          open={panelOpen}
           onOpenChange={(isOpen) => !isOpen && close()}
           title={editing.name}
           description={`${KIND_LABEL[editing.kind]} · ID ${editing.id}`}

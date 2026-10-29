@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 
 /** Header label; sortable columns get the ↕ menu (sort ascending / descending / clear, hide column). */
 export function ColumnHeader<TData>({ column }: { column: Column<TData, unknown> }) {
-  const label = column.columnDef.meta?.label ?? column.id;
+  const label = column.columnDef.meta?.label ?? "";
   const right = column.columnDef.meta?.align === "right";
   if (!column.getCanSort()) return <span className={cn("block", right && "text-right")}>{label}</span>;
 

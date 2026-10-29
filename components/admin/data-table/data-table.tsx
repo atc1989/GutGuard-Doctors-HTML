@@ -232,7 +232,7 @@ export function DataTable<TData>({
                     )}
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className={cn("px-4 align-middle", cell.column.columnDef.meta?.align === "right" && "text-right tabular-nums")}>
+                      <td key={cell.id} className={cn("px-4 py-2.5 align-middle", cell.column.columnDef.meta?.align === "right" && "text-right tabular-nums")}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}

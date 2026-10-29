@@ -1,6 +1,8 @@
 "use client";
 
 import { Fragment, type FormEvent, type ReactNode } from "react";
+import { Button } from "@/components/admin/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/admin/ui/dialog";
 import { Label } from "@/components/admin/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/admin/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -15,6 +17,7 @@ export function EditSheet({
   description,
   onSubmit,
   footer,
+  size = "default",
   children,
 }: {
   open: boolean;
@@ -23,11 +26,16 @@ export function EditSheet({
   description?: ReactNode;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   footer: ReactNode;
+  /** "wide" for editors with rows of fields (e.g. promo prices per product). */
+  size?: "default" | "wide";
   children: ReactNode;
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full gap-0 bg-background p-0 font-sans text-foreground sm:max-w-[480px]">
+      <SheetContent
+        side="right"
+        className={cn("w-full gap-0 bg-background p-0 font-sans text-foreground", size === "wide" ? "sm:max-w-[640px]" : "sm:max-w-[480px]")}
+      >
         <form onSubmit={onSubmit} className="flex h-full min-h-0 flex-col">
           <SheetHeader className="gap-0.5 border-b border-border px-6 py-4 pr-12">
             <SheetTitle className="text-base font-medium">{title}</SheetTitle>
@@ -38,6 +46,46 @@ export function EditSheet({
         </form>
       </SheetContent>
     </Sheet>
+  );
+}
+
+/** Small "are you sure?" window. `destructive` makes the confirm button red. */
+export function ConfirmDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  confirmLabel,
+  destructive,
+  busy,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: ReactNode;
+  description?: ReactNode;
+  confirmLabel: string;
+  destructive?: boolean;
+  busy?: boolean;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent showCloseButton={false} className="max-w-sm gap-5 rounded-xl border-border p-5 font-sans text-foreground shadow-[0_8px_32px_-8px_rgb(0_0_0/0.16)]">
+        <DialogHeader className="gap-1 text-left">
+          <DialogTitle className="text-base font-medium">{title}</DialogTitle>
+          {description ? <DialogDescription className="text-[13px]">{description}</DialogDescription> : null}
+        </DialogHeader>
+        <DialogFooter className="gap-2">
+          <Button type="button" variant="ghost" size="sm" onClick={() => onOpenChange(false)} disabled={busy}>
+            Cancel
+          </Button>
+          <Button type="button" size="sm" variant={destructive ? "destructive" : "default"} onClick={onConfirm} disabled={busy}>
+            {busy ? "Working…" : confirmLabel}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

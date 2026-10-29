@@ -1,7 +1,19 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
-import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
+import { Plus, RefreshCw } from "lucide-react";
+import { Alert, FilterTabs, PageBody, Section, StatusDot } from "@/components/admin/blocks";
+import { CellStack, DataTable } from "@/components/admin/data-table/data-table";
+import { RowActions } from "@/components/admin/data-table/row-actions";
+import { ConfirmDialog, EditSheet, Field, FieldGroup } from "@/components/admin/form";
+import { Badge } from "@/components/admin/ui/badge";
+import { Button } from "@/components/admin/ui/button";
+import { Checkbox } from "@/components/admin/ui/checkbox";
+import { DatePicker } from "@/components/admin/ui/date-time-picker";
+import { Input } from "@/components/admin/ui/input";
+import { Label } from "@/components/admin/ui/label";
+import { Switch } from "@/components/admin/ui/switch";
 import {
   discountedPrice,
   formatPromoDay,
@@ -12,11 +24,26 @@ import {
   type Promo,
 } from "@/lib/catalog";
 
-const productLabel = (product: Product) =>
-  `${product.name}${product.phase ? ` (${product.phase})` : ""}${product.status === "active" ? "" : ` - ${product.status}`}`;
+type Status = ReturnType<typeof promoStatus>;
+type Tab = "all" | Status;
+
+const STATUS_TONE: Record<Status, "green" | "amber" | "gray"> = { Live: "green", Scheduled: "amber", Ended: "gray", Off: "gray" };
+const TABS: Status[] = ["Live", "Scheduled", "Ended", "Off"];
 
 const peso = (value: number) =>
   new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value);
+const shortName = (name: string) => name.replace(/^SynBIOTIC\+\s*/i, "");
+const productLabel = (product: Product) =>
+  `${product.name}${product.phase ? ` (${product.phase})` : ""}${product.status === "active" ? "" : ` · ${product.status}`}`;
+const day = (value: string) => `${formatPromoDay(value)}, ${value.slice(0, 4)}`;
+
+/** "Nov 1 – Dec 31, 2026" (one year shown when both ends share it) or "From Nov 1, 2026". */
+function dateRange(promo: Promo) {
+  if (!promo.ends_on) return `From ${day(promo.starts_on)}`;
+  return promo.starts_on.slice(0, 4) === promo.ends_on.slice(0, 4)
+    ? `${formatPromoDay(promo.starts_on)} – ${day(promo.ends_on)}`
+    : `${day(promo.starts_on)} – ${day(promo.ends_on)}`;
+}
 
 const emptyDraft = (): Promo => ({
   id: "",
@@ -42,24 +69,17 @@ async function request<T>(method: string, body?: unknown, query = ""): Promise<T
 }
 
 export default function AdminPromosPage() {
-  const [loaded, setLoaded] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [promos, setPromos] = useState<Promo[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  // Archived products leave the picker, unless a promo being edited still has them.
-  const pickable = products
-    .filter((product) => product.status !== "archived" || draft?.discounts[product.id] !== undefined)
-    .sort((a, b) => a.kind.localeCompare(b.kind) || a.sortOrder - b.sortOrder);
+  const [tab, setTab] = useState<Tab>("all");
   const [draft, setDraft] = useState<Promo | null>(null);
+  // Separate from draft so the panel keeps its content while it slides out.
+  const [panelOpen, setPanelOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [toDelete, setToDelete] = useState<Promo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-
-  // AdminShell only renders this page once the admin session is valid.
-  useEffect(() => {
-    loadPromos();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   async function loadPromos() {
     setIsLoading(true);
@@ -68,7 +88,6 @@ export default function AdminPromosPage() {
       const data = await request<{ promos: Promo[]; products: Product[] }>("GET");
       setPromos(data.promos);
       setProducts(data.products);
-      setLoaded(true);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load promos.");
     } finally {
@@ -76,6 +95,10 @@ export default function AdminPromosPage() {
     }
   }
 
+  // AdminShell only renders this page once the admin session is valid.
+  useEffect(() => {
+    loadPromos();
+  }, []);
 
   async function save(promo: Promo, message: string) {
     setIsSaving(true);
@@ -84,9 +107,7 @@ export default function AdminPromosPage() {
     try {
       const { promo: saved } = await request<{ promo: Promo }>("POST", promo);
       setPromos((current) =>
-        current.some((row) => row.id === saved.id)
-          ? current.map((row) => (row.id === saved.id ? saved : row))
-          : [saved, ...current],
+        current.some((row) => row.id === saved.id) ? current.map((row) => (row.id === saved.id ? saved : row)) : [saved, ...current],
       );
       setNotice(message);
       return true;
@@ -100,20 +121,34 @@ export default function AdminPromosPage() {
 
   async function submitDraft(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (draft && (await save(draft, `${draft.name.trim()} saved.`))) setDraft(null);
+    if (!draft) return;
+    if (await save(draft, `${draft.name.trim()} saved.`)) setPanelOpen(false);
   }
 
-  async function remove(promo: Promo) {
-    if (!window.confirm(`Delete "${promo.name}"? Shop prices update immediately.`)) return;
+  async function confirmDelete() {
+    if (!toDelete) return;
+    setIsSaving(true);
     setError(null);
     try {
-      await request("DELETE", undefined, `?id=${encodeURIComponent(promo.id)}`);
-      setPromos((current) => current.filter((row) => row.id !== promo.id));
-      setNotice(`${promo.name} deleted.`);
+      await request("DELETE", undefined, `?id=${encodeURIComponent(toDelete.id)}`);
+      setPromos((current) => current.filter((row) => row.id !== toDelete.id));
+      setNotice(`${toDelete.name} deleted.`);
+      if (draft?.id === toDelete.id) setPanelOpen(false);
+      setToDelete(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not delete promo.");
+      setToDelete(null);
+    } finally {
+      setIsSaving(false);
     }
   }
+
+  const openDraft = (promo: Promo) => {
+    setDraft(promo);
+    setPanelOpen(true);
+    setError(null);
+    setNotice(null);
+  };
 
   function setPercent(productId: string, value: string | null) {
     if (!draft) return;
@@ -141,239 +176,266 @@ export default function AdminPromosPage() {
     setDraft({ ...draft, [field]: typed });
   }
 
-  const now = new Date();
-  const live = promos.filter((promo) => promoStatus(promo, now) === "Live").length;
+  const now = useMemo(() => new Date(), []);
+  const productById = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
+  // Archived products leave the picker, unless the promo being edited still has them.
+  const pickable = products
+    .filter((product) => product.status !== "archived" || draft?.discounts[product.id] !== undefined)
+    .sort((a, b) => a.kind.localeCompare(b.kind) || a.sortOrder - b.sortOrder);
+
+  const counts = Object.fromEntries(TABS.map((status) => [status, promos.filter((promo) => promoStatus(promo, now) === status).length]));
+  const rows = useMemo(() => (tab === "all" ? promos : promos.filter((promo) => promoStatus(promo, now) === tab)), [promos, tab, now]);
+
+  const columns = useMemo<ColumnDef<Promo, unknown>[]>(
+    () => [
+      {
+        id: "name",
+        accessorKey: "name",
+        meta: { label: "Promo" },
+        cell: ({ row }) => (
+          <CellStack title={row.original.name} sub={row.original.label ? `Shows as "${row.original.label}"` : undefined} />
+        ),
+      },
+      {
+        id: "dates",
+        accessorKey: "starts_on",
+        meta: { label: "Dates" },
+        cell: ({ row }) => <CellStack title={dateRange(row.original)} sub={row.original.ends_on ? undefined : "No end date"} />,
+      },
+      {
+        id: "products",
+        accessorFn: (promo) => Object.keys(promo.discounts).join(", "),
+        enableSorting: false,
+        meta: { label: "Products" },
+        cell: ({ row }) => (
+          <div className="flex min-w-60 max-w-md flex-wrap gap-1.5">
+            {Object.entries(row.original.discounts).map(([id, pct]) => (
+              <Badge key={id}>
+                {shortName(productById.get(id)?.name ?? id)} −{pct}%
+              </Badge>
+            ))}
+          </div>
+        ),
+      },
+      {
+        id: "status",
+        accessorFn: (promo) => promoStatus(promo, now),
+        meta: { label: "Status" },
+        cell: ({ getValue }) => {
+          const status = getValue() as Status;
+          return <StatusDot tone={STATUS_TONE[status]}>{status}</StatusDot>;
+        },
+      },
+      {
+        id: "actions",
+        enableSorting: false,
+        enableHiding: false,
+        cell: ({ row }) => (
+          <div className="flex justify-end">
+            <RowActions
+              label={`Actions for ${row.original.name}`}
+              actions={[
+                { label: "Edit", onSelect: () => openDraft(row.original) },
+                {
+                  label: row.original.enabled ? "Switch off" : "Switch on",
+                  disabled: isSaving,
+                  onSelect: () =>
+                    save(
+                      { ...row.original, enabled: !row.original.enabled },
+                      `${row.original.name} switched ${row.original.enabled ? "off" : "on"}.`,
+                    ),
+                },
+                { label: "Delete", destructive: true, onSelect: () => setToDelete(row.original) },
+              ]}
+            />
+          </div>
+        ),
+      },
+    ],
+    [productById, now, isSaving],
+  );
+
+  const existing = Boolean(draft && promos.some((promo) => promo.id === draft.id));
 
   return (
-    <div className="admin-wheel-shell admin-shop-orders-shell">
-      <AdminPageHeader
-        kicker="GutGuard shop"
-        title="Promotions"
-        description="Scheduled price promotions and the packages they apply to."
-      >
-        <button type="button" className="admin-overview-action-btn" onClick={loadPromos} disabled={isLoading}>
-          {isLoading ? "Loading" : "Refresh"}
-        </button>
-      </AdminPageHeader>
+    <PageBody>
+      {error && !panelOpen ? <Alert tone="error">{error}</Alert> : null}
+      {notice ? <Alert>{notice}</Alert> : null}
 
-      {notice ? <div className="admin-wheel-alert">{notice}</div> : null}
-      {error ? <div className="admin-wheel-alert error">{error}</div> : null}
-
-      {loaded ? (
-        <section className="admin-wheel-panel">
-          <div className="admin-wheel-panel-head">
-            <div>
-              <p className="admin-wheel-kicker">Discounts</p>
-              <h2>Shop promos</h2>
+      <Section
+        actions={
+          <div className="flex w-full flex-wrap items-center justify-between gap-2">
+            <FilterTabs
+              label="Filter promotions by status"
+              value={tab}
+              onChange={setTab}
+              tabs={[{ value: "all" as Tab, label: "All", count: promos.length }, ...TABS.map((status) => ({ value: status as Tab, label: status, count: counts[status] }))]}
+            />
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon-sm" onClick={loadPromos} disabled={isLoading} aria-label="Refresh promotions" title="Refresh promotions" className="rounded-lg shadow-none">
+                <RefreshCw className={isLoading ? "animate-spin" : undefined} strokeWidth={1.5} />
+              </Button>
+              <Button size="sm" onClick={() => openDraft(emptyDraft())} className="h-8 rounded-lg text-[13px]">
+                <Plus strokeWidth={1.5} />
+                New promo
+              </Button>
             </div>
-            <p>
-              Dates are Philippine time; a promo runs until 11:59 PM on its end date. When promos overlap, each
-              product gets the biggest discount - they never add up.
-            </p>
           </div>
+        }
+      >
+        <DataTable
+          data={rows}
+          columns={columns}
+          loading={isLoading && promos.length === 0}
+          toolbar={false}
+          onRowClick={openDraft}
+          initialSort={[{ id: "dates", desc: true }]}
+          emptyText={tab === "all" ? "No promos yet." : `No ${tab.toLowerCase()} promos.`}
+        />
+      </Section>
 
-          {draft ? (
-            <form className="admin-wheel-prize admin-promo-editor" onSubmit={submitDraft}>
-              <div className="admin-wheel-prize-main">
-                <label>
-                  Promo name
-                  <input
-                    value={draft.name}
-                    placeholder="Holiday Promo"
-                    onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-                    required
-                  />
-                </label>
-                <label>
-                  Shop label (optional, shown to customers)
-                  <input
-                    value={draft.label}
-                    placeholder="Holiday Sale"
-                    onChange={(event) => setDraft({ ...draft, label: event.target.value })}
-                  />
-                </label>
-                <div className="admin-wheel-grid admin-promo-dates">
-                  <label>
-                    Starts
-                    <input
-                      type="date"
-                      value={draft.starts_on}
-                      onChange={(event) => setDraft({ ...draft, starts_on: event.target.value })}
-                      required
-                    />
-                  </label>
-                  <label>
-                    Ends (blank = no end)
-                    <input
-                      type="date"
-                      value={draft.ends_on ?? ""}
-                      min={draft.starts_on}
-                      onChange={(event) => setDraft({ ...draft, ends_on: event.target.value || null })}
-                    />
-                  </label>
-                </div>
-              </div>
+      {draft ? (
+        <EditSheet
+          open={panelOpen}
+          size="wide"
+          onOpenChange={(isOpen) => !isOpen && setPanelOpen(false)}
+          title={existing ? draft.name || "Promo" : "New promo"}
+          description={existing ? `${promoStatus(draft, now)} · ${dateRange(draft)}` : "Pick the dates and the products it discounts."}
+          onSubmit={submitDraft}
+          footer={
+            <>
+              {existing ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setToDelete(draft)}
+                  className="mr-auto text-[13px] font-normal text-down hover:bg-down/5 hover:text-down"
+                >
+                  Delete
+                </Button>
+              ) : null}
+              <Button type="button" variant="ghost" size="sm" onClick={() => setPanelOpen(false)} disabled={isSaving}>
+                Cancel
+              </Button>
+              <Button type="submit" size="sm" disabled={isSaving}>
+                {isSaving ? "Saving" : "Save"}
+              </Button>
+            </>
+          }
+        >
+          {error ? <Alert tone="error">{error}</Alert> : null}
 
-              <div className="admin-promo-products">
-                <div className="admin-promo-product admin-promo-product-head" aria-hidden="true">
-                  <span>Product</span>
-                  <span>Discount</span>
-                  <span>Final price</span>
-                  <span>Promo ₱/cap</span>
-                  <span>Shop shows</span>
-                </div>
-                {pickable.map((product) => {
-                  const pct = draft.discounts[product.id];
-                  const chosen = pct !== undefined;
-                  const calculatedPerCap = discountedPrice(product.perCap, pct || 0);
-                  const calculatedPrice = discountedPrice(product.price, pct || 0);
-                  return (
-                    <div className="admin-promo-product" key={product.id}>
-                      <label className="admin-wheel-toggle">
-                        <input
-                          type="checkbox"
-                          checked={chosen}
-                          onChange={(event) => setPercent(product.id, event.target.checked ? "10" : null)}
-                        />
-                        {productLabel(product)}
-                      </label>
-                      {chosen ? (
-                        <>
-                          <label className="admin-promo-percent">
-                            <input
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Promo name" htmlFor="promo-name">
+              <Input id="promo-name" value={draft.name} placeholder="Holiday Promo" required onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+            </Field>
+            <Field label="Shop label (optional)" htmlFor="promo-label" hint="Shown to customers.">
+              <Input id="promo-label" value={draft.label} placeholder="Holiday Sale" onChange={(e) => setDraft({ ...draft, label: e.target.value })} />
+            </Field>
+            <Field label="Starts" htmlFor="promo-starts">
+              <DatePicker id="promo-starts" value={draft.starts_on} onChange={(value) => value && setDraft({ ...draft, starts_on: value })} />
+            </Field>
+            <Field label="Ends" htmlFor="promo-ends">
+              <DatePicker
+                id="promo-ends"
+                value={draft.ends_on}
+                min={draft.starts_on}
+                clearable
+                placeholder="No end date"
+                onChange={(value) => setDraft({ ...draft, ends_on: value })}
+              />
+            </Field>
+          </div>
+          <p className="-mt-2 text-xs text-muted-foreground">Philippine time. A promo runs until 11:59 PM on its end date.</p>
+
+          <FieldGroup title="Products">
+            <div className="flex flex-col divide-y divide-border rounded-lg border border-border">
+              {pickable.map((product) => {
+                const pct = draft.discounts[product.id];
+                const chosen = pct !== undefined;
+                const calculatedPrice = discountedPrice(product.price, pct || 0);
+                const calculatedPerCap = discountedPrice(product.perCap, pct || 0);
+                return (
+                  <div key={product.id} className="flex flex-col gap-3 p-3">
+                    <label className="flex cursor-pointer items-center gap-2.5 text-sm">
+                      <Checkbox checked={chosen} onCheckedChange={(checked) => setPercent(product.id, checked ? "10" : null)} />
+                      <span className="flex-1">{productLabel(product)}</span>
+                      <span className="text-[13px] tabular-nums text-muted-foreground">{peso(product.price)}</span>
+                    </label>
+                    {chosen ? (
+                      <>
+                        <div className="grid grid-cols-3 gap-3">
+                          <Field label="Discount %" htmlFor={`promo-pct-${product.id}`}>
+                            <Input
+                              id={`promo-pct-${product.id}`}
                               type="number"
                               min={1}
                               max={MAX_PROMO_PERCENT}
                               value={pct || ""}
-                              aria-label={`${product.name} discount percent`}
-                              onChange={(event) => setPercent(product.id, event.target.value)}
+                              onChange={(e) => setPercent(product.id, e.target.value)}
                             />
-                            %
-                          </label>
-                          <label className="admin-promo-final">
-                            ₱
-                            <input
+                          </Field>
+                          <Field label="Final price (₱)" htmlFor={`promo-price-${product.id}`}>
+                            <Input
+                              id={`promo-price-${product.id}`}
                               type="number"
                               min={1}
                               max={product.price - 1}
                               value={draft.prices[product.id] ?? ""}
                               placeholder={String(calculatedPrice)}
-                              title={`Blank uses the calculation: ₱${product.price} less ${pct || 0}% = ₱${calculatedPrice}. This is what checkout charges.`}
-                              aria-label={`${product.name} promo final price`}
-                              onChange={(event) => setTyped("prices", product.id, event.target.value)}
+                              onChange={(e) => setTyped("prices", product.id, e.target.value)}
                             />
-                          </label>
-                          <label className="admin-promo-percap">
-                            ₱
-                            <input
+                          </Field>
+                          <Field label="Per capsule (₱)" htmlFor={`promo-percap-${product.id}`}>
+                            <Input
+                              id={`promo-percap-${product.id}`}
                               type="number"
                               min={1}
                               value={draft.perCap[product.id] ?? ""}
                               placeholder={String(calculatedPerCap)}
-                              title={`Blank uses the calculation: ₱${product.perCap} less ${pct || 0}% = ₱${calculatedPerCap}`}
-                              aria-label={`${product.name} promo price per capsule`}
-                              onChange={(event) => setTyped("perCap", product.id, event.target.value)}
+                              onChange={(e) => setTyped("perCap", product.id, e.target.value)}
                             />
-                          </label>
-                          <span className="admin-promo-preview">
-                            {peso(product.price)} → <strong>{peso(draft.prices[product.id] || calculatedPrice)}</strong>
-                            <small>
-                              {peso(product.perCap)} → {peso(draft.perCap[product.id] || calculatedPerCap)} /cap
-                            </small>
-                          </span>
-                        </>
-                      ) : (
-                        <span className="admin-promo-preview">
-                          {peso(product.price)}
-                          <small>{peso(product.perCap)} /cap</small>
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="admin-wheel-prize-footer">
-                <label className="admin-wheel-toggle">
-                  <input
-                    type="checkbox"
-                    checked={draft.enabled}
-                    onChange={(event) => setDraft({ ...draft, enabled: event.target.checked })}
-                  />
-                  Promo is on
-                </label>
-                <button type="button" onClick={() => setDraft(null)} disabled={isSaving}>
-                  Cancel
-                </button>
-                <button type="submit" disabled={isSaving}>
-                  {isSaving ? "Saving" : "Save promo"}
-                </button>
-              </div>
-            </form>
-          ) : (
-            <div className="admin-table-row-actions">
-              <button type="button" onClick={() => setDraft(emptyDraft())}>
-                New promo
-              </button>
-            </div>
-          )}
-
-          {promos.length === 0 ? (
-            <p className="admin-wheel-empty">No promos yet.</p>
-          ) : (
-            <div className="admin-wheel-list">
-              {promos.map((promo) => {
-                const status = promoStatus(promo, now);
-                return (
-                  <article className={`admin-promo-row ${status.toLowerCase()}`} key={promo.id}>
-                    <div>
-                      <strong>{promo.name}</strong>
-                      <span className="admin-promo-status">{status}</span>
-                      <p>
-                        {formatPromoDay(promo.starts_on)} {promo.starts_on.slice(0, 4)} –{" "}
-                        {promo.ends_on ? `${formatPromoDay(promo.ends_on)} ${promo.ends_on.slice(0, 4)}` : "no end date"}
-                        {promo.label ? ` · shows as "${promo.label}"` : ""}
-                      </p>
-                      <p>
-                        {products
-                          .filter((product) => promo.discounts[product.id])
-                          .map((product) => {
-                            const typed = [
-                              promo.prices[product.id] ? `₱${promo.prices[product.id].toLocaleString("en-PH")}` : "",
-                              promo.perCap[product.id] ? `₱${promo.perCap[product.id]}/cap` : "",
-                            ].filter(Boolean);
-                            return `${product.name} ${promo.discounts[product.id]}%${typed.length ? ` (${typed.join(", ")})` : ""}`;
-                          })
-                          .join(" · ")}
-                      </p>
-                    </div>
-                    <div className="admin-table-row-actions">
-                      <button type="button" onClick={() => setDraft(promo)} disabled={isSaving}>
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        disabled={isSaving}
-                        onClick={() =>
-                          save(
-                            { ...promo, enabled: !promo.enabled },
-                            `${promo.name} switched ${promo.enabled ? "off" : "on"}.`,
-                          )
-                        }
-                      >
-                        {promo.enabled ? "Switch off" : "Switch on"}
-                      </button>
-                      <button type="button" onClick={() => remove(promo)} disabled={isSaving}>
-                        Delete
-                      </button>
-                    </div>
-                  </article>
+                          </Field>
+                        </div>
+                        <p className="text-[13px] tabular-nums text-muted-foreground">
+                          {peso(product.price)} → <span className="text-foreground">{peso(draft.prices[product.id] || calculatedPrice)}</span>
+                          {" · "}
+                          {peso(product.perCap)} → <span className="text-foreground">{peso(draft.perCap[product.id] || calculatedPerCap)}</span> per capsule
+                        </p>
+                      </>
+                    ) : null}
+                  </div>
                 );
               })}
             </div>
-          )}
-        </section>
+            <p className="text-xs text-muted-foreground">
+              Leave a price blank to use the calculated one. When promos overlap, each product gets the biggest discount. They never add up.
+            </p>
+          </FieldGroup>
+
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="promo-enabled" className="text-[13px] font-normal">
+                Promo is on
+              </Label>
+              <p className="text-xs text-muted-foreground">Switch off to hide it from the shop without deleting it.</p>
+            </div>
+            <Switch id="promo-enabled" checked={draft.enabled} onCheckedChange={(enabled) => setDraft({ ...draft, enabled })} />
+          </div>
+        </EditSheet>
       ) : null}
-    </div>
+
+      <ConfirmDialog
+        open={toDelete !== null}
+        onOpenChange={(isOpen) => !isOpen && setToDelete(null)}
+        title={`Delete ${toDelete?.name ?? "promo"}?`}
+        description="Shop prices update immediately. This can't be undone."
+        confirmLabel="Delete promo"
+        destructive
+        busy={isSaving}
+        onConfirm={confirmDelete}
+      />
+    </PageBody>
   );
 }

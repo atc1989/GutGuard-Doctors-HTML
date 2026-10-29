@@ -8,6 +8,8 @@
 @layer theme, base, legacy, components, utilities;
 
 @import "tailwindcss" source(none);
+/* The slide/fade classes shadcn components use (animate-in, slide-in-from-right, fade-out-0…). */
+@import "tw-animate-css";
 @import "./globals.css" layer(legacy);
 
 /* The admin is light-only: shadcn's dark: classes apply only under a .dark class we never set. */
@@ -42,6 +44,16 @@
   * {
     border-color: var(--border);
     outline-color: color-mix(in srgb, var(--ring) 50%, transparent);
+  }
+}
+
+/* People who ask their OS for less motion get instant panels, menus and sidebar. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }
 

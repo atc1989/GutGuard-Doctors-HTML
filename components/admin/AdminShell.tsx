@@ -5,6 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  ChevronsLeft,
+  ChevronsRight,
   ExternalLink,
   Gift,
   LayoutGrid,
@@ -30,6 +32,7 @@ import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { Badge } from "@/components/admin/ui/badge";
 import { Button } from "@/components/admin/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/admin/ui/sheet";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/admin/ui/tooltip";
 import { adminLogout, checkAdminSession, type AdminSessionInfo } from "@/lib/api";
 import { isSandboxShop } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
@@ -86,6 +89,8 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
+const SIDEBAR_KEY = "gg-admin-sidebar";
+
 const navItemClass =
   "flex h-8 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm text-muted-foreground hover:bg-black/[0.03] hover:text-foreground";
 
@@ -95,6 +100,24 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const [isChecking, setIsChecking] = useState(true);
   const [access, setAccess] = useState<AdminSessionInfo | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // Desktop sidebar collapsed to icons; remembered in this browser. (The server render is only the
+  // session spinner, so reading localStorage here can't cause a hydration mismatch.)
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return typeof window !== "undefined" && localStorage.getItem(SIDEBAR_KEY) === "collapsed";
+    } catch {
+      return false;
+    }
+  });
+  const toggleCollapsed = () =>
+    setCollapsed((current) => {
+      try {
+        localStorage.setItem(SIDEBAR_KEY, current ? "expanded" : "collapsed");
+      } catch {
+        // Private mode or blocked storage: the toggle still works for this visit.
+      }
+      return !current;
+    });
 
   const checkAuth = useCallback(async () => {
     try {
@@ -172,65 +195,107 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   if (!access) return <AdminLogin onSignedIn={handleSignedIn} />;
 
   const displayName = access.owner ? "Owner" : access.name;
-  const sidebar = (
-    <>
-      <div className="flex h-14 shrink-0 items-center border-b border-border px-4">
-        <Link href="/admin" className="flex items-center gap-2">
-          <Image src="/gutguard-logo.png" alt="" width={18} height={22} priority />
-          <span className="text-[15px] font-medium tracking-[-0.01em] text-foreground">GutGuard</span>
-        </Link>
-      </div>
-
-      <nav className="flex flex-1 flex-col gap-6 overflow-y-auto p-4 [scrollbar-width:thin]" aria-label="Admin">
-        {navGroups.map((group) => (
-          <div key={group.title ?? "home"} className="flex flex-col gap-1">
-            {group.title && (
-              <p className="px-2.5 pb-1 text-[11px] uppercase tracking-[0.08em] text-subtle-foreground">{group.title}</p>
-            )}
-            {group.items.map(({ href, label, icon: Icon }) => {
-              const active = isActive(href);
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(navItemClass, active && "border-border bg-background text-foreground shadow-lift hover:bg-background")}
-                >
-                  <Icon className="size-4 shrink-0" strokeWidth={1.5} aria-hidden="true" />
-                  {label}
-                </Link>
-              );
-            })}
-          </div>
-        ))}
-      </nav>
-
-      <div className="flex flex-col gap-3 border-t border-border p-4">
-        <a href="/shop" target="_blank" rel="noopener noreferrer" className={navItemClass}>
-          <ExternalLink className="size-4 shrink-0" strokeWidth={1.5} aria-hidden="true" />
-          Live shop
-        </a>
-        <div className="flex items-center gap-2.5 pl-2.5">
-          <span className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-[11px] uppercase text-muted-foreground">
-            {displayName.slice(0, 2)}
-          </span>
-          <div className="min-w-0 flex-1 leading-tight">
-            <p className="truncate text-[13px] text-foreground">{displayName}</p>
-            <p className="text-xs text-muted-foreground">
-              {access.owner ? "All sections" : `${access.modules.length} section${access.modules.length === 1 ? "" : "s"}`}
-            </p>
-          </div>
-          <Button variant="ghost" size="icon-sm" onClick={handleLogout} aria-label="Sign out" title="Sign out" className="text-muted-foreground">
-            <LogOut strokeWidth={1.5} />
-          </Button>
+  // `narrow` = the collapsed desktop strip: icons only, names in tooltips. The phone drawer is always full.
+  const renderSidebar = (narrow: boolean, onToggle?: () => void) => {
+    const itemClass = cn(navItemClass, narrow && "w-10 justify-center gap-0 px-0");
+    return (
+      <>
+        <div className={cn("flex h-14 shrink-0 items-center border-b border-border", narrow ? "justify-center px-2" : "px-4")}>
+          {!narrow && (
+            <Link href="/admin" className="flex min-w-0 items-center gap-2">
+              <Image src="/gutguard-logo.png" alt="" width={18} height={22} priority />
+              <span className="truncate text-[15px] font-medium tracking-[-0.01em] text-foreground">GutGuard</span>
+            </Link>
+          )}
+          {onToggle && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onToggle}
+              aria-label={narrow ? "Expand sidebar" : "Collapse sidebar"}
+              title={narrow ? "Expand sidebar" : "Collapse sidebar"}
+              className={cn("text-muted-foreground", !narrow && "ml-auto")}
+            >
+              {narrow ? <ChevronsRight strokeWidth={1.5} /> : <ChevronsLeft strokeWidth={1.5} />}
+            </Button>
+          )}
         </div>
-      </div>
-    </>
-  );
+
+        <nav
+          className={cn("flex flex-1 flex-col gap-6 overflow-x-hidden overflow-y-auto py-4 [scrollbar-width:thin]", narrow ? "items-center px-2" : "px-4")}
+          aria-label="Admin"
+        >
+          {navGroups.map((group) => (
+            <div key={group.title ?? "home"} className="flex flex-col gap-1">
+              {/* Dropped when narrow: the nav's gap still keeps the groups apart, and the text's
+                  width would push the icons off-centre. */}
+              {group.title && !narrow && (
+                <p className="px-2.5 pb-1 text-[11px] whitespace-nowrap uppercase tracking-[0.08em] text-subtle-foreground">{group.title}</p>
+              )}
+              {group.items.map(({ href, label, icon: Icon }) => {
+                const active = isActive(href);
+                return (
+                  <NavTip key={href} show={narrow} label={label}>
+                    <Link
+                      href={href}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(itemClass, "focus-ring", active && "border-border bg-background text-foreground shadow-lift hover:bg-background")}
+                    >
+                      <Icon className="size-4 shrink-0" strokeWidth={1.5} aria-hidden="true" />
+                      <span className={cn("truncate", narrow && "sr-only")}>{label}</span>
+                    </Link>
+                  </NavTip>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+
+        <div className={cn("flex flex-col gap-3 border-t border-border py-4", narrow ? "items-center px-2" : "px-4")}>
+          <NavTip show={narrow} label="Live shop">
+            <a href="/shop" target="_blank" rel="noopener noreferrer" className={cn(itemClass, "focus-ring")}>
+              <ExternalLink className="size-4 shrink-0" strokeWidth={1.5} aria-hidden="true" />
+              <span className={cn("truncate", narrow && "sr-only")}>Live shop</span>
+            </a>
+          </NavTip>
+          {narrow ? (
+            <NavTip show label="Sign out">
+              <Button variant="ghost" size="icon-sm" onClick={handleLogout} aria-label="Sign out" className="text-muted-foreground">
+                <LogOut strokeWidth={1.5} />
+              </Button>
+            </NavTip>
+          ) : (
+            <div className="flex items-center gap-2.5 pl-2.5">
+              <span className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-[11px] uppercase text-muted-foreground">
+                {displayName.slice(0, 2)}
+              </span>
+              <div className="min-w-0 flex-1 leading-tight">
+                <p className="truncate text-[13px] text-foreground">{displayName}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {access.owner ? "All sections" : `${access.modules.length} section${access.modules.length === 1 ? "" : "s"}`}
+                </p>
+              </div>
+              <Button variant="ghost" size="icon-sm" onClick={handleLogout} aria-label="Sign out" title="Sign out" className="text-muted-foreground">
+                <LogOut strokeWidth={1.5} />
+              </Button>
+            </div>
+          )}
+        </div>
+      </>
+    );
+  };
 
   return (
+    <TooltipProvider delayDuration={300}>
     <div className="flex h-dvh bg-background font-sans text-foreground antialiased">
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-chrome md:flex">{sidebar}</aside>
+      <aside
+        className={cn(
+          "hidden shrink-0 flex-col overflow-hidden border-r border-border bg-chrome transition-[width] duration-200 ease-out md:flex",
+          collapsed ? "w-14" : "w-60",
+        )}
+      >
+        {renderSidebar(collapsed, toggleCollapsed)}
+      </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-chrome px-4 sm:px-6">
@@ -243,7 +308,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
               </SheetTrigger>
               <SheetContent side="left" showCloseButton={false} className="w-60 gap-0 bg-chrome p-0 font-sans sm:max-w-60">
                 <SheetTitle className="sr-only">Admin menu</SheetTitle>
-                {sidebar}
+                {renderSidebar(false)}
               </SheetContent>
             </Sheet>
             <h1 className="m-0 max-w-none font-sans text-base font-medium leading-6 tracking-normal text-foreground">{currentLabel}</h1>
@@ -267,5 +332,19 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         </main>
       </div>
     </div>
+    </TooltipProvider>
+  );
+}
+
+/** Shows `label` beside the element on hover/focus, only while the sidebar is collapsed. */
+function NavTip({ show, label, children }: { show: boolean; label: string; children: React.ReactElement }) {
+  if (!show) return children;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side="right" sideOffset={8} className="font-sans">
+        {label}
+      </TooltipContent>
+    </Tooltip>
   );
 }

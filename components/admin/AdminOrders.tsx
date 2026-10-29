@@ -5,7 +5,8 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { CreditCard, Plus, ReceiptText, RefreshCw, Truck, Wallet, X } from "lucide-react";
 import { Alert, FilterTabs, MetricCell, MetricStrip, PageBody, Section, StatusDot } from "@/components/admin/blocks";
 import { CellStack, DataTable } from "@/components/admin/data-table/data-table";
-import { DetailList, EditSheet, Field, FieldGroup } from "@/components/admin/form";
+import { ConfirmDialog, DetailList, EditSheet, Field, FieldGroup } from "@/components/admin/form";
+import { RowActions } from "@/components/admin/data-table/row-actions";
 import { Badge } from "@/components/admin/ui/badge";
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
@@ -148,8 +149,19 @@ export default function AdminOrders() {
   // selectedOrder is the editable copy; savedOrder is what the server last returned.
   const savedOrder = selectedOrder ? orders.find((order) => order.id === selectedOrder.id) : undefined;
   const detailDirty = Boolean(selectedOrder && JSON.stringify(selectedOrder) !== JSON.stringify(savedOrder));
+  // The panels' open flags are separate from their data so content stays while they slide out.
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [newOrderOpen, setNewOrderOpen] = useState(false);
+  // Partner email waiting for the "Log in as partner" confirmation from a row's ⋯ menu.
+  const [loginTarget, setLoginTarget] = useState<string | null>(null);
+  const openOrder = (order: ShopOrder) => {
+    setSelectedOrder(order);
+    setDetailOpen(true);
+    setConfirmingLogin(false);
+    setError(null);
+  };
   const closeDetail = () => {
-    setSelectedOrder(null);
+    setDetailOpen(false);
     setConfirmingLogin(false);
     setError(null);
   };
@@ -307,8 +319,28 @@ export default function AdminOrders() {
           return <StatusDot tone={tone}>{label}</StatusDot>;
         },
       },
+      {
+        id: "actions",
+        enableSorting: false,
+        enableHiding: false,
+        cell: ({ row }) => {
+          const order = row.original;
+          const partnerEmail = order.referral_doctor_id ? partnerEmails.get(order.referral_doctor_id) : undefined;
+          return (
+            <div className="flex justify-end">
+              <RowActions
+                label={`Actions for ${order.order_code}`}
+                actions={[
+                  { label: "Edit", onSelect: () => openOrder(order) },
+                  ...(owner && partnerEmail ? [{ label: "Log in as partner", onSelect: () => setLoginTarget(partnerEmail) }] : []),
+                ]}
+              />
+            </div>
+          );
+        },
+      },
     ],
-    [partnerStoreTypes, sourceName],
+    [partnerStoreTypes, sourceName, partnerEmails, owner],
   );
 
   async function saveOrder(event: FormEvent<HTMLFormElement>) {
@@ -346,6 +378,7 @@ export default function AdminOrders() {
   function openNewOrder() {
     // Order time starts at "now"; the admin changes it when entering an older sale.
     setNewOrder({ ...EMPTY_OFFLINE_ORDER, fulfillment: { ...EMPTY_FULFILLMENT, order_time: new Date().toISOString() } });
+    setNewOrderOpen(true);
     setNewOrderError(null);
     if (catalog.products.length === 0) {
       loadShopCatalog()
@@ -376,7 +409,7 @@ export default function AdminOrders() {
     try {
       const saved = await adminCreateOfflineOrder(newOrder);
       setOrders((current) => [saved, ...current]);
-      setNewOrder(null);
+      setNewOrderOpen(false);
       setNotice(`Saved ${saved.order_code} as a paid ${saved.payment_method} order.`);
     } catch (caught) {
       setNewOrderError(caught instanceof Error ? caught.message : "Could not save the order.");
@@ -461,7 +494,7 @@ export default function AdminOrders() {
               { column: "payment_method", title: "Payment" },
             ]}
             exportName="gutguard-orders"
-            onRowClick={setSelectedOrder}
+            onRowClick={openOrder}
             initialHidden={["created", "mobile", "email", "payment_method", "payment_status", "reference"]}
             emptyText="No orders yet."
             actions={
@@ -481,7 +514,7 @@ export default function AdminOrders() {
 
       {selectedOrder ? (
         <EditSheet
-          open
+          open={detailOpen}
           onOpenChange={(isOpen) => !isOpen && closeDetail()}
           title={selectedOrder.order_code}
           description={
@@ -655,14 +688,14 @@ export default function AdminOrders() {
 
       {newOrder ? (
         <EditSheet
-          open
-          onOpenChange={(isOpen) => !isOpen && setNewOrder(null)}
+          open={newOrderOpen}
+          onOpenChange={(isOpen) => !isOpen && setNewOrderOpen(false)}
           title="Add order"
           description="Consignment or cash sale. Saved as paid; prices come from the catalog and there's no shipping fee."
           onSubmit={saveNewOrder}
           footer={
             <>
-              <Button type="button" variant="ghost" size="sm" onClick={() => setNewOrder(null)}>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setNewOrderOpen(false)}>
                 Cancel
               </Button>
               <Button type="submit" size="sm" disabled={isSaving || !newOrderItems}>
@@ -809,6 +842,19 @@ export default function AdminOrders() {
           />
         </EditSheet>
       ) : null}
+
+      <ConfirmDialog
+        open={loginTarget !== null}
+        onOpenChange={(isOpen) => !isOpen && setLoginTarget(null)}
+        title="Log in as this partner?"
+        description={`Opens the partner portal as ${loginTarget ?? ""}. It's recorded in the impersonation log and replaces any partner session in this browser.`}
+        confirmLabel="Open partner portal"
+        busy={isImpersonating}
+        onConfirm={async () => {
+          if (loginTarget) await loginAsReferralPartner(loginTarget);
+          setLoginTarget(null);
+        }}
+      />
     </>
   );
 }
