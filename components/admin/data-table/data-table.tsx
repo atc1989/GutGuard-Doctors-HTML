@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -22,11 +22,10 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/admin/ui/dropdown-menu";
 import { Input } from "@/components/admin/ui/input";
+import { Select } from "@/components/admin/ui/select";
 import { Skeleton } from "@/components/admin/ui/skeleton";
 import { downloadCsv } from "@/lib/csv";
 import { cn } from "@/lib/utils";
@@ -91,6 +90,7 @@ export function DataTable<TData>({
   selection,
 }: DataTableProps<TData>) {
   const [query, setQuery] = useState("");
+  const pageSizeId = useId();
   const searched = useMemo(() => {
     const q = query.trim().toLowerCase();
     return q && searchText ? data.filter((row) => searchText(row).toLowerCase().includes(q)) : data;
@@ -332,20 +332,16 @@ export function DataTable<TData>({
             : `Showing ${(pageIndex * pageSize + 1).toLocaleString()}–${Math.min((pageIndex + 1) * pageSize, total).toLocaleString()} of ${total.toLocaleString()}`}
         </span>
         <div className="flex items-center gap-3">
-          <DropdownMenu>
-            <DropdownMenuTrigger className="inline-flex h-8 items-center gap-1 rounded-lg px-2 outline-none hover:bg-black/[0.04] hover:text-foreground">
-              {pageSize} per page
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="font-sans">
-              <DropdownMenuRadioGroup value={String(pageSize)} onValueChange={(value) => table.setPageSize(Number(value))}>
-                {PAGE_SIZES.map((size) => (
-                  <DropdownMenuRadioItem key={size} value={String(size)} className="text-[13px]">
-                    {size} per page
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-2">
+            <label htmlFor={pageSizeId}>Rows per page</label>
+            <Select
+              id={pageSizeId}
+              value={String(pageSize)}
+              onValueChange={(value) => table.setPageSize(Number(value))}
+              options={PAGE_SIZES.map((size) => ({ value: String(size), label: String(size) }))}
+              className="h-8 w-[72px] rounded-lg text-[13px] text-foreground"
+            />
+          </div>
           <span className="tabular-nums">
             Page {pageIndex + 1} of {Math.max(table.getPageCount(), 1)}
           </span>
