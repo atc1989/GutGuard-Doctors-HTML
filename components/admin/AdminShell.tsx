@@ -9,6 +9,7 @@ import {
   ChevronsRight,
   ExternalLink,
   Gift,
+  KeyRound,
   LayoutGrid,
   ListOrdered,
   LoaderCircle,
@@ -54,7 +55,7 @@ export function useAdminAccess() {
 type NavItem = { href: string; label: string; icon: LucideIcon };
 type NavGroup = { title: string | null; items: NavItem[] };
 
-const NAV_GROUPS: NavGroup[] = [
+export const NAV_GROUPS: NavGroup[] = [
   { title: null, items: [{ href: "/admin", label: "Dashboard", icon: LayoutGrid }] },
   {
     title: "Commerce",
@@ -86,6 +87,11 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: "Content",
     items: [{ href: "/admin/testimonials", label: "Testimonials", icon: MessageSquareQuote }],
+  },
+  {
+    // "staff" is never a staff module, so canOpen shows this to the super admin only.
+    title: "Settings",
+    items: [{ href: "/admin/staff", label: "Staff Accounts", icon: KeyRound }],
   },
 ];
 

@@ -2,25 +2,40 @@ import { cookies } from "next/headers";
 import { Redis } from "@upstash/redis";
 import {
   ADMIN_SESSION_MS,
-  accessFor,
+  ADMIN_MODULES,
+  OWNER,
   allows,
+  cleanModules,
+  cleanUsername,
   issueAdminToken,
-  matchLogin,
-  parseStaff,
+  passwordMatches,
   readAdminToken,
+  verifyPassword,
   type AdminAccess,
   type AdminModule,
 } from "@/lib/admin-token";
+import { supabaseAdminShop } from "@/lib/supabase-admin";
 
 export const ADMIN_SESSION_COOKIE = "gg_admin_session";
 export const ADMIN_SESSION_MAX_AGE_S = ADMIN_SESSION_MS / 1000;
 
-// ADMIN_PASSWORD is required: it is the owner login and the value passed to the
-// assert_wheel_admin RPCs. No fallback key - unset means locked out.
+// ADMIN_PASSWORD is required: it is the super admin login (username "admin") and the value passed
+// to the assert_wheel_admin RPCs. No fallback key - unset means locked out. Staff accounts live in
+// <shop schema>.admin_staff (Admin -> Staff) and never learn it: the server still passes it to the
+// RPCs once the module check passes.
 const adminPassword = () => process.env.ADMIN_PASSWORD?.trim() || null;
-// Staff logins with their modules (see parseStaff). They never learn ADMIN_PASSWORD: the server
-// still passes it to the RPCs once the module check passes.
-const staff = () => parseStaff(process.env.ADMIN_STAFF);
+
+type StaffRow = { password_hash: string; modules: string[]; active: boolean; password_changed_at: string };
+async function staffRow(username: string): Promise<StaffRow | null> {
+  if (!supabaseAdminShop) return null;
+  const { data, error } = await supabaseAdminShop
+    .from("admin_staff")
+    .select("password_hash, modules, active, password_changed_at")
+    .eq("username", username)
+    .maybeSingle();
+  if (error) console.error("admin_staff lookup failed:", error.message);
+  return (data as StaffRow | null) ?? null;
+}
 // Cookie HMAC key. Set ADMIN_SESSION_SECRET (long random) so a leaked cookie cannot be used to
 // brute-force the password offline; falls back to the password so existing deploys keep working.
 const sessionKey = () => (adminPassword() ? process.env.ADMIN_SESSION_SECRET?.trim() || adminPassword() : null);
@@ -31,10 +46,17 @@ const redis = () =>
   process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN ? Redis.fromEnv() : null;
 const revokedKey = (jti: string) => `admin-session-revoked:${jti}`;
 
-/** Returns who is logging in ("owner" or a staff name). Fails closed when ADMIN_PASSWORD is unset. */
-export async function matchAdminLogin(candidate: string): Promise<string | null> {
+/** Returns who is logging in ("admin" or a staff username). Fails closed when ADMIN_PASSWORD is unset. */
+export async function matchAdminLogin(username: string, password: string): Promise<string | null> {
   const secret = adminPassword();
-  return secret ? matchLogin(candidate, secret, staff()) : null;
+  if (!secret || !password.trim()) return null;
+  const name = username.trim().toLowerCase();
+  if (name === OWNER) return passwordMatches(password, secret) ? OWNER : null;
+  const staffName = cleanUsername(name);
+  const row = staffName ? await staffRow(staffName) : null;
+  // verifyPassword runs even without a row, so a wrong username takes as long as a wrong password.
+  const ok = await verifyPassword(password.trim(), row?.password_hash ?? null);
+  return ok && row?.active ? staffName : null;
 }
 
 export function createAdminSessionToken(name: string): string | null {
@@ -59,7 +81,13 @@ export async function getAdminSession(): Promise<AdminAccess | null> {
       return null; // can't confirm the session is live - fail closed
     }
   }
-  return accessFor(session.name, staff());
+  if (session.name === OWNER) return { name: OWNER, owner: true, modules: [...ADMIN_MODULES] };
+
+  // Staff: re-read the row so removing, disabling or a password reset ends the session at once.
+  const row = await staffRow(session.name);
+  const issuedAt = session.exp - ADMIN_SESSION_MS;
+  if (!row?.active || Date.parse(row.password_changed_at) > issuedAt) return null;
+  return { name: session.name, owner: false, modules: cleanModules(row.modules) };
 }
 
 /**

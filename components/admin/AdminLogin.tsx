@@ -9,21 +9,23 @@ import { Label } from "@/components/admin/ui/label";
 import { adminLogin } from "@/lib/api";
 
 export default function AdminLogin({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const ready = Boolean(username.trim() && password.trim());
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!password.trim()) return;
+    if (!ready) return;
     setLoggingIn(true);
     setError(null);
     try {
-      await adminLogin(password);
+      await adminLogin(username.trim(), password);
       setPassword("");
       await onSignedIn();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "That password didn't work. Try again.");
+      setError(err instanceof Error ? err.message : "Wrong username or password.");
     } finally {
       setLoggingIn(false);
     }
@@ -39,9 +41,24 @@ export default function AdminLogin({ onSignedIn }: { onSignedIn: () => Promise<v
 
         <div className="rounded-xl border border-border bg-background p-6 shadow-lift">
           <h1 className="m-0 max-w-none font-sans text-base font-medium leading-6 tracking-normal text-foreground">Sign in to admin</h1>
-          <p className="mt-1 text-[13px] text-muted-foreground">Use your owner or staff password.</p>
+          <p className="mt-1 text-[13px] text-muted-foreground">Use your admin or staff username and password.</p>
 
           <form onSubmit={handleSubmit} className="mt-5 flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="admin-username">Username</Label>
+              <Input
+                id="admin-username"
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                disabled={loggingIn}
+                aria-invalid={error ? true : undefined}
+                autoFocus
+                required
+              />
+            </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="admin-password">Password</Label>
               <Input
@@ -53,7 +70,6 @@ export default function AdminLogin({ onSignedIn }: { onSignedIn: () => Promise<v
                 disabled={loggingIn}
                 aria-invalid={error ? true : undefined}
                 aria-describedby={error ? "admin-login-error" : undefined}
-                autoFocus
                 required
               />
               {error && (
@@ -62,7 +78,7 @@ export default function AdminLogin({ onSignedIn }: { onSignedIn: () => Promise<v
                 </p>
               )}
             </div>
-            <Button type="submit" className="w-full" disabled={loggingIn || !password.trim()}>
+            <Button type="submit" className="w-full" disabled={loggingIn || !ready}>
               {loggingIn ? (
                 <>
                   <LoaderCircle className="animate-spin" strokeWidth={1.5} aria-hidden="true" />

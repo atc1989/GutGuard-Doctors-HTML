@@ -342,13 +342,13 @@ Things to know about admin sessions:
 
 ### Security settings to keep correct
 
-- **Admin password.**
-  - The owner password opens every section. It must be identical in two places: Vercel (`ADMIN_PASSWORD`) and the database admin settings.
+- **Super admin password.**
+  - Log in to Admin with username `admin` and this password; it opens every section. It must be identical in two places: Vercel (`ADMIN_PASSWORD`) and the database admin settings.
   - Changing it signs out every admin.
-- **Staff logins.**
-  - Each staff member gets their own password and a list of sections, set in Vercel (`ADMIN_STAFF`; the format is in `.env.example`). Staff only see their sections in the menu, and the server refuses the rest.
-  - Only the owner login can use "Log in as" a partner.
-  - To remove someone, delete their entry and redeploy; they are signed out at once. A changed staff password only takes effect at their next sign-in (sessions last up to 8 hours).
+- **Staff accounts — Admin → Staff Accounts** (super admin only).
+  - **New staff account:** pick a username and a password (8+ characters), tick the sections they may open, then share the password with them privately.
+  - Staff only see their ticked sections in the menu, and the server refuses the rest. Only the super admin can "Log in as" a partner or manage staff.
+  - **Edit** changes their sections (applies on their next click) or sets a new password (signs them out). **Turn off** blocks them without deleting; **Delete** removes the account. Both sign them out at once.
 - **Rate limiting (Upstash).**
   - These settings must be present in production. Without them, sign-in and login limits are switched off and "Sign Out" doesn't fully end a session.
 - **Maya.**
