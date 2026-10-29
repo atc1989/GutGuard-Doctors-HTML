@@ -31,27 +31,6 @@ type AdminDoctorRegistration = {
   partner_code?: number | null;
 };
 
-type NewsletterSendHistory = {
-  id: string;
-  doctor_id: string;
-  newsletter_id?: string | null;
-  newsletter_title?: string | null;
-  email: string;
-  subject: string;
-  status: "sent" | "failed" | "skipped";
-  resend_id?: string | null;
-  error_message?: string | null;
-  sent_at: string;
-};
-
-type NewsletterSendResult = {
-  doctorId: string;
-  email: string;
-  status: "sent" | "failed" | "skipped";
-  resendId?: string | null;
-  error?: string | null;
-};
-
 type SmsSendHistory = {
   id: string;
   doctor_id: string;
@@ -125,17 +104,6 @@ const PUBLIC_SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://partner
   /\/$/,
   "",
 );
-const PLACEHOLDER_TOKENS = [
-  "{{doctor_name}}",
-  "{{name_prefix}}",
-  "{{prefixed_name}}",
-  "{{doctor_email}}",
-  "{{doctor_mobile}}",
-  "{{specialty}}",
-  "{{clinic_location}}",
-  "{{registered_at}}",
-  "{{prize_label}}",
-];
 const SMS_PLACEHOLDER_TOKENS = [
   "{{doctor_name}}",
   "{{name_prefix}}",
@@ -170,11 +138,10 @@ async function loadWheelApi() {
   return import("@/lib/api");
 }
 
-// Newsletter, SMS blast and Email sequence still share this older page; each route picks its tab.
-export type AdminMessagingTab = "newsletter" | "sms" | "registrationEmail" | "sequence";
+// SMS blast and Email sequence still share this older page; each route picks its tab.
+export type AdminMessagingTab = "sms" | "registrationEmail" | "sequence";
 
 const TAB_HEADERS: Record<AdminMessagingTab, { kicker: string; title: string; description: string }> = {
-  newsletter: { kicker: "Marketing", title: "Newsletter", description: "Compose and send an email blast to selected partners." },
   sms: { kicker: "Marketing", title: "SMS Blast", description: "Send a short message to selected partners and review past sends." },
   sequence: { kicker: "Automation", title: "Email Sequence", description: "The onboarding emails new partners receive, in order." },
   registrationEmail: { kicker: "Automation", title: "Registration Email", description: "Replaced by Email Sequence." },
@@ -183,19 +150,6 @@ const TAB_HEADERS: Record<AdminMessagingTab, { kicker: string; title: string; de
 export default function AdminMessaging({ tab: activeTab }: { tab: AdminMessagingTab }) {
   const { can } = useAdminAccess();
   const [doctors, setDoctors] = useState<AdminDoctorRegistration[]>([]);
-  const [newsletterSearch, setNewsletterSearch] = useState("");
-  const [newsletterPage, setNewsletterPage] = useState(1);
-  const [newsletterPageSize, setNewsletterPageSize] = useState(10);
-  const [selectedDoctorIds, setSelectedDoctorIds] = useState<string[]>([]);
-  const [newsletterHistory, setNewsletterHistory] = useState<NewsletterSendHistory[]>([]);
-  const [newsletterResults, setNewsletterResults] = useState<NewsletterSendResult[]>([]);
-  const [isNewsletterSending, setIsNewsletterSending] = useState(false);
-  const [showNewsletterConfirm, setShowNewsletterConfirm] = useState(false);
-  const [newsletterSubject, setNewsletterSubject] = useState("");
-  const [newsletterHtml, setNewsletterHtml] = useState("");
-  const [newsletterFileName, setNewsletterFileName] = useState("");
-  const [newsletterFileError, setNewsletterFileError] = useState<string | null>(null);
-  const [showNewsletterPreview, setShowNewsletterPreview] = useState(false);
   const [smsSearch, setSmsSearch] = useState("");
   const [smsPage, setSmsPage] = useState(1);
   const [smsPageSize, setSmsPageSize] = useState(10);
@@ -219,7 +173,6 @@ export default function AdminMessaging({ tab: activeTab }: { tab: AdminMessaging
   const [isRegistrationEmailSaving, setIsRegistrationEmailSaving] = useState(false);
   const [isRegistrationEmailRemovingHtml, setIsRegistrationEmailRemovingHtml] = useState(false);
   const [isRegistrationEmailTesting, setIsRegistrationEmailTesting] = useState(false);
-  const [historyDoctorId, setHistoryDoctorId] = useState<string | null>(null);
   const [sequenceSteps, setSequenceSteps] = useState<SequenceStep[]>([]);
   const [sequenceProgress, setSequenceProgress] = useState<SequenceProgress[]>([]);
   const [sequenceTotalSteps, setSequenceTotalSteps] = useState(0);
@@ -242,38 +195,6 @@ export default function AdminMessaging({ tab: activeTab }: { tab: AdminMessaging
     message: string;
   } | null>(null);
 
-  const filteredNewsletterDoctors = useMemo(() => {
-    const query = newsletterSearch.trim().toLowerCase();
-    const withEmail = doctors.filter((doctor) => doctor.email);
-    if (!query) return withEmail;
-
-    return withEmail.filter((doctor) =>
-      [
-        doctor.full_name,
-        doctor.name_prefix,
-        doctor.email,
-        doctor.mobile,
-        doctor.specialty,
-        doctor.practice_location,
-        doctor.prize_label ?? "",
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(query),
-    );
-  }, [newsletterSearch, doctors]);
-  const totalNewsletterPages = Math.max(
-    1,
-    Math.ceil(filteredNewsletterDoctors.length / newsletterPageSize),
-  );
-  const visibleNewsletterDoctors = filteredNewsletterDoctors.slice(
-    (newsletterPage - 1) * newsletterPageSize,
-    newsletterPage * newsletterPageSize,
-  );
-  const selectedDoctors = useMemo(
-    () => doctors.filter((doctor) => selectedDoctorIds.includes(doctor.id)),
-    [doctors, selectedDoctorIds],
-  );
   const filteredSmsDoctors = useMemo(() => {
     const query = smsSearch.trim().toLowerCase();
     const withMobile = doctors.filter((doctor) => normalizeSmsMobile(doctor.mobile));
@@ -303,25 +224,6 @@ export default function AdminMessaging({ tab: activeTab }: { tab: AdminMessaging
     () => doctors.filter((doctor) => selectedSmsDoctorIds.includes(doctor.id)),
     [doctors, selectedSmsDoctorIds],
   );
-  const latestNewsletterByDoctor = useMemo(() => {
-    return newsletterHistory.reduce<Record<string, NewsletterSendHistory>>((current, item) => {
-      const existing = current[item.doctor_id];
-      if (!existing || new Date(item.sent_at).getTime() > new Date(existing.sent_at).getTime()) {
-        current[item.doctor_id] = item;
-      }
-      return current;
-    }, {});
-  }, [newsletterHistory]);
-  const newsletterHistoryByDoctor = useMemo(() => {
-    return newsletterHistory.reduce<Record<string, NewsletterSendHistory[]>>((current, item) => {
-      current[item.doctor_id] = [...(current[item.doctor_id] ?? []), item].sort(
-        (a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime(),
-      );
-      return current;
-    }, {});
-  }, [newsletterHistory]);
-  const historyDoctor = historyDoctorId ? doctors.find((doctor) => doctor.id === historyDoctorId) : null;
-  const historyItems = historyDoctorId ? newsletterHistoryByDoctor[historyDoctorId] ?? [] : [];
   const latestSmsByDoctor = useMemo(() => {
     return smsHistory.reduce<Record<string, SmsSendHistory>>((current, item) => {
       const existing = current[item.doctor_id];
@@ -341,19 +243,6 @@ export default function AdminMessaging({ tab: activeTab }: { tab: AdminMessaging
   }, [smsHistory]);
   const smsHistoryDoctor = smsHistoryDoctorId ? doctors.find((doctor) => doctor.id === smsHistoryDoctorId) : null;
   const smsHistoryItems = smsHistoryDoctorId ? smsHistoryByDoctor[smsHistoryDoctorId] ?? [] : [];
-  const detectedPlaceholders = useMemo(() => {
-    return Array.from(new Set(newsletterHtml.match(/\{\{\s*[a-zA-Z0-9_]+\s*\}\}/g) ?? [])).map((token) =>
-      token.replace(/\s+/g, ""),
-    );
-  }, [newsletterHtml]);
-  const visibleSelectedCount = visibleNewsletterDoctors.filter((doctor) =>
-    selectedDoctorIds.includes(doctor.id),
-  ).length;
-  const allVisibleSelected =
-    visibleNewsletterDoctors.length > 0 && visibleSelectedCount === visibleNewsletterDoctors.length;
-  const canSendNewsletter =
-    selectedDoctorIds.length > 0 && newsletterSubject.trim().length > 0 && newsletterHtml.trim().length > 0;
-  const previewHtml = useMemo(() => renderNewsletterPreview(newsletterHtml), [newsletterHtml]);
   const detectedSmsPlaceholders = useMemo(() => {
     return Array.from(new Set(smsMessage.match(/\{\{\s*[a-zA-Z0-9_]+\s*\}\}/g) ?? [])).map((token) =>
       token.replace(/\s+/g, ""),
@@ -417,10 +306,9 @@ export default function AdminMessaging({ tab: activeTab }: { tab: AdminMessaging
     };
 
     // Staff logins only load the tabs they can open; the rest would be refused by the API.
-    const partnersNeeded = ["newsletter", "sms"].some(can);
-    const [loadedDoctors, loadedNewsletterHistory, loadedSmsHistory, loadedRegistrationEmail, loadedSequence] = await Promise.all([
+    const partnersNeeded = can("sms");
+    const [loadedDoctors, loadedSmsHistory, loadedRegistrationEmail, loadedSequence] = await Promise.all([
       partnersNeeded ? api.getDoctorRegistrations() : Promise.resolve([]),
-      can("newsletter") ? api.getNewsletterSendHistory() : Promise.resolve([]),
       can("sms") ? api.getSmsBlastHistory() : Promise.resolve([]),
       can("referral-email")
         ? api.getRegistrationEmailSettings().catch(showFailure(emptyRegistrationEmailSettings))
@@ -428,46 +316,17 @@ export default function AdminMessaging({ tab: activeTab }: { tab: AdminMessaging
       can("sequence") ? api.getSequenceSteps().catch(showFailure([])) : Promise.resolve([]),
     ]);
     setDoctors(loadedDoctors);
-    setNewsletterHistory(loadedNewsletterHistory);
     setSmsHistory(loadedSmsHistory);
     setRegistrationEmail(loadedRegistrationEmail);
     setRegistrationEmailFileName(loadedRegistrationEmail.html ? "Saved registration email HTML" : "");
     setSequenceSteps(loadedSequence.sort((a, b) => a.step_number - b.step_number));
-    setNewsletterPage(1);
     setSmsPage(1);
-  }
-
-  async function refreshNewsletterHistory() {
-    const api = await loadWheelApi();
-    if (!api.getNewsletterSendHistory) return;
-    setNewsletterHistory(await api.getNewsletterSendHistory());
   }
 
   async function refreshSmsHistory() {
     const api = await loadWheelApi();
     if (!api.getSmsBlastHistory) return;
     setSmsHistory(await api.getSmsBlastHistory());
-  }
-
-  function toggleNewsletterDoctor(doctorId: string) {
-    setShowNewsletterConfirm(false);
-    setSelectedDoctorIds((current) =>
-      current.includes(doctorId)
-        ? current.filter((id) => id !== doctorId)
-        : [...current, doctorId],
-    );
-  }
-
-  function toggleVisibleNewsletterDoctors() {
-    setShowNewsletterConfirm(false);
-    const visibleIds = visibleNewsletterDoctors.map((doctor) => doctor.id);
-    setSelectedDoctorIds((current) => {
-      if (visibleIds.every((id) => current.includes(id))) {
-        return current.filter((id) => !visibleIds.includes(id));
-      }
-
-      return Array.from(new Set([...current, ...visibleIds]));
-    });
   }
 
   function toggleSmsDoctor(doctorId: string) {
@@ -489,40 +348,6 @@ export default function AdminMessaging({ tab: activeTab }: { tab: AdminMessaging
 
       return Array.from(new Set([...current, ...visibleIds]));
     });
-  }
-
-  async function handleNewsletterUpload(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    setNewsletterFileError(null);
-    setShowNewsletterConfirm(false);
-
-    if (!file) {
-      setNewsletterFileName("");
-      setNewsletterHtml("");
-      return;
-    }
-
-    if (!file.name.toLowerCase().endsWith(".html") && file.type !== "text/html") {
-      setNewsletterFileName("");
-      setNewsletterHtml("");
-      setNewsletterFileError("Please upload a .html newsletter file.");
-      return;
-    }
-
-    if (file.size > 250_000) {
-      setNewsletterFileName("");
-      setNewsletterHtml("");
-      setNewsletterFileError("Please keep the HTML file under 250 KB.");
-      return;
-    }
-
-    const content = await file.text();
-    setNewsletterFileName(file.name);
-    setNewsletterHtml(content);
-
-    if (!newsletterSubject.trim()) {
-      setNewsletterSubject(file.name.replace(/\.html?$/i, "").replace(/[-_]+/g, " "));
-    }
   }
 
   async function handleRegistrationEmailUpload(event: ChangeEvent<HTMLInputElement>) {
@@ -721,57 +546,6 @@ export default function AdminMessaging({ tab: activeTab }: { tab: AdminMessaging
       setError(caught instanceof Error ? caught.message : "Unable to send test registration email.");
     } finally {
       setIsRegistrationEmailTesting(false);
-    }
-  }
-
-  async function handleNewsletterSend() {
-    if (!canSendNewsletter) {
-      setError("Upload an HTML file, enter a subject, and select at least one recipient.");
-      return;
-    }
-
-    setShowNewsletterConfirm(true);
-  }
-
-  async function confirmNewsletterSend() {
-    if (!canSendNewsletter) return;
-
-    setError(null);
-    setNotice(null);
-    setNewsletterResults([]);
-    setIsNewsletterSending(true);
-
-    try {
-      const api = await loadWheelApi();
-      if (!api.sendNewsletter) {
-        throw new Error("Missing sendNewsletter helper in lib/api.ts.");
-      }
-
-      const response = await api.sendNewsletter(selectedDoctorIds,
-        newsletterSubject.trim(),
-        newsletterHtml,
-      );
-      setNewsletterResults(response.results);
-      setNewsletterToast({
-        tone: "success",
-        title: "Newsletter send complete",
-        message: `Newsletter sent: ${response.sent} sent, ${response.failed} failed, ${response.skipped} skipped.`,
-      });
-      setNotice(
-        `Newsletter complete: ${response.sent} sent, ${response.failed} failed, ${response.skipped} skipped.`,
-      );
-      setShowNewsletterConfirm(false);
-      await refreshNewsletterHistory();
-    } catch (caught) {
-      const message = caught instanceof Error ? caught.message : "Unable to send newsletter.";
-      setError(message);
-      setNewsletterToast({
-        tone: "error",
-        title: "Newsletter send failed",
-        message,
-      });
-    } finally {
-      setIsNewsletterSending(false);
     }
   }
 
@@ -994,224 +768,6 @@ export default function AdminMessaging({ tab: activeTab }: { tab: AdminMessaging
             Close
           </button>
         </div>
-      ) : null}
-
-      {activeTab === "newsletter" ? (
-        <section className="admin-wheel-panel">
-          <div className="admin-wheel-panel-head">
-            <div>
-              <p className="admin-wheel-kicker">Bulk Email</p>
-              <h2>Newsletter Send</h2>
-            </div>
-            <div className="admin-doctor-actions">
-              <label htmlFor="newsletter-search">
-                Search recipients
-                <input
-                  id="newsletter-search"
-                  type="search"
-                  value={newsletterSearch}
-                  placeholder="Name, email, clinic..."
-                  onChange={(event) => {
-                    setNewsletterSearch(event.target.value);
-                    setNewsletterPage(1);
-                  }}
-                />
-              </label>
-              <button type="button" onClick={refreshNewsletterHistory} disabled={isLoading}>
-                Refresh history
-              </button>
-            </div>
-          </div>
-
-          <div className="admin-newsletter-upload">
-            <label htmlFor="newsletter-subject">
-              Newsletter subject
-              <input
-                id="newsletter-subject"
-                value={newsletterSubject}
-                placeholder="GutGuard Doctors Newsletter"
-                onChange={(event) => {
-                  setNewsletterSubject(event.target.value);
-                  setShowNewsletterConfirm(false);
-                }}
-              />
-            </label>
-            <label htmlFor="newsletter-html-file">
-              Upload HTML file
-              <input id="newsletter-html-file" type="file" accept=".html,text/html" onChange={handleNewsletterUpload} />
-            </label>
-            <button
-              className="admin-newsletter-upload-action"
-              type="button"
-              onClick={() => setShowNewsletterPreview(true)}
-              disabled={newsletterHtml.trim().length === 0}
-            >
-              Preview HTML
-            </button>
-            <a
-              className="admin-newsletter-download"
-              href="/sample-upload-newsletter.html"
-              download="sample-upload-newsletter.html"
-            >
-              Download sample HTML
-            </a>
-            <div className="admin-newsletter-placeholder-box">
-              <p>{newsletterFileName ? `Loaded ${newsletterFileName}` : "No newsletter uploaded yet."}</p>
-              {newsletterFileError ? <strong>{newsletterFileError}</strong> : null}
-              <span>Available placeholders</span>
-              <div>
-                {PLACEHOLDER_TOKENS.map((token) => (
-                  <code key={token}>{token}</code>
-                ))}
-              </div>
-              {detectedPlaceholders.length > 0 ? (
-                <>
-                  <span>Detected in uploaded HTML</span>
-                  <div>
-                    {detectedPlaceholders.map((token) => (
-                      <code key={token}>{token}</code>
-                    ))}
-                  </div>
-                </>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="admin-newsletter-toolbar">
-            <label className="admin-newsletter-select-all">
-              <input
-                type="checkbox"
-                checked={allVisibleSelected}
-                onChange={toggleVisibleNewsletterDoctors}
-              />
-              Select visible recipients
-            </label>
-            <div className="admin-newsletter-sendbox">
-              <p>{selectedDoctorIds.length} selected</p>
-              <button
-                type="button"
-                onClick={handleNewsletterSend}
-                disabled={isNewsletterSending || !canSendNewsletter}
-              >
-                {isNewsletterSending ? "Sending" : "Review and send"}
-              </button>
-            </div>
-          </div>
-
-          {selectedDoctors.length > 0 ? (
-            <div className="admin-newsletter-selected">
-              <p>Selected emails</p>
-              <div>
-                {selectedDoctors.map((doctor) => (
-                  <span key={doctor.id}>{doctor.email}</span>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          <div className="admin-doctor-list">
-            {visibleNewsletterDoctors.length > 0 ? (
-              visibleNewsletterDoctors.map((doctor) => {
-                const latestSend = latestNewsletterByDoctor[doctor.id];
-                const doctorHistory = newsletterHistoryByDoctor[doctor.id] ?? [];
-                const latestResult = newsletterResults.find((result) => result.doctorId === doctor.id);
-
-                return (
-                  <article className="admin-doctor-row newsletter" key={doctor.id}>
-                    <label className="admin-newsletter-recipient">
-                      <input
-                        type="checkbox"
-                        checked={selectedDoctorIds.includes(doctor.id)}
-                        onChange={() => toggleNewsletterDoctor(doctor.id)}
-                      />
-                      <span>
-                        <strong>{formatPrefixedName(doctor.name_prefix, doctor.full_name) || "Unnamed doctor"}</strong>
-                        <em>{doctor.email}</em>
-                      </span>
-                    </label>
-                    <dl className="admin-doctor-details">
-                      <div>
-                        <dt>City address</dt>
-                        <dd>{doctor.practice_location || "--"}</dd>
-                      </div>
-                      <div>
-                        <dt>Last newsletter</dt>
-                        <dd>
-                          {doctorHistory.length > 1 ? (
-                            <button
-                              className="admin-history-link"
-                              type="button"
-                              onClick={() => setHistoryDoctorId(doctor.id)}
-                            >
-                              {doctorHistory.length} newsletters sent
-                            </button>
-                          ) : latestSend ? (
-                            `${latestSend.newsletter_title || latestSend.subject} - ${formatAdminDate(latestSend.sent_at)}`
-                          ) : (
-                            "Never sent"
-                          )}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Send result</dt>
-                        <dd>{latestResult ? formatSendResult(latestResult) : "--"}</dd>
-                      </div>
-                    </dl>
-                  </article>
-                );
-              })
-            ) : (
-              <div className="admin-wheel-empty">
-                <p>No email-ready doctors match that search.</p>
-              </div>
-            )}
-          </div>
-
-          <div className="admin-pagination">
-            <p>
-              Showing {visibleNewsletterDoctors.length > 0 ? (newsletterPage - 1) * newsletterPageSize + 1 : 0}
-              {"-"}
-              {Math.min(newsletterPage * newsletterPageSize, filteredNewsletterDoctors.length)} of{" "}
-              {filteredNewsletterDoctors.length}
-            </p>
-            <div className="admin-pagination-controls">
-              <label htmlFor="newsletter-page-size">
-                Show
-                <select
-                  id="newsletter-page-size"
-                  value={newsletterPageSize}
-                  onChange={(event) => {
-                    setNewsletterPageSize(Number(event.target.value));
-                    setNewsletterPage(1);
-                  }}
-                >
-                  {PAGE_SIZE_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button
-                type="button"
-                onClick={() => setNewsletterPage((current) => Math.max(1, current - 1))}
-                disabled={newsletterPage <= 1}
-              >
-                Previous
-              </button>
-              <span>
-                Page {newsletterPage} of {totalNewsletterPages}
-              </span>
-              <button
-                type="button"
-                onClick={() => setNewsletterPage((current) => Math.min(totalNewsletterPages, current + 1))}
-                disabled={newsletterPage >= totalNewsletterPages}
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        </section>
       ) : null}
 
       {activeTab === "sms" ? (
@@ -1986,74 +1542,6 @@ export default function AdminMessaging({ tab: activeTab }: { tab: AdminMessaging
         </div>
       ) : null}
 
-      {showNewsletterPreview ? (
-        <div className="admin-modal-backdrop" role="presentation">
-          <section
-            className="admin-modal admin-newsletter-preview-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="newsletter-preview-title"
-          >
-            <div className="admin-modal-head">
-              <div>
-                <p className="admin-wheel-kicker">Newsletter Preview</p>
-                <h2 id="newsletter-preview-title">{newsletterSubject || "Uploaded HTML"}</h2>
-              </div>
-              <button type="button" onClick={() => setShowNewsletterPreview(false)}>
-                Close
-              </button>
-            </div>
-            <iframe
-              className="admin-newsletter-preview-frame"
-              title="Newsletter HTML preview"
-              sandbox=""
-              srcDoc={previewHtml}
-            />
-          </section>
-        </div>
-      ) : null}
-
-      {showNewsletterConfirm ? (
-        <div className="admin-modal-backdrop" role="presentation">
-          <section className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="newsletter-confirm-title">
-            <div className="admin-modal-head">
-              <div>
-                <p className="admin-wheel-kicker">Confirm Newsletter</p>
-                <h2 id="newsletter-confirm-title">Send to {selectedDoctors.length} doctors</h2>
-              </div>
-              <button type="button" onClick={() => setShowNewsletterConfirm(false)}>
-                Close
-              </button>
-            </div>
-            <div className="admin-modal-body">
-              <dl className="admin-confirm-summary">
-                <div>
-                  <dt>Subject</dt>
-                  <dd>{newsletterSubject}</dd>
-                </div>
-                <div>
-                  <dt>HTML file</dt>
-                  <dd>{newsletterFileName || "Uploaded HTML"}</dd>
-                </div>
-              </dl>
-              <div className="admin-email-list">
-                {selectedDoctors.map((doctor) => (
-                  <span key={doctor.id}>{doctor.email}</span>
-                ))}
-              </div>
-            </div>
-            <div className="admin-modal-actions">
-              <button type="button" onClick={() => setShowNewsletterConfirm(false)}>
-                Cancel
-              </button>
-              <button type="button" onClick={confirmNewsletterSend} disabled={isNewsletterSending}>
-                {isNewsletterSending ? "Sending" : "Send newsletter"}
-              </button>
-            </div>
-          </section>
-        </div>
-      ) : null}
-
       {showSmsConfirm ? (
         <div className="admin-modal-backdrop" role="presentation">
           <section className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="sms-confirm-title">
@@ -2098,33 +1586,6 @@ export default function AdminMessaging({ tab: activeTab }: { tab: AdminMessaging
               <button type="button" onClick={confirmSmsSend} disabled={isSmsSending}>
                 {isSmsSending ? "Sending" : "Send SMS blast"}
               </button>
-            </div>
-          </section>
-        </div>
-      ) : null}
-
-      {historyDoctor ? (
-        <div className="admin-modal-backdrop" role="presentation">
-          <section className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="newsletter-history-title">
-            <div className="admin-modal-head">
-              <div>
-                <p className="admin-wheel-kicker">Newsletter History</p>
-                <h2 id="newsletter-history-title">{historyDoctor.full_name || "Unnamed doctor"}</h2>
-              </div>
-              <button type="button" onClick={() => setHistoryDoctorId(null)}>
-                Close
-              </button>
-            </div>
-            <div className="admin-history-list">
-              {historyItems.map((item) => (
-                <article key={item.id}>
-                  <strong>{item.newsletter_title || item.subject}</strong>
-                  <span>
-                    {item.status} - {formatAdminDate(item.sent_at)}
-                  </span>
-                  {item.error_message ? <p>{item.error_message}</p> : null}
-                </article>
-              ))}
             </div>
           </section>
         </div>
@@ -2210,35 +1671,10 @@ function formatAdminDate(value: string) {
   }).format(date);
 }
 
-function formatSendResult(result: NewsletterSendResult) {
-  if (result.status === "sent") return "Sent";
-  if (result.status === "skipped") return `Skipped${result.error ? ` - ${result.error}` : ""}`;
-  return `Failed${result.error ? ` - ${result.error}` : ""}`;
-}
-
 function formatSmsResult(result: SmsSendResult) {
   if (result.status === "sent") return "Sent";
   if (result.status === "skipped") return `Skipped${result.error ? ` - ${result.error}` : ""}`;
   return `Failed${result.error ? ` - ${result.error}` : ""}`;
-}
-
-function renderNewsletterPreview(html: string) {
-  const replacements: Record<string, string> = {
-    doctor_name: "Maria Santos",
-    name_prefix: "Dr.",
-    prefixed_name: "Dr. Maria Santos",
-    doctor_email: "doctor@example.com",
-    doctor_mobile: "09171234567",
-    specialty: "Internal Medicine",
-    clinic_location: "Makati City",
-    registered_at: "Jun 12, 2026",
-    prize_label: "GutGuard Tote",
-  };
-
-  return html.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, key: string) => {
-    if (!(key in replacements)) return match;
-    return escapeHtml(replacements[key]);
-  });
 }
 
 function renderSmsPreview(message: string) {

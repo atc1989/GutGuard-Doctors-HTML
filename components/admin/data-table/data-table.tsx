@@ -17,6 +17,7 @@ import {
 } from "@tanstack/react-table";
 import { ChevronLeft, ChevronRight, Columns3, Download, Search, X } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
+import { Checkbox } from "@/components/admin/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -68,6 +69,8 @@ type DataTableProps<TData> = {
   emptyText?: string;
   /** false hides search, filters, Columns and Export, for short lists. */
   toolbar?: boolean;
+  /** Adds a checkbox column; the header box selects every row matching the search and filters. */
+  selection?: { getId: (row: TData) => string; selected: string[]; onChange: (ids: string[]) => void };
 };
 
 export function DataTable<TData>({
@@ -84,6 +87,7 @@ export function DataTable<TData>({
   initialHidden = [],
   emptyText = "Nothing here yet.",
   toolbar = true,
+  selection,
 }: DataTableProps<TData>) {
   const [query, setQuery] = useState("");
   const searched = useMemo(() => {
@@ -91,9 +95,46 @@ export function DataTable<TData>({
     return q && searchText ? data.filter((row) => searchText(row).toLowerCase().includes(q)) : data;
   }, [data, query, searchText]);
 
+  const allColumns = useMemo<ColumnDef<TData, unknown>[]>(() => {
+    if (!selection) return columns;
+    const { getId, selected, onChange } = selection;
+    const picked = new Set(selected);
+    const toggle = (ids: string[], on: boolean) =>
+      onChange(on ? Array.from(new Set([...selected, ...ids])) : selected.filter((id) => !ids.includes(id)));
+    return [
+      {
+        id: "select",
+        enableSorting: false,
+        enableHiding: false,
+        header: ({ table }) => {
+          const ids = table.getPrePaginationRowModel().rows.map((row) => getId(row.original));
+          const count = ids.filter((id) => picked.has(id)).length;
+          return (
+            <Checkbox
+              aria-label={`Select all ${ids.length.toLocaleString()} matching rows`}
+              title={`Select all ${ids.length.toLocaleString()} matching rows`}
+              disabled={ids.length === 0}
+              checked={count > 0 && count === ids.length ? true : count > 0 ? "indeterminate" : false}
+              onCheckedChange={() => toggle(ids, count < ids.length)}
+            />
+          );
+        },
+        cell: ({ row }) => (
+          <Checkbox
+            aria-label="Select row"
+            checked={picked.has(getId(row.original))}
+            onClick={(event) => event.stopPropagation()}
+            onCheckedChange={(on) => toggle([getId(row.original)], on === true)}
+          />
+        ),
+      },
+      ...columns,
+    ];
+  }, [columns, selection]);
+
   const table = useReactTable({
     data: searched,
-    columns,
+    columns: allColumns,
     defaultColumn: { filterFn: inValues as FilterFn<TData> },
     initialState: {
       sorting: initialSort,
@@ -121,6 +162,16 @@ export function DataTable<TData>({
     );
     downloadCsv(exportName!, [cols.map((column) => column.columnDef.meta!.label), ...rows]);
   };
+
+  // With selection and no row action, clicking a row ticks its box.
+  const rowClick =
+    onRowClick ??
+    (selection
+      ? (row: TData) => {
+          const id = selection.getId(row);
+          selection.onChange(selection.selected.includes(id) ? selection.selected.filter((item) => item !== id) : [...selection.selected, id]);
+        }
+      : undefined);
 
   const { pageIndex, pageSize } = table.getState().pagination;
   const total = table.getFilteredRowModel().rows.length;
@@ -202,9 +253,17 @@ export function DataTable<TData>({
                     <th
                       key={header.id}
                       scope="col"
-                      className={cn("px-4 text-[13px] font-normal whitespace-nowrap text-muted-foreground", header.column.columnDef.meta?.align === "right" && "text-right")}
+                      className={cn(
+                        "px-4 text-[13px] font-normal whitespace-nowrap text-muted-foreground",
+                        header.column.columnDef.meta?.align === "right" && "text-right",
+                        header.column.id === "select" && "w-px pr-0",
+                      )}
                     >
-                      {header.isPlaceholder ? null : <ColumnHeader column={header.column} />}
+                      {header.isPlaceholder ? null : header.column.id === "select" ? (
+                        <span className="flex">{flexRender(header.column.columnDef.header, header.getContext())}</span>
+                      ) : (
+                        <ColumnHeader column={header.column} />
+                      )}
                     </th>
                   ))}
                 </tr>
@@ -223,16 +282,23 @@ export function DataTable<TData>({
                 table.getRowModel().rows.map((row) => (
                   <tr
                     key={row.id}
-                    onClick={onRowClick ? () => onRowClick(row.original) : undefined}
-                    onKeyDown={onRowClick ? (e) => e.key === "Enter" && onRowClick(row.original) : undefined}
-                    tabIndex={onRowClick ? 0 : undefined}
+                    onClick={rowClick ? () => rowClick(row.original) : undefined}
+                    onKeyDown={rowClick ? (e) => e.key === "Enter" && rowClick(row.original) : undefined}
+                    tabIndex={rowClick ? 0 : undefined}
                     className={cn(
                       "h-16 border-b border-border last:border-0",
-                      onRowClick && "cursor-pointer outline-none hover:bg-chrome/60 focus-visible:bg-chrome",
+                      rowClick && "cursor-pointer outline-none hover:bg-chrome/60 focus-visible:bg-chrome",
                     )}
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className={cn("px-4 py-2.5 align-middle", cell.column.columnDef.meta?.align === "right" && "text-right tabular-nums")}>
+                      <td
+                        key={cell.id}
+                        className={cn(
+                          "px-4 py-2.5 align-middle",
+                          cell.column.columnDef.meta?.align === "right" && "text-right tabular-nums",
+                          cell.column.id === "select" && "w-px pr-0 [&>button]:flex",
+                        )}
+                      >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}

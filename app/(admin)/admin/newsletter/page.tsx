@@ -1,4 +1,4 @@
-import AdminMessaging from "@/components/admin/AdminMessaging";
+import Newsletter from "@/components/admin/Newsletter";
 
 export const metadata = {
   title: "Newsletter Broadcast | GutGuard CRM",
@@ -6,5 +6,5 @@ export const metadata = {
 };
 
 export default function NewsletterAdminPage() {
-  return <AdminMessaging tab="newsletter" />;
+  return <Newsletter />;
 }
