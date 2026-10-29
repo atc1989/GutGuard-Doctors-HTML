@@ -1,6 +1,6 @@
 "use client";
 
-import type { FormEvent, ReactNode } from "react";
+import { Fragment, type FormEvent, type ReactNode } from "react";
 import { Label } from "@/components/admin/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/admin/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -38,6 +38,32 @@ export function EditSheet({
         </form>
       </SheetContent>
     </Sheet>
+  );
+}
+
+/** A titled block of fields (or anything else) inside an EditSheet. */
+export function FieldGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-3">
+      <h3 className="text-[13px] font-medium">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+/** Read-only label / value pairs; empty values show a dash. */
+export function DetailList({ title, items }: { title: string; items: [string, ReactNode][] }) {
+  return (
+    <FieldGroup title={title}>
+      <dl className="grid grid-cols-[128px_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-[13px]">
+        {items.map(([label, value]) => (
+          <Fragment key={label}>
+            <dt className="text-muted-foreground">{label}</dt>
+            <dd className="break-words">{value === "" || value === null || value === undefined ? "—" : value}</dd>
+          </Fragment>
+        ))}
+      </dl>
+    </FieldGroup>
   );
 }
 

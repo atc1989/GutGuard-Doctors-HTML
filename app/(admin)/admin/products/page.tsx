@@ -9,7 +9,7 @@ import { EditSheet, Field } from "@/components/admin/form";
 import { Badge } from "@/components/admin/ui/badge";
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
-import { NativeSelect, NativeSelectOption } from "@/components/admin/ui/native-select";
+import { Select } from "@/components/admin/ui/select";
 import { Textarea } from "@/components/admin/ui/textarea";
 import {
   isPromoLive,
@@ -190,7 +190,6 @@ export default function AdminProductsPage() {
       {notice ? <Alert>{notice}</Alert> : null}
 
       <Section
-        title="Products"
         actions={
           <div className="flex items-center gap-2">
             <FilterTabs
@@ -268,13 +267,12 @@ export default function AdminProductsPage() {
               </>
             ) : (
               <Field label="Image" htmlFor="product-image">
-                <NativeSelect id="product-image" value={draft.image} onChange={(e) => edit({ image: e.target.value })}>
-                  {SHOP_IMAGES.map((image) => (
-                    <NativeSelectOption key={image} value={image}>
-                      {image.replace("/shop/", "")}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
+                <Select
+                  id="product-image"
+                  value={draft.image}
+                  onValueChange={(image) => edit({ image })}
+                  options={SHOP_IMAGES.map((image) => ({ value: image, label: image.replace("/shop/", "") }))}
+                />
               </Field>
             )}
             <Field label="Display order" htmlFor="product-order">
@@ -307,13 +305,12 @@ export default function AdminProductsPage() {
           ) : null}
 
           <Field label="Status" htmlFor="product-status" hint={STATUSES.find(({ value }) => value === draft.status)?.help}>
-            <NativeSelect id="product-status" value={draft.status} onChange={(e) => edit({ status: e.target.value as ProductStatus })}>
-              {STATUSES.map(({ value, label }) => (
-                <NativeSelectOption key={value} value={value}>
-                  {label}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
+            <Select
+              id="product-status"
+              value={draft.status}
+              onValueChange={(status) => edit({ status: status as ProductStatus })}
+              options={STATUSES.map(({ value, label }) => ({ value, label }))}
+            />
           </Field>
 
           <div className="flex flex-col gap-1 rounded-lg border border-border bg-chrome p-4 text-[13px]" aria-live="polite">

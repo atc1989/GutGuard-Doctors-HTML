@@ -13,15 +13,26 @@ import {
   DialogTitle,
 } from "@/components/admin/ui/dialog"
 
+// Admin tweak: cmdk selects the first item as soon as the list opens, which reads as a stray
+// hover. Pointer hover now only shows :hover, and the keyboard highlight (data-selected) appears
+// once the arrow keys are used ("kb" class, reset when the list unmounts).
 function Command({
   className,
+  onKeyDown,
   ...props
 }: React.ComponentProps<typeof CommandPrimitive>) {
+  const [keyboard, setKeyboard] = React.useState(false)
   return (
     <CommandPrimitive
       data-slot="command"
+      disablePointerSelection
+      onKeyDown={(event) => {
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") setKeyboard(true)
+        onKeyDown?.(event)
+      }}
       className={cn(
         "flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground",
+        keyboard && "kb",
         className
       )}
       {...props}
@@ -73,7 +84,7 @@ function CommandInput({
       <CommandPrimitive.Input
         data-slot="command-input"
         className={cn(
-          "flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-hidden placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
+          "flex h-10 w-full rounded-md bg-transparent py-3 text-[13px] outline-hidden placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
           className
         )}
         {...props}
@@ -104,7 +115,7 @@ function CommandEmpty({
   return (
     <CommandPrimitive.Empty
       data-slot="command-empty"
-      className="py-6 text-center text-sm"
+      className="py-6 text-center text-[13px] text-muted-foreground"
       {...props}
     />
   )
@@ -147,7 +158,7 @@ function CommandItem({
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        "relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground",
+        "relative flex cursor-default items-center gap-2 rounded-md px-2 py-1.5 text-[13px] outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 hover:bg-muted [.kb_&]:data-[selected=true]:bg-muted [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground",
         className
       )}
       {...props}

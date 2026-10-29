@@ -17,6 +17,25 @@
 @source "../components/admin";
 @source "../app/(admin)";
 
+/* Our focus styles (replace shadcn's 3px gray halo). Keyboard navigation only: AdminShell sets
+   <html data-focus-source="keyboard"> on Tab / Enter / arrows / Escape and clears it on any
+   pointer press, so a mouse click never lights an element up - not even a text field, which
+   browsers otherwise always treat as :focus-visible.
+   focus-field: things you type in or pick a value with - a darker border and a faint halo.
+   focus-ring: buttons, tabs, menu triggers, links - a thin outline. */
+@utility focus-field {
+  :where([data-focus-source="keyboard"]) &:focus {
+    border-color: var(--muted-foreground);
+    box-shadow: 0 0 0 3px rgb(0 0 0 / 0.04);
+  }
+}
+@utility focus-ring {
+  :where([data-focus-source="keyboard"]) &:focus {
+    outline: 2px solid var(--muted-foreground);
+    outline-offset: 1px;
+  }
+}
+
 /* shadcn's base rule: Tailwind v4 borders default to the text colour (black); ours are light gray.
    In the base layer, so the legacy site rules and any border-* utility still win. */
 @layer base {

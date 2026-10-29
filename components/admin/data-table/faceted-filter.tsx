@@ -50,7 +50,7 @@ export function FacetedFilter<TData>({
 
   return (
     <Popover>
-      <PopoverTrigger className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 text-[13px] text-foreground outline-none hover:bg-chrome/60 focus-visible:ring-2 focus-visible:ring-ring/50">
+      <PopoverTrigger className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 text-[13px] text-foreground outline-none hover:bg-chrome/60 focus-ring">
         <Plus className="size-3.5 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
         {title}
         {selected.size > 0 && (

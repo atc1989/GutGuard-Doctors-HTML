@@ -24,7 +24,7 @@ export function ColumnHeader<TData>({ column }: { column: Column<TData, unknown>
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
-          "-mx-1.5 inline-flex h-7 items-center gap-1 rounded-md px-1.5 outline-none hover:bg-black/[0.04] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 data-[state=open]:bg-black/[0.04]",
+          "-mx-1.5 inline-flex h-7 items-center gap-1 rounded-md px-1.5 outline-none hover:bg-black/[0.04] hover:text-foreground focus-ring data-[state=open]:bg-black/[0.04]",
           sorted && "text-foreground",
           right && "float-right",
         )}

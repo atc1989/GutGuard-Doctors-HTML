@@ -1,4 +1,4 @@
-import AdminOrders from "@/components/AdminOrders";
+import AdminOrders from "@/components/admin/AdminOrders";
 
 export const metadata = {
   title: "Shop Orders | GutGuard CRM",

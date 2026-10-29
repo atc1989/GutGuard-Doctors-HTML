@@ -57,15 +57,20 @@ export function MetricCell({ label, icon: Icon, value, loading, footer, href }: 
   );
 }
 
-/** Section heading with an optional round count and a right-hand slot for tabs or buttons. */
-export function Section({ title, count, actions, children }: { title: string; count?: number; actions?: ReactNode; children: ReactNode }) {
+/**
+ * Section heading with an optional round count and a slot for tabs or buttons. Without a title
+ * (the topbar already names the page) the slot sits on the left.
+ */
+export function Section({ title, count, actions, children }: { title?: string; count?: number; actions?: ReactNode; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <h2 className="text-[15px] font-medium leading-6">{title}</h2>
-          {count !== undefined && <Badge variant="count">{count}</Badge>}
-        </div>
+        {title && (
+          <div className="flex items-center gap-2">
+            <h2 className="text-[15px] font-medium leading-6">{title}</h2>
+            {count !== undefined && <Badge variant="count">{count}</Badge>}
+          </div>
+        )}
         {actions}
       </div>
       {children}

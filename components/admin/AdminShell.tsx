@@ -110,6 +110,22 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
     checkAuth();
   }, [checkAuth]);
 
+  // Focus outlines show only while navigating by keyboard (see focus-field / focus-ring in admin.css).
+  useEffect(() => {
+    const root = document.documentElement;
+    const NAV_KEYS = new Set(["Tab", "Enter", "Escape", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
+    const onKey = (event: KeyboardEvent) => {
+      if (NAV_KEYS.has(event.key)) root.dataset.focusSource = "keyboard";
+    };
+    const onPointer = () => delete root.dataset.focusSource;
+    document.addEventListener("keydown", onKey, true);
+    document.addEventListener("pointerdown", onPointer, true);
+    return () => {
+      document.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("pointerdown", onPointer, true);
+    };
+  }, []);
+
   // Close mobile drawer on route change
   useEffect(() => {
     setMobileMenuOpen(false);

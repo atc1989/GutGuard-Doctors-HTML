@@ -3,7 +3,7 @@
 import { ChangeEvent, FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { QRCodeCanvas, QRCodeSVG } from "qrcode.react";
-import AdminOrders from "@/components/AdminOrders";
+import AdminOrders from "@/components/admin/AdminOrders";
 import { useAdminAccess } from "@/components/admin/AdminShell";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import { DownloadIcon } from "@/components/Icons";
