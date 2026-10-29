@@ -17,6 +17,15 @@
 @source "../components/admin";
 @source "../app/(admin)";
 
+/* shadcn's base rule: Tailwind v4 borders default to the text colour (black); ours are light gray.
+   In the base layer, so the legacy site rules and any border-* utility still win. */
+@layer base {
+  * {
+    border-color: var(--border);
+    outline-color: color-mix(in srgb, var(--ring) 50%, transparent);
+  }
+}
+
 /* Unlayered, so these beat the legacy site rules: no bone canvas or dotted texture in the admin. */
 body {
   background: var(--background);

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ChevronRight, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/admin/ui/badge";
 import { Skeleton } from "@/components/admin/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/admin/ui/tabs";
 import { cn } from "@/lib/utils";
 
 // Page building blocks for the admin redesign (spec: Obsidian "Admin Design Spec").
@@ -98,6 +99,69 @@ export function SkeletonRows({ rows = 3 }: { rows?: number }) {
         </div>
       ))}
     </LinkList>
+  );
+}
+
+/** Preset filters above a table: gray track, bordered white active tab, a count in each tab. */
+export function FilterTabs<T extends string>({
+  value,
+  onChange,
+  tabs,
+  label,
+}: {
+  value: T;
+  onChange: (value: T) => void;
+  tabs: { value: T; label: string; count?: number }[];
+  label: string;
+}) {
+  return (
+    <Tabs value={value} onValueChange={(next) => onChange(next as T)}>
+      <TabsList aria-label={label} className="h-9 max-w-full overflow-x-auto bg-[#f2f2f2] [scrollbar-width:none]">
+        {tabs.map((tab) => (
+          <TabsTrigger
+            key={tab.value}
+            value={tab.value}
+            className="flex-none px-3 text-[13px] font-normal text-muted-foreground data-[state=active]:border-border data-[state=active]:shadow-lift"
+          >
+            {tab.label}
+            {tab.count !== undefined && <Badge variant="count">{tab.count.toLocaleString("en-PH")}</Badge>}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
+  );
+}
+
+const DOT_TONE = {
+  green: "bg-up",
+  amber: "bg-[#d97706]",
+  red: "bg-down",
+  ink: "bg-foreground",
+  gray: "bg-subtle-foreground",
+} as const;
+
+/** Status as a small coloured dot plus its label. */
+export function StatusDot({ tone, children }: { tone: keyof typeof DOT_TONE; children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+      <span className={cn("size-1.5 shrink-0 rounded-full", DOT_TONE[tone])} aria-hidden="true" />
+      {children}
+    </span>
+  );
+}
+
+/** Page-level message: an error in red, anything else in gray. */
+export function Alert({ tone = "info", children }: { tone?: "info" | "error"; children: ReactNode }) {
+  return (
+    <p
+      role={tone === "error" ? "alert" : "status"}
+      className={cn(
+        "rounded-lg border px-3 py-2 text-[13px]",
+        tone === "error" ? "border-down/30 bg-down/5 text-down" : "border-border bg-chrome text-muted-foreground",
+      )}
+    >
+      {children}
+    </p>
   );
 }
 

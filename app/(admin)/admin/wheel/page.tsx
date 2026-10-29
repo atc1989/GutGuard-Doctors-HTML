@@ -2190,7 +2190,7 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
         </section>
       ) : null}
 
-      {activeTab === "orders" ? <AdminOrders partners={doctors} /> : null}
+      {activeTab === "orders" ? <AdminOrders /> : null}
 
       {activeTab === "newsletter" ? (
         <section className="admin-wheel-panel">

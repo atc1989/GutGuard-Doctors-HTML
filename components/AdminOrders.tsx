@@ -1,11 +1,18 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
+import { CreditCard, Plus, ReceiptText, RefreshCw, Truck, Wallet } from "lucide-react";
+import { Alert, FilterTabs, MetricCell, MetricStrip, PageBody, Section, StatusDot } from "@/components/admin/blocks";
+import { CellStack, DataTable } from "@/components/admin/data-table/data-table";
+import { Badge } from "@/components/admin/ui/badge";
+import { Button } from "@/components/admin/ui/button";
 import {
   adminCreateOfflineOrder,
   adminImpersonateDoctor,
   adminListShopOrders,
   adminUpdateShopOrder,
+  getDoctorRegistrations,
   loadShopCatalog,
   type AdminOfflineOrderInput,
   type ShopOrder,
@@ -50,7 +57,39 @@ const EMPTY_OFFLINE_ORDER: AdminOfflineOrderInput = {
   fulfillment: EMPTY_FULFILLMENT,
 };
 
-export default function AdminOrders({ partners }: { partners: PartnerLike[] }) {
+type OrderTab = "all" | "review" | "ship" | "fulfilled";
+
+const TAB_MATCH: Record<OrderTab, (order: ShopOrder) => boolean> = {
+  all: () => true,
+  review: (order) => order.status === "payment_review",
+  ship: (order) => order.status === "paid" || order.status === "confirmed",
+  fulfilled: (order) => order.status === "fulfilled",
+};
+
+const STATUS_VIEW: Record<ShopOrderStatus, [string, "gray" | "amber" | "ink" | "green"]> = {
+  pending_payment: ["Awaiting payment", "gray"],
+  payment_review: ["Payment review", "amber"],
+  paid: ["Paid", "ink"],
+  confirmed: ["Confirmed", "ink"],
+  fulfilled: ["Fulfilled", "green"],
+  cancelled: ["Cancelled", "gray"],
+};
+
+const STORE_TYPE_LABEL = { main: "Main store", affiliate: "Affiliate", lifestyle: "Lifestyle" } as const;
+
+const monthIndex = (iso: string) => {
+  const date = new Date(iso);
+  return date.getFullYear() * 12 + date.getMonth();
+};
+const shortItemName = (name: string) => name.replace(/^SynBIOTIC\+\s*/i, "");
+
+export default function AdminOrders() {
+  // Partner names for the "Came from" column. Failing to load them only falls back to the link slug.
+  const [partners, setPartners] = useState<PartnerLike[]>([]);
+  useEffect(() => {
+    getDoctorRegistrations().then(setPartners).catch(() => undefined);
+  }, []);
+  const [tab, setTab] = useState<OrderTab>("all");
   const [orders, setOrders] = useState<ShopOrder[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<ShopOrder | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -59,7 +98,6 @@ export default function AdminOrders({ partners }: { partners: PartnerLike[] }) {
   const { owner } = useAdminAccess();
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
   // Consignment/cash sale the admin is typing in; saved straight away as paid.
   const [newOrder, setNewOrder] = useState<AdminOfflineOrderInput | null>(null);
   const [newOrderError, setNewOrderError] = useState<string | null>(null);
@@ -114,7 +152,6 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
     try {
       const response = await adminListShopOrders();
       setOrders(response);
-      setNotice(`Loaded ${response.length} website order${response.length === 1 ? "" : "s"}.`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load website orders.");
     } finally {
@@ -127,10 +164,17 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
     loadOrders();
   }, [loadOrders]);
 
-  const filteredOrders = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return orders;
-    return orders.filter((order) =>
+  /** Partner name (or "Direct") for the "Came from" column, filter and CSV. */
+  const sourceName = useCallback(
+    (order: ShopOrder) =>
+      !order.referral_slug
+        ? "Direct"
+        : (order.referral_doctor_id ? partnerNames.get(order.referral_doctor_id) : "") || order.referral_slug,
+    [partnerNames],
+  );
+
+  const searchText = useCallback(
+    (order: ShopOrder) =>
       [
         order.order_code,
         order.customer_name,
@@ -139,24 +183,114 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
         order.city,
         order.province,
         order.barangay,
-        order.status,
         order.payment_method,
         salesChannel(order),
         order.maya_reference ?? "",
-        referralSource(order, partnerNames),
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(query),
-    );
-  }, [orders, partnerNames, search]);
+        sourceName(order),
+      ].join(" "),
+    [sourceName],
+  );
 
-  const metrics = useMemo(
-    () => ({
-      pending: orders.filter((order) => order.status === "pending_payment" || order.status === "payment_review").length,
-      confirmed: orders.filter((order) => order.status === "confirmed" || order.status === "fulfilled").length,
-    }),
-    [orders],
+  const metrics = useMemo(() => {
+    const thisMonth = new Date().getFullYear() * 12 + new Date().getMonth();
+    const paidThisMonth = orders.filter(
+      (order) => order.payment_status === "paid" && monthIndex(order.paid_at ?? order.created_at) === thisMonth,
+    );
+    return {
+      review: orders.filter(TAB_MATCH.review).length,
+      awaiting: orders.filter((order) => order.status === "pending_payment").length,
+      ship: orders.filter(TAB_MATCH.ship).length,
+      fulfilled: orders.filter(TAB_MATCH.fulfilled).length,
+      revenue: paidThisMonth.reduce((sum, order) => sum + order.total_amount, 0),
+      paidCount: paidThisMonth.length,
+      thisMonth: orders.filter((order) => monthIndex(order.created_at) === thisMonth).length,
+      lastMonth: orders.filter((order) => monthIndex(order.created_at) === thisMonth - 1).length,
+    };
+  }, [orders]);
+
+  const tabOrders = useMemo(() => orders.filter(TAB_MATCH[tab]), [orders, tab]);
+
+  const columns = useMemo<ColumnDef<ShopOrder, unknown>[]>(
+    () => [
+      {
+        id: "order",
+        accessorKey: "created_at",
+        meta: { label: "Order", csv: (order) => order.order_code },
+        cell: ({ row }) => <CellStack title={row.original.order_code} sub={formatAdminDate(row.original.created_at)} />,
+      },
+      {
+        id: "created",
+        accessorKey: "created_at",
+        meta: { label: "Created", csv: (order) => order.created_at },
+        cell: ({ row }) => formatAdminDate(row.original.created_at),
+      },
+      {
+        id: "customer",
+        accessorKey: "customer_name",
+        meta: { label: "Customer" },
+        cell: ({ row }) => <CellStack title={row.original.customer_name} sub={row.original.mobile} />,
+      },
+      { id: "mobile", accessorKey: "mobile", meta: { label: "Mobile" } },
+      { id: "email", accessorKey: "email", meta: { label: "Email" } },
+      {
+        id: "items",
+        accessorFn: (order) => order.items.map((item) => item.name).join(", "),
+        enableSorting: false,
+        meta: { label: "Items", csv: (order) => order.items.map((item) => `${item.name} x${item.qty}`).join("; ") },
+        cell: ({ row }) => (
+          <div className="flex flex-wrap gap-1.5">
+            {row.original.items.map((item) => (
+              <Badge key={item.id}>
+                {shortItemName(item.name)}
+                {item.qty > 1 ? ` ×${item.qty}` : ""}
+              </Badge>
+            ))}
+          </div>
+        ),
+      },
+      {
+        id: "source",
+        accessorFn: sourceName,
+        meta: { label: "Came from" },
+        cell: ({ row }) => {
+          const order = row.original;
+          const type = order.referral_doctor_id ? partnerStoreTypes.get(order.referral_doctor_id) : undefined;
+          const sub = !order.referral_slug ? undefined : order.referral_doctor_id ? (type ? STORE_TYPE_LABEL[type] : undefined) : "Not credited, self-referral";
+          return <CellStack title={sourceName(order)} sub={sub} />;
+        },
+      },
+      {
+        id: "payment_method",
+        accessorFn: (order) => formatStatus(order.payment_method),
+        meta: { label: "Payment method" },
+      },
+      {
+        id: "payment_status",
+        accessorFn: (order) => formatStatus(order.payment_status),
+        meta: { label: "Payment status" },
+      },
+      {
+        id: "reference",
+        accessorFn: (order) => order.maya_reference ?? "",
+        meta: { label: "Payment reference" },
+      },
+      {
+        id: "total",
+        accessorKey: "total_amount",
+        meta: { label: "Total", align: "right" },
+        cell: ({ row }) => formatPeso(row.original.total_amount),
+      },
+      {
+        id: "status",
+        accessorFn: (order) => STATUS_VIEW[order.status]?.[0] ?? formatStatus(order.status),
+        meta: { label: "Status" },
+        cell: ({ row }) => {
+          const [label, tone] = STATUS_VIEW[row.original.status] ?? [formatStatus(row.original.status), "gray"];
+          return <StatusDot tone={tone}>{label}</StatusDot>;
+        },
+      },
+    ],
+    [partnerStoreTypes, sourceName],
   );
 
   async function saveOrder(event: FormEvent<HTMLFormElement>) {
@@ -242,90 +376,91 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
   );
 
   return (
-    <section className="admin-wheel-panel admin-shop-orders-shell">
-      <div className="admin-wheel-panel-head">
-        <div>
-          <p className="admin-wheel-kicker">Order Queue</p>
-          <h2>Website orders</h2>
-        </div>
-        <p>
-          {metrics.pending} pending payment review. {metrics.confirmed} confirmed or fulfilled.
-        </p>
-      </div>
+    <>
+      <MetricStrip>
+        <MetricCell
+          label="Payments to review"
+          icon={CreditCard}
+          loading={isLoading}
+          value={metrics.review.toLocaleString("en-PH")}
+          footer={["Awaiting payment", metrics.awaiting.toLocaleString("en-PH")]}
+        />
+        <MetricCell
+          label="To ship"
+          icon={Truck}
+          loading={isLoading}
+          value={metrics.ship.toLocaleString("en-PH")}
+          footer={["Fulfilled", metrics.fulfilled.toLocaleString("en-PH")]}
+        />
+        <MetricCell
+          label="Revenue this month"
+          icon={Wallet}
+          loading={isLoading}
+          value={formatPeso(metrics.revenue)}
+          footer={["Paid orders", metrics.paidCount.toLocaleString("en-PH")]}
+        />
+        <MetricCell
+          label="Orders this month"
+          icon={ReceiptText}
+          loading={isLoading}
+          value={metrics.thisMonth.toLocaleString("en-PH")}
+          footer={["Last month", metrics.lastMonth.toLocaleString("en-PH")]}
+        />
+      </MetricStrip>
 
-      {error ? <div className="admin-wheel-alert error">{error}</div> : null}
-      {notice ? <div className="admin-wheel-alert">{notice}</div> : null}
+      <PageBody>
+        {error ? <Alert tone="error">{error}</Alert> : null}
+        {notice ? <Alert>{notice}</Alert> : null}
 
-      <div className="admin-shop-order-toolbar">
-        <label>
-          Search orders
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Name, mobile, code, status, partner"
+        <Section
+          title="Orders"
+          actions={
+            <FilterTabs
+              label="Filter orders by status"
+              value={tab}
+              onChange={setTab}
+              tabs={[
+                { value: "all", label: "All", count: orders.length },
+                { value: "review", label: "Payment review", count: metrics.review },
+                { value: "ship", label: "To ship", count: metrics.ship },
+                { value: "fulfilled", label: "Fulfilled", count: metrics.fulfilled },
+              ]}
+            />
+          }
+        >
+          <DataTable
+            data={tabOrders}
+            columns={columns}
+            loading={isLoading && orders.length === 0}
+            searchText={searchText}
+            searchPlaceholder="Search orders"
+            facets={[
+              { column: "source", title: "Came from" },
+              { column: "payment_method", title: "Payment" },
+            ]}
+            exportName="gutguard-orders"
+            onRowClick={setSelectedOrder}
+            initialHidden={["created", "mobile", "email", "payment_method", "payment_status", "reference"]}
+            emptyText="No orders yet."
+            actions={
+              <>
+                <Button variant="outline" size="icon-sm" onClick={loadOrders} disabled={isLoading} aria-label="Refresh orders" title="Refresh orders" className="rounded-lg shadow-none">
+                  <RefreshCw className={isLoading ? "animate-spin" : undefined} strokeWidth={1.5} />
+                </Button>
+                <Button size="sm" onClick={openNewOrder} className="h-8 rounded-lg text-[13px]">
+                  <Plus strokeWidth={1.5} />
+                  Add order
+                </Button>
+              </>
+            }
           />
-        </label>
-        <button type="button" onClick={loadOrders} disabled={isLoading}>
-          {isLoading ? "Loading" : "Refresh orders"}
-        </button>
-        <button type="button" onClick={openNewOrder}>
-          Add order
-        </button>
-      </div>
+        </Section>
+      </PageBody>
 
-      {filteredOrders.length > 0 ? (
-        <div className="admin-table-table-wrap">
-          <table className="admin-table-table admin-shop-orders-table">
-            <thead>
-              <tr>
-                <th>Order</th>
-                <th>Customer</th>
-                <th>Mobile</th>
-                <th>Status</th>
-                <th>Payment</th>
-                <th>Came from</th>
-                <th>Total</th>
-                <th>Created</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredOrders.map((order) => (
-                <tr key={order.id}>
-                  <td>{order.order_code}</td>
-                  <td>
-                    <strong>{order.customer_name}</strong>
-                    <span>{order.email}</span>
-                  </td>
-                  <td>{order.mobile}</td>
-                  <td>
-                    {formatStatus(order.status)}
-                    <span>{formatStatus(order.payment_status)}</span>
-                  </td>
-                  <td>
-                    {formatStatus(order.payment_method)}
-                    <span>{salesChannel(order)}</span>
-                  </td>
-                  <td>{referralSource(order, partnerNames, partnerStoreTypes)}</td>
-                  <td>{formatPeso(order.total_amount)}</td>
-                  <td>{formatAdminDate(order.created_at)}</td>
-                  <td>
-                    <div className="admin-table-row-actions">
-                      <button type="button" onClick={() => setSelectedOrder(order)}>
-                        View
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <section className="admin-wheel-empty">
-          <p>{isLoading ? "Loading website orders." : "No website orders match the current search."}</p>
-        </section>
-      )}
+      {/* ponytail: the old detail and Add-order pop-ups stay until part 2 moves them into a Sheet.
+          Their inputs and buttons are only styled inside .admin-wheel-shell, so keep that ancestor
+          without letting it take up any space. */}
+      <div className="admin-wheel-shell contents">
 
       {selectedOrder ? (
         <div className="admin-modal-backdrop" role="presentation">
@@ -659,7 +794,8 @@ This signs you in as them and is recorded in the impersonation log. Any partner 
           </form>
         </div>
       ) : null}
-    </section>
+      </div>
+    </>
   );
 }
 

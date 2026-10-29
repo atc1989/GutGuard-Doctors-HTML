@@ -1,4 +1,4 @@
-import AdminWheelPage from "@/app/(admin)/admin/wheel/page";
+import AdminOrders from "@/components/AdminOrders";
 
 export const metadata = {
   title: "Shop Orders | GutGuard CRM",
@@ -6,5 +6,5 @@ export const metadata = {
 };
 
 export default function OrdersAdminPage() {
-  return <AdminWheelPage defaultTab="orders" />;
+  return <AdminOrders />;
 }

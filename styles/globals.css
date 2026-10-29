@@ -3308,31 +3308,6 @@
   font-weight: 700;
 }
 
-.admin-shop-order-toolbar {
-  margin-bottom: 16px;
-}
-
-.admin-shop-order-toolbar label {
-  display: grid;
-  gap: 7px;
-  color: var(--ink-3);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.admin-shop-orders-table td strong,
-.admin-shop-orders-table td span {
-  display: block;
-}
-
-.admin-shop-orders-table td span {
-  margin-top: 4px;
-  color: var(--ink-3);
-  font-size: 12px;
-}
-
 .admin-shop-orders-shell .admin-table-table-wrap {
   overflow-x: visible;
 }
@@ -3341,14 +3316,11 @@
   max-width: 1360px;
 }
 
-.admin-shop-orders-table,
 .admin-shop-line-items-table {
   min-width: 0;
   table-layout: fixed;
 }
 
-.admin-shop-orders-table th,
-.admin-shop-orders-table td,
 .admin-shop-line-items-table th,
 .admin-shop-line-items-table td {
   padding: 12px 10px;
@@ -3356,57 +3328,7 @@
   word-break: normal;
 }
 
-.admin-shop-orders-table th:nth-child(1),
-.admin-shop-orders-table td:nth-child(1) {
-  width: 15%;
-}
-
-.admin-shop-orders-table th:nth-child(2),
-.admin-shop-orders-table td:nth-child(2) {
-  width: 19%;
-}
-
-.admin-shop-orders-table th:nth-child(3),
-.admin-shop-orders-table td:nth-child(3) {
-  width: 13%;
-}
-
-.admin-shop-orders-table th:nth-child(4),
-.admin-shop-orders-table td:nth-child(4) {
-  width: 13%;
-}
-
 /* Came from: a partner's full name, so it needs more room than the Maya ref it replaced. */
-.admin-shop-orders-table th:nth-child(5),
-.admin-shop-orders-table td:nth-child(5) {
-  width: 13%;
-}
-
-.admin-shop-orders-table th:nth-child(6),
-.admin-shop-orders-table td:nth-child(6) {
-  width: 9%;
-}
-
-.admin-shop-orders-table th:nth-child(7),
-.admin-shop-orders-table td:nth-child(7) {
-  width: 12%;
-}
-
-.admin-shop-orders-table th:nth-child(8),
-.admin-shop-orders-table td:nth-child(8) {
-  width: 6%;
-  text-align: right;
-}
-
-.admin-shop-orders-table .admin-table-row-actions button {
-  min-height: 32px;
-  padding: 8px 10px;
-  white-space: nowrap;
-}
-
-.admin-shop-orders-table .admin-table-row-actions {
-  justify-content: flex-end;
-}
 
 .admin-shop-line-items-table.compact {
   min-width: 0;

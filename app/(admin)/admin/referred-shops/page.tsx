@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import AdminPageHeader from "@/components/admin/AdminPageHeader";
 import type { AdminShop } from "@/app/api/admin/referred-shops/route";
+import { downloadCsv } from "@/lib/csv";
 
 const peso = (value: number) =>
   new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value);
@@ -14,8 +15,7 @@ const storeLabel = (type: string) => STORE_TYPES[type] ?? type;
 
 type Sort = "newest" | "sales" | "orders" | "name";
 
-/** RFC 4180 quoting, so addresses with commas stay in one cell in Excel. */
-function toCsv(shops: AdminShop[]) {
+function csvRows(shops: AdminShop[]) {
   const header = ["Shop / owner", "Clinic address", "Mobile", "Email", "Store type", "Referred by", "Main store", "Joined", "Orders", "Paid sales (PHP)"];
   const rows = shops.map((shop) => [
     shop.name,
@@ -29,7 +29,7 @@ function toCsv(shops: AdminShop[]) {
     String(shop.orders),
     String(shop.sales),
   ]);
-  return [header, ...rows].map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(",")).join("\r\n");
+  return [header, ...rows];
 }
 
 export default function AdminReferredShopsPage() {
@@ -106,16 +106,7 @@ export default function AdminReferredShopsPage() {
     );
   }, [visible]);
 
-  function downloadCsv() {
-    // BOM so Excel reads ₱ and ñ in addresses correctly.
-    const blob = new Blob(["﻿" + toCsv(visible)], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `gutguard-shops-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-  }
+  const exportCsv = () => downloadCsv("gutguard-shops", csvRows(visible));
 
   const referredCount = shops.filter((shop) => shop.referrerId).length;
   const totals = visible.reduce((sum, shop) => ({ orders: sum.orders + shop.orders, sales: sum.sales + shop.sales }), {
@@ -247,7 +238,7 @@ export default function AdminReferredShopsPage() {
             <span>
               {visible.length} shops · {totals.orders} orders · {peso(totals.sales)} paid sales
             </span>
-            <button type="button" onClick={downloadCsv} disabled={visible.length === 0}>
+            <button type="button" onClick={exportCsv} disabled={visible.length === 0}>
               Download CSV
             </button>
           </div>
