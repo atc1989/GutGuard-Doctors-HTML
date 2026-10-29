@@ -629,15 +629,15 @@ export async function claimPrize(doctorId: string | null | undefined): Promise<P
   return PRIZES[pickPrizeIndex()];
 }
 
-export async function adminLogin(password: string): Promise<boolean> {
+export async function adminLogin(username: string, password: string): Promise<boolean> {
   const res = await fetch("/api/admin/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ password }),
+    body: JSON.stringify({ username, password }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || "Invalid admin password.");
+    throw new Error(data.error || "Wrong username or password.");
   }
   return true;
 }

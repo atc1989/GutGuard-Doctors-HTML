@@ -8,6 +8,7 @@ import {
   ChevronRight,
   ExternalLink,
   Gift,
+  KeyRound,
   LayoutDashboard,
   ListOrdered,
   LoaderCircle,
@@ -24,6 +25,7 @@ import {
   Star,
   Store,
   Tag,
+  UserRound,
   Users,
   Wallet,
   X,
@@ -57,7 +59,7 @@ type NavGroup = {
   items: NavItem[];
 };
 
-const NAV_GROUPS: NavGroup[] = [
+export const NAV_GROUPS: NavGroup[] = [
   {
     title: "Overview",
     items: [
@@ -97,6 +99,11 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/admin/testimonials", label: "Testimonials", icon: Star },
     ],
   },
+  {
+    // "staff" is never a staff module, so canOpen shows this to the super admin only.
+    title: "Settings",
+    items: [{ href: "/admin/staff", label: "Staff Accounts", icon: KeyRound }],
+  },
 ];
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
@@ -105,6 +112,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const [isChecking, setIsChecking] = useState(true);
   const [access, setAccess] = useState<AdminSessionInfo | null>(null);
   const isAuthenticated = Boolean(access);
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -131,11 +139,11 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!password.trim()) return;
+    if (!username.trim() || !password.trim()) return;
     setLoggingIn(true);
     setError(null);
     try {
-      await adminLogin(password);
+      await adminLogin(username, password);
       setPassword("");
       await checkAuth();
       router.refresh();
@@ -201,14 +209,32 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             </div>
             <p className="admin-crm-login-kicker">GutGuard Philippines</p>
             <h1>Operations CRM</h1>
-            <p className="admin-crm-login-sub">Enter administrator password to access the operational controls.</p>
+            <p className="admin-crm-login-sub">Sign in with your admin username and password.</p>
           </div>
 
           <form onSubmit={handleLogin} className="admin-crm-login-form">
             {error && <div className="admin-crm-login-error" role="alert">{error}</div>}
 
             <div className="admin-crm-field">
-              <label htmlFor="admin-password">Administrator Password</label>
+              <label htmlFor="admin-username">Username</label>
+              <div className="admin-crm-input-wrap">
+                <UserRound size={17} className="admin-crm-field-icon" />
+                <input
+                  id="admin-username"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  disabled={loggingIn}
+                  autoFocus
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="admin-crm-field">
+              <label htmlFor="admin-password">Password</label>
               <div className="admin-crm-input-wrap">
                 <Lock size={17} className="admin-crm-field-icon" />
                 <input
@@ -219,13 +245,12 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={loggingIn}
-                  autoFocus
                   required
                 />
               </div>
             </div>
 
-            <button type="submit" className="admin-crm-primary-btn" disabled={loggingIn || !password.trim()}>
+            <button type="submit" className="admin-crm-primary-btn" disabled={loggingIn || !username.trim() || !password.trim()}>
               {loggingIn ? (
                 <>
                   <LoaderCircle size={18} className="admin-crm-spinner" />

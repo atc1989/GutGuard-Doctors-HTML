@@ -8,21 +8,23 @@ import {
 } from "@/lib/admin-session";
 
 export async function POST(req: NextRequest) {
+  let username = "";
   let password = "";
   try {
     const body = await req.json();
+    username = typeof body?.username === "string" ? body.username : "";
     password = typeof body?.password === "string" ? body.password : "";
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  if (!password) {
-    return NextResponse.json({ error: "Admin password is required." }, { status: 400 });
+  if (!username || !password) {
+    return NextResponse.json({ error: "Username and password are required." }, { status: 400 });
   }
 
-  const name = await matchAdminLogin(password);
+  const name = await matchAdminLogin(username, password);
   if (!name) {
-    return NextResponse.json({ error: "Invalid admin password." }, { status: 401 });
+    return NextResponse.json({ error: "Wrong username or password." }, { status: 401 });
   }
 
   const token = createAdminSessionToken(name);
