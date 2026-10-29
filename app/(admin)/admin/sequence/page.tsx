@@ -1,4 +1,4 @@
-import AdminMessaging from "@/components/admin/AdminMessaging";
+import EmailSequence from "@/components/admin/EmailSequence";
 
 export const metadata = {
   title: "Email Onboarding Sequence | GutGuard CRM",
@@ -6,5 +6,5 @@ export const metadata = {
 };
 
 export default function SequenceAdminPage() {
-  return <AdminMessaging tab="sequence" />;
+  return <EmailSequence />;
 }

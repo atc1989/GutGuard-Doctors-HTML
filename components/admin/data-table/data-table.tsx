@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -136,6 +136,9 @@ export function DataTable<TData>({
     data: searched,
     columns: allColumns,
     defaultColumn: { filterFn: inValues as FilterFn<TData> },
+    // TanStack's own reset queues a state update from render, which React flags when the rows
+    // change before the table has mounted. The effect below does the same reset after render.
+    autoResetPageIndex: false,
     initialState: {
       sorting: initialSort,
       columnVisibility: Object.fromEntries(initialHidden.map((id) => [id, false])),
@@ -149,7 +152,13 @@ export function DataTable<TData>({
     getFacetedUniqueValues: getFacetedUniqueValues(),
   });
 
-  const filtered = query !== "" || table.getState().columnFilters.length > 0;
+  // Back to page 1 whenever the rows, search or filters change.
+  const columnFilters = table.getState().columnFilters;
+  useEffect(() => {
+    if (table.getState().pagination.pageIndex !== 0) table.setPageIndex(0);
+  }, [table, searched, columnFilters]);
+
+  const filtered = query !== "" || columnFilters.length > 0;
   const reset = () => {
     setQuery("");
     table.resetColumnFilters();
@@ -186,10 +195,7 @@ export function DataTable<TData>({
             <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
             <Input
               value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                table.setPageIndex(0);
-              }}
+              onChange={(e) => setQuery(e.target.value)}
               placeholder={searchPlaceholder}
               aria-label={searchPlaceholder}
               className="h-8 rounded-lg pl-8 text-[13px] shadow-none md:text-[13px]"
