@@ -66,6 +66,8 @@ type DataTableProps<TData> = {
   initialSort?: SortingState;
   initialHidden?: string[];
   emptyText?: string;
+  /** false hides search, filters, Columns and Export, for short lists. */
+  toolbar?: boolean;
 };
 
 export function DataTable<TData>({
@@ -81,6 +83,7 @@ export function DataTable<TData>({
   initialSort = [],
   initialHidden = [],
   emptyText = "Nothing here yet.",
+  toolbar = true,
 }: DataTableProps<TData>) {
   const [query, setQuery] = useState("");
   const searched = useMemo(() => {
@@ -125,6 +128,7 @@ export function DataTable<TData>({
 
   return (
     <div className="flex flex-col gap-3">
+      {toolbar && (
       <div className="flex flex-wrap items-center gap-2">
         {searchText && (
           <div className="relative w-full sm:w-64">
@@ -186,6 +190,7 @@ export function DataTable<TData>({
           {actions}
         </div>
       </div>
+      )}
 
       <div className="overflow-hidden rounded-xl border border-border">
         <div className="overflow-x-auto">
@@ -245,6 +250,7 @@ export function DataTable<TData>({
         </div>
       </div>
 
+      {total > PAGE_SIZES[0] && (
       <div className="flex flex-wrap items-center justify-between gap-3 text-[13px] text-muted-foreground">
         <span className="tabular-nums">
           {total === 0
@@ -279,6 +285,7 @@ export function DataTable<TData>({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

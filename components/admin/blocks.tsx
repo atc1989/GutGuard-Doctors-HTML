@@ -150,16 +150,16 @@ export function StatusDot({ tone, children }: { tone: keyof typeof DOT_TONE; chi
   );
 }
 
-/** Page-level message: an error in red, anything else in gray. */
-export function Alert({ tone = "info", children }: { tone?: "info" | "error"; children: ReactNode }) {
+const ALERT_TONE = {
+  info: "border-border bg-chrome text-muted-foreground",
+  warning: "border-[#d97706]/30 bg-[#d97706]/5 text-[#92400e]",
+  error: "border-down/30 bg-down/5 text-down",
+} as const;
+
+/** Page or form message: gray info, amber warning, red error. */
+export function Alert({ tone = "info", children }: { tone?: keyof typeof ALERT_TONE; children: ReactNode }) {
   return (
-    <p
-      role={tone === "error" ? "alert" : "status"}
-      className={cn(
-        "rounded-lg border px-3 py-2 text-[13px]",
-        tone === "error" ? "border-down/30 bg-down/5 text-down" : "border-border bg-chrome text-muted-foreground",
-      )}
-    >
+    <p role={tone === "info" ? "status" : "alert"} className={cn("rounded-lg border px-3 py-2 text-[13px]", ALERT_TONE[tone])}>
       {children}
     </p>
   );

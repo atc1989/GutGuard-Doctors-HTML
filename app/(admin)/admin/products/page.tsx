@@ -1,7 +1,16 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
-import AdminPageHeader from "@/components/admin/AdminPageHeader";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
+import { RefreshCw } from "lucide-react";
+import { Alert, FilterTabs, PageBody, Section, StatusDot } from "@/components/admin/blocks";
+import { CellStack, DataTable } from "@/components/admin/data-table/data-table";
+import { EditSheet, Field } from "@/components/admin/form";
+import { Badge } from "@/components/admin/ui/badge";
+import { Button } from "@/components/admin/ui/button";
+import { Input } from "@/components/admin/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/components/admin/ui/native-select";
+import { Textarea } from "@/components/admin/ui/textarea";
 import {
   isPromoLive,
   promoPerCap,
@@ -17,16 +26,12 @@ type AdminProduct = Product & { updatedAt: string };
 const peso = (value: number) =>
   new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", maximumFractionDigits: 0 }).format(value);
 
-const STATUS_TABS: { value: ProductStatus; label: string; help: string }[] = [
-  { value: "active", label: "Active", help: "In the shop and can be bought." },
-  { value: "hidden", label: "Hidden", help: "Not in the shop. Still in promos - easy to bring back." },
-  { value: "archived", label: "Archived", help: "Retired. Not in the shop or the promo picker. Never deleted." },
+const STATUSES: { value: ProductStatus; label: string; help: string; tone: "green" | "gray" }[] = [
+  { value: "active", label: "Active", help: "In the shop and can be bought.", tone: "green" },
+  { value: "hidden", label: "Hidden", help: "Not in the shop. Still in promos, so it's easy to bring back.", tone: "gray" },
+  { value: "archived", label: "Archived", help: "Retired. Not in the shop or the promo picker. Never deleted.", tone: "gray" },
 ];
-
-const GROUPS: { kind: Product["kind"]; label: string }[] = [
-  { kind: "protocol", label: "Full Protocol" },
-  { kind: "trial", label: "Try First" },
-];
+const KIND_LABEL: Record<Product["kind"], string> = { protocol: "Protocol", trial: "Try first" };
 
 async function request<T>(url: string, body?: unknown): Promise<T> {
   const res = await fetch(url, {
@@ -39,22 +44,18 @@ async function request<T>(url: string, body?: unknown): Promise<T> {
   return data as T;
 }
 
+const whole = (value: string) => Math.round(Number(value));
+
 export default function AdminProductsPage() {
-  const [loaded, setLoaded] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [promos, setPromos] = useState<Promo[]>([]);
-  const [drafts, setDrafts] = useState<Record<string, AdminProduct>>({});
   const [tab, setTab] = useState<ProductStatus>("active");
-  const [savingId, setSavingId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<AdminProduct | null>(null);
+  const [draft, setDraft] = useState<AdminProduct | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-
-  // AdminShell only renders this page once the admin session is valid.
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   async function load() {
     setIsLoading(true);
@@ -66,8 +67,6 @@ export default function AdminProductsPage() {
       ]);
       setProducts(productData.products);
       setPromos(promoData.promos);
-      setDrafts({});
-      setLoaded(true);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not load products.");
     } finally {
@@ -75,286 +74,272 @@ export default function AdminProductsPage() {
     }
   }
 
+  // AdminShell only renders this page once the admin session is valid.
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  function edit(product: AdminProduct, patch: Partial<AdminProduct>) {
-    setDrafts((current) => ({ ...current, [product.id]: { ...(current[product.id] ?? product), ...patch } }));
-  }
+  const now = useMemo(() => new Date(), []);
+  const livePromos = useMemo(() => promos.filter((promo) => isPromoLive(promo, now)), [promos, now]);
 
-  async function save(product: AdminProduct, draft: AdminProduct) {
-    if (
-      draft.price !== product.price &&
-      !window.confirm(
-        `Change ${product.name} from ${peso(product.price)} to ${peso(draft.price)}?\n\n` +
-          "Customers with an unpaid order at the old price will be asked to rebuild their basket.",
-      )
-    ) {
-      return;
-    }
-    setSavingId(product.id);
-    setError(null);
+  const open = (product: AdminProduct) => {
+    setEditing(product);
+    setDraft(product);
     setNotice(null);
+  };
+  const close = () => {
+    setEditing(null);
+    setDraft(null);
+  };
+  const edit = (patch: Partial<AdminProduct>) => setDraft((current) => (current ? { ...current, ...patch } : current));
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editing || !draft) return;
+    setIsSaving(true);
+    setError(null);
     try {
       const { product: saved } = await request<{ product: AdminProduct }>("/api/admin/products", draft);
       setProducts((current) => current.map((row) => (row.id === saved.id ? saved : row)));
-      setDrafts((current) => {
-        const next = { ...current };
-        delete next[product.id];
-        return next;
-      });
-      setNotice(
-        saved.status === product.status
-          ? `${saved.name} saved.`
-          : `${saved.name} is now ${saved.status}.`,
-      );
+      setNotice(saved.status === editing.status ? `${saved.name} saved.` : `${saved.name} is now ${saved.status}.`);
+      close();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not save product.");
     } finally {
-      setSavingId(null);
+      setIsSaving(false);
     }
   }
 
-  const now = new Date();
-  const livePromos = promos.filter((promo) => isPromoLive(promo, now));
   const counts = Object.fromEntries(
-    STATUS_TABS.map(({ value }) => [value, products.filter((product) => product.status === value).length]),
+    STATUSES.map(({ value }) => [value, products.filter((product) => product.status === value).length]),
   ) as Record<ProductStatus, number>;
+  const rows = useMemo(() => products.filter((product) => product.status === tab), [products, tab]);
+
+  const columns = useMemo<ColumnDef<AdminProduct, unknown>[]>(
+    () => [
+      {
+        id: "name",
+        accessorKey: "name",
+        meta: { label: "Product" },
+        cell: ({ row }) => (
+          <CellStack
+            title={
+              <span className="inline-flex items-center gap-2">
+                {row.original.name}
+                {row.original.tag ? <Badge>{row.original.tag}</Badge> : null}
+              </span>
+            }
+            sub={row.original.phase || undefined}
+          />
+        ),
+      },
+      {
+        id: "type",
+        accessorFn: (product) => KIND_LABEL[product.kind],
+        meta: { label: "Type" },
+        cell: ({ getValue }) => <Badge>{String(getValue())}</Badge>,
+      },
+      {
+        id: "price",
+        accessorKey: "price",
+        meta: { label: "Price", align: "right" },
+        cell: ({ row }) => {
+          const live = promoPrice(row.original.id, row.original.price, livePromos, now);
+          return (
+            <CellStack
+              title={peso(row.original.price)}
+              sub={live.promo ? `${peso(live.price)} with ${live.promo.name}` : undefined}
+            />
+          );
+        },
+      },
+      {
+        id: "perCap",
+        accessorKey: "perCap",
+        meta: { label: "Per capsule", align: "right" },
+        cell: ({ row }) => peso(row.original.perCap),
+      },
+      { id: "caps", accessorKey: "caps", meta: { label: "Capsules", align: "right" } },
+      {
+        id: "status",
+        accessorKey: "status",
+        meta: { label: "Status" },
+        cell: ({ row }) => {
+          const status = STATUSES.find(({ value }) => value === row.original.status);
+          return <StatusDot tone={status?.tone ?? "gray"}>{status?.label ?? row.original.status}</StatusDot>;
+        },
+      },
+      { id: "sortOrder", accessorKey: "sortOrder", meta: { label: "Display order", align: "right" } },
+      {
+        id: "updated",
+        accessorKey: "updatedAt",
+        meta: { label: "Last changed" },
+        cell: ({ row }) => (row.original.updatedAt ? new Date(row.original.updatedAt).toLocaleString("en-PH") : "Never"),
+      },
+    ],
+    [livePromos, now],
+  );
+
+  const priceChanged = Boolean(editing && draft && draft.price !== editing.price);
+  const dirty = Boolean(editing && draft && JSON.stringify(draft) !== JSON.stringify(editing));
 
   return (
-    <div className="admin-wheel-shell admin-shop-orders-shell">
-      <AdminPageHeader
-        kicker="GutGuard shop"
-        title="Product Catalog"
-        description="Prices, per-capsule copy and shop visibility for every product."
+    <PageBody>
+      {error && !editing ? <Alert tone="error">{error}</Alert> : null}
+      {notice ? <Alert>{notice}</Alert> : null}
+
+      <Section
+        title="Products"
+        actions={
+          <div className="flex items-center gap-2">
+            <FilterTabs
+              label="Filter products by status"
+              value={tab}
+              onChange={setTab}
+              tabs={STATUSES.map(({ value, label }) => ({ value, label, count: counts[value] }))}
+            />
+            <Button variant="outline" size="icon-sm" onClick={load} disabled={isLoading} aria-label="Refresh products" title="Refresh products" className="rounded-lg shadow-none">
+              <RefreshCw className={isLoading ? "animate-spin" : undefined} strokeWidth={1.5} />
+            </Button>
+          </div>
+        }
       >
-        <button type="button" className="admin-overview-action-btn" onClick={load} disabled={isLoading}>
-          {isLoading ? "Loading" : "Refresh"}
-        </button>
-      </AdminPageHeader>
+        <DataTable
+          data={rows}
+          columns={columns}
+          loading={isLoading && products.length === 0}
+          toolbar={false}
+          onRowClick={open}
+          initialSort={[
+            { id: "type", desc: false },
+            { id: "sortOrder", desc: false },
+          ]}
+          initialHidden={["sortOrder", "updated"]}
+          emptyText={`No ${tab} products.`}
+        />
+      </Section>
 
-      {notice ? <div className="admin-wheel-alert">{notice}</div> : null}
-      {error ? <div className="admin-wheel-alert error">{error}</div> : null}
+      {draft && editing ? (
+        <EditSheet
+          open
+          onOpenChange={(isOpen) => !isOpen && close()}
+          title={editing.name}
+          description={`${KIND_LABEL[editing.kind]} · ID ${editing.id}`}
+          onSubmit={save}
+          footer={
+            <>
+              <Button type="button" variant="ghost" size="sm" onClick={close}>
+                Cancel
+              </Button>
+              <Button type="submit" size="sm" disabled={!dirty || isSaving}>
+                {isSaving ? "Saving" : priceChanged ? "Save new price" : "Save"}
+              </Button>
+            </>
+          }
+        >
+          {error ? <Alert tone="error">{error}</Alert> : null}
 
-      {loaded ? (
-        <section className="admin-wheel-panel">
-          <div className="admin-wheel-panel-head">
-            <div>
-              <p className="admin-wheel-kicker">Catalog</p>
-              <h2>Shop products</h2>
-            </div>
-            <p>
-              Price is what checkout charges. Price per capsule is what the shop shows - type it in, it is not
-              calculated. Products are never deleted: hide or archive them instead.
+          <Field label="Name" htmlFor="product-name">
+            <Input id="product-name" value={draft.name} onChange={(e) => edit({ name: e.target.value })} required />
+          </Field>
+
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="Price (₱)" htmlFor="product-price">
+              <Input id="product-price" type="number" min={1} value={draft.price || ""} onChange={(e) => edit({ price: whole(e.target.value) })} required />
+            </Field>
+            <Field label="Per capsule (₱)" htmlFor="product-percap">
+              <Input id="product-percap" type="number" min={1} value={draft.perCap || ""} onChange={(e) => edit({ perCap: whole(e.target.value) })} required />
+            </Field>
+            <Field label="Capsules" htmlFor="product-caps">
+              <Input id="product-caps" type="number" min={1} value={draft.caps || ""} onChange={(e) => edit({ caps: whole(e.target.value) })} required />
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {draft.kind === "protocol" ? (
+              <>
+                <Field label="Phase" htmlFor="product-phase">
+                  <Input id="product-phase" value={draft.phase} placeholder="30-day" onChange={(e) => edit({ phase: e.target.value })} />
+                </Field>
+                <Field label="Tag" htmlFor="product-tag">
+                  <Input id="product-tag" value={draft.tag} placeholder="Popular" onChange={(e) => edit({ tag: e.target.value })} />
+                </Field>
+              </>
+            ) : (
+              <Field label="Image" htmlFor="product-image">
+                <NativeSelect id="product-image" value={draft.image} onChange={(e) => edit({ image: e.target.value })}>
+                  {SHOP_IMAGES.map((image) => (
+                    <NativeSelectOption key={image} value={image}>
+                      {image.replace("/shop/", "")}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </Field>
+            )}
+            <Field label="Display order" htmlFor="product-order">
+              <Input id="product-order" type="number" value={draft.sortOrder} onChange={(e) => edit({ sortOrder: whole(e.target.value) })} />
+            </Field>
+          </div>
+
+          {draft.kind === "protocol" ? (
+            <>
+              <Field label="Dosage line" htmlFor="product-dosage" hint="Shown on the product card.">
+                <Input id="product-dosage" value={draft.dosage} placeholder="2–4 capsules a day" onChange={(e) => edit({ dosage: e.target.value })} />
+              </Field>
+              <Field label="What's included" htmlFor="product-includes" hint="One per line. Shown when the product is selected.">
+                <Textarea
+                  id="product-includes"
+                  value={draft.includes.join("\n")}
+                  placeholder={"SynBIOTIC+ (330 capsules)\nLifestyle Protocol"}
+                  onChange={(e) => edit({ includes: e.target.value.split("\n") })}
+                />
+              </Field>
+              <Field label="Note under the included list" htmlFor="product-note">
+                <Input
+                  id="product-note"
+                  value={draft.includesNote}
+                  placeholder="Lower rate for completing the full 90 days."
+                  onChange={(e) => edit({ includesNote: e.target.value })}
+                />
+              </Field>
+            </>
+          ) : null}
+
+          <Field label="Status" htmlFor="product-status" hint={STATUSES.find(({ value }) => value === draft.status)?.help}>
+            <NativeSelect id="product-status" value={draft.status} onChange={(e) => edit({ status: e.target.value as ProductStatus })}>
+              {STATUSES.map(({ value, label }) => (
+                <NativeSelectOption key={value} value={value}>
+                  {label}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </Field>
+
+          <div className="flex flex-col gap-1 rounded-lg border border-border bg-chrome p-4 text-[13px]" aria-live="polite">
+            <p className="text-xs text-muted-foreground">Shop preview</p>
+            <p className="tabular-nums">
+              {peso(draft.price)} · {peso(draft.perCap)} per capsule · {draft.caps} capsules
             </p>
+            {livePromos
+              .filter((promo) => promo.discounts[draft.id])
+              .map((promo) => {
+                const pricing = promoPrice(draft.id, draft.price, [promo], now);
+                const showing = promoPrice(draft.id, draft.price, livePromos, now).promo?.id === promo.id;
+                return (
+                  <p key={promo.id} className="tabular-nums text-muted-foreground">
+                    With {promo.name}: {peso(pricing.price)} · {peso(promoPerCap(draft, pricing))} per capsule
+                    {showing ? " (showing now)" : ""}
+                  </p>
+                );
+              })}
           </div>
 
-          <div className="admin-product-tabs" role="tablist" aria-label="Product status">
-            {STATUS_TABS.map(({ value, label }) => (
-              <button
-                key={value}
-                type="button"
-                role="tab"
-                aria-selected={tab === value}
-                className={tab === value ? "active" : ""}
-                onClick={() => setTab(value)}
-              >
-                {label} ({counts[value] ?? 0})
-              </button>
-            ))}
-          </div>
-          <p className="admin-product-tab-help">{STATUS_TABS.find(({ value }) => value === tab)?.help}</p>
-
-          {GROUPS.map(({ kind, label }) => {
-            const rows = products.filter((product) => product.kind === kind && product.status === tab);
-            if (rows.length === 0) return null;
-            return (
-              <div className="admin-product-group" key={kind}>
-                <h3>{label}</h3>
-                <div className="admin-wheel-list">
-                  {rows.map((product) => {
-                    const draft = drafts[product.id] ?? product;
-                    const dirty = drafts[product.id] !== undefined;
-                    return (
-                      <form
-                        className="admin-wheel-prize admin-product-card"
-                        key={product.id}
-                        onSubmit={(event) => {
-                          event.preventDefault();
-                          save(product, draft);
-                        }}
-                      >
-                        <div className="admin-wheel-prize-main">
-                          <label>
-                            Name
-                            <input value={draft.name} onChange={(event) => edit(product, { name: event.target.value })} required />
-                          </label>
-                          <div className="admin-wheel-grid">
-                            <label>
-                              Price (₱)
-                              <input
-                                type="number"
-                                min={1}
-                                value={draft.price || ""}
-                                onChange={(event) => edit(product, { price: Math.round(Number(event.target.value)) })}
-                                required
-                              />
-                            </label>
-                            <label>
-                              Price per capsule (₱)
-                              <input
-                                type="number"
-                                min={1}
-                                value={draft.perCap || ""}
-                                onChange={(event) => edit(product, { perCap: Math.round(Number(event.target.value)) })}
-                                required
-                              />
-                            </label>
-                            <label>
-                              Capsules
-                              <input
-                                type="number"
-                                min={1}
-                                value={draft.caps || ""}
-                                onChange={(event) => edit(product, { caps: Math.round(Number(event.target.value)) })}
-                                required
-                              />
-                            </label>
-                          </div>
-                          <div className="admin-wheel-grid">
-                            {kind === "protocol" ? (
-                              <>
-                                <label>
-                                  Phase label
-                                  <input
-                                    value={draft.phase}
-                                    placeholder="30-day"
-                                    onChange={(event) => edit(product, { phase: event.target.value })}
-                                  />
-                                </label>
-                                <label>
-                                  Tag (optional)
-                                  <input
-                                    value={draft.tag}
-                                    placeholder="Popular"
-                                    onChange={(event) => edit(product, { tag: event.target.value })}
-                                  />
-                                </label>
-                              </>
-                            ) : (
-                              <label>
-                                Image
-                                <select value={draft.image} onChange={(event) => edit(product, { image: event.target.value })}>
-                                  {SHOP_IMAGES.map((image) => (
-                                    <option key={image} value={image}>
-                                      {image.replace("/shop/", "")}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
-                            )}
-                            <label>
-                              Display order
-                              <input
-                                type="number"
-                                value={draft.sortOrder}
-                                onChange={(event) => edit(product, { sortOrder: Math.round(Number(event.target.value)) })}
-                              />
-                            </label>
-                          </div>
-                          {kind === "protocol" ? (
-                            <>
-                              <label>
-                                Dosage line (on the card)
-                                <input
-                                  value={draft.dosage}
-                                  placeholder="2–4 capsules a day"
-                                  onChange={(event) => edit(product, { dosage: event.target.value })}
-                                />
-                              </label>
-                              <label>
-                                What&apos;s included (one per line, shown when selected)
-                                <textarea
-                                  value={draft.includes.join("\n")}
-                                  placeholder={"SynBIOTIC+ (330 capsules)\nLifestyle Protocol"}
-                                  onChange={(event) => edit(product, { includes: event.target.value.split("\n") })}
-                                />
-                              </label>
-                              <label>
-                                Note under the included list
-                                <input
-                                  value={draft.includesNote}
-                                  placeholder="Lower rate for completing the full 90 days."
-                                  onChange={(event) => edit(product, { includesNote: event.target.value })}
-                                />
-                              </label>
-                            </>
-                          ) : null}
-                        </div>
-
-                        <div className="admin-product-preview" aria-live="polite">
-                          <p className="admin-wheel-kicker">Shop preview</p>
-                          <p>
-                            <strong>{peso(draft.price)}</strong> · {peso(draft.perCap)}/cap · {draft.caps} capsules
-                          </p>
-                          {livePromos
-                            .filter((promo) => promo.discounts[product.id])
-                            .map((promo) => {
-                              const pricing = promoPrice(product.id, draft.price, [promo], now);
-                              const winning = promoPrice(product.id, draft.price, livePromos, now).promo?.id === promo.id;
-                              return (
-                                <p key={promo.id} className={winning ? "winning" : ""}>
-                                  With {promo.name} ({pricing.percent}%): <strong>{peso(pricing.price)}</strong> ·{" "}
-                                  {peso(promoPerCap(draft, pricing))}/cap
-                                  {winning ? " - showing now" : ""}
-                                </p>
-                              );
-                            })}
-                          <small>
-                            ID <code>{product.id}</code> · last changed{" "}
-                            {product.updatedAt ? new Date(product.updatedAt).toLocaleString("en-PH") : "never"}
-                          </small>
-                        </div>
-
-                        <div className="admin-wheel-prize-footer">
-                          <label>
-                            Status
-                            <select
-                              value={draft.status}
-                              onChange={(event) => edit(product, { status: event.target.value as ProductStatus })}
-                            >
-                              {STATUS_TABS.map(({ value, label: statusLabel }) => (
-                                <option key={value} value={value}>
-                                  {statusLabel}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <button
-                            type="button"
-                            disabled={!dirty || savingId === product.id}
-                            onClick={() =>
-                              setDrafts((current) => {
-                                const next = { ...current };
-                                delete next[product.id];
-                                return next;
-                              })
-                            }
-                          >
-                            Undo
-                          </button>
-                          <button type="submit" disabled={!dirty || savingId === product.id}>
-                            {savingId === product.id ? "Saving" : "Save"}
-                          </button>
-                        </div>
-                      </form>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-          {counts[tab] ? null : <p className="admin-wheel-empty">No {tab} products.</p>}
-        </section>
+          {priceChanged ? (
+            <Alert tone="warning">Unpaid orders at {peso(editing.price)} will be asked to rebuild their basket.</Alert>
+          ) : null}
+        </EditSheet>
       ) : null}
-    </div>
+    </PageBody>
   );
 }
