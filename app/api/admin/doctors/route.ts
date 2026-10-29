@@ -7,10 +7,11 @@ import {
   serverUpdateDoctorRegistration,
 } from "@/lib/admin-server-api";
 
+// The partner list also feeds the Codes page, the Orders partner picker and newsletter/SMS recipients.
 export async function GET() {
-  const adminPassword = await getAdminPasswordFromSession();
+  const adminPassword = await getAdminPasswordFromSession("doctors", "codes", "orders", "newsletter", "sms");
   if (!adminPassword) {
-    return NextResponse.json({ error: "Unauthorized: Admin session expired." }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized: admin session expired, or this login can't open this section." }, { status: 401 });
   }
 
   try {
@@ -25,9 +26,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const adminPassword = await getAdminPasswordFromSession();
+  const adminPassword = await getAdminPasswordFromSession("doctors");
   if (!adminPassword) {
-    return NextResponse.json({ error: "Unauthorized: Admin session expired." }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized: admin session expired, or this login can't open this section." }, { status: 401 });
   }
 
   try {
@@ -43,9 +44,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const adminPassword = await getAdminPasswordFromSession();
+  const adminPassword = await getAdminPasswordFromSession("doctors");
   if (!adminPassword) {
-    return NextResponse.json({ error: "Unauthorized: Admin session expired." }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized: admin session expired, or this login can't open this section." }, { status: 401 });
   }
 
   try {

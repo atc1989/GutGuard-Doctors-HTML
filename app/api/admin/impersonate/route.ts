@@ -9,9 +9,10 @@ function partnerAuthRedirectTo() {
 }
 
 export async function POST(req: NextRequest) {
+  // Owner only: signing in as a partner is never part of a staff module.
   const adminPassword = await getAdminPasswordFromSession();
   if (!adminPassword) {
-    return NextResponse.json({ error: "Unauthorized: Admin session expired." }, { status: 401 });
+    return NextResponse.json({ error: "Admin session expired, or only the owner login can sign in as a partner." }, { status: 401 });
   }
 
   try {

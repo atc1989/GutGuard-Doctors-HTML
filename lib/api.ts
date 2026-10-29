@@ -629,15 +629,15 @@ export async function claimPrize(doctorId: string | null | undefined): Promise<P
   return PRIZES[pickPrizeIndex()];
 }
 
-export async function adminLogin(password: string): Promise<boolean> {
+export async function adminLogin(username: string, password: string): Promise<boolean> {
   const res = await fetch("/api/admin/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ password }),
+    body: JSON.stringify({ username, password }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || "Invalid admin password.");
+    throw new Error(data.error || "Wrong username or password.");
   }
   return true;
 }
@@ -646,14 +646,17 @@ export async function adminLogout(): Promise<void> {
   await fetch("/api/admin/logout", { method: "POST" });
 }
 
-export async function checkAdminSession(): Promise<boolean> {
+/** Who is logged in to /admin: the owner, or a staff login limited to `modules` (nav slugs). */
+export type AdminSessionInfo = { name: string; owner: boolean; modules: string[] };
+
+export async function checkAdminSession(): Promise<AdminSessionInfo | null> {
   try {
     const res = await fetch("/api/admin/session");
-    if (!res.ok) return false;
+    if (!res.ok) return null;
     const data = await res.json();
-    return Boolean(data.authenticated);
+    return data.authenticated ? { name: data.name, owner: Boolean(data.owner), modules: data.modules ?? [] } : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -664,7 +667,8 @@ export async function adminListWheelPrizes(): Promise<WheelPrize[]> {
     throw new Error(data.error || "Failed to load wheel prizes.");
   }
   const data = await res.json();
-  return ((data.prizes ?? []) as PrizeRow[]).map(mapWheelPrizeRow);
+  // The route already maps the rows (serverAdminListWheelPrizes); mapping again reset every field.
+  return (data.prizes ?? []) as WheelPrize[];
 }
 
 export async function adminSaveWheelPrize(
@@ -680,7 +684,7 @@ export async function adminSaveWheelPrize(
     throw new Error(data.error || "Failed to save wheel prize.");
   }
   const data = await res.json();
-  return mapWheelPrizeRow((Array.isArray(data.prize) ? data.prize[0] : data.prize) as PrizeRow);
+  return data.prize as WheelPrize;
 }
 
 export async function getWheelPrizes(): Promise<AdminWheelPrize[]> {
