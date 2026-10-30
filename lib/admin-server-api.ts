@@ -304,13 +304,23 @@ export async function serverUpdateDoctorRegistration(
   return { ...updated, routing_slug: cleanSlug };
 }
 
+type CodeFields = Pick<AdminDoctorRegistrationUpdate, "id" | "code_note" | "code_source" | "code_label">;
+
+/** Partner codes page: change a code's label, description and where-used without the doctor's details. */
+export async function serverUpdatePartnerCodeFields(
+  fields: CodeFields,
+): Promise<Partial<AdminDoctorRegistration> & { label_saved?: boolean }> {
+  if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
+  return saveCodeFields(fields);
+}
+
 /**
  * Partner Codes fields (label, description, where the QR is used), editable after the code is
  * made. Written to the table directly, like routing_slug, so admin_update_doctor_registration
  * (also recreated by the TikTok migrations) stays as it is.
  */
 async function saveCodeFields(
-  doctor: AdminDoctorRegistrationUpdate,
+  doctor: CodeFields,
 ): Promise<Partial<AdminDoctorRegistration> & { label_saved?: boolean }> {
   const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : undefined);
   const fields: Record<string, string> = {};
