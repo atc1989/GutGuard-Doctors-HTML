@@ -4,9 +4,9 @@ import { serverAdminPromotePartner } from "@/lib/admin-server-api";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
-  const adminPassword = await getAdminPasswordFromSession();
+  const adminPassword = await getAdminPasswordFromSession("doctors");
   if (!adminPassword) {
-    return NextResponse.json({ error: "Unauthorized: Admin session expired." }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized: admin session expired, or this login can't open this section." }, { status: 401 });
   }
 
   try {

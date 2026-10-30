@@ -26,6 +26,10 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
+  // The site and the admin have separate root layouts, so unmatched URLs need app/global-not-found.tsx.
+  experimental: {
+    globalNotFound: true,
+  },
   // The payment route checks addresses against the PSGC snapshot on disk (lib/order-address.ts).
   outputFileTracingIncludes: {
     "/api/maya/checkout": ["./public/psgc/**/*.json"],

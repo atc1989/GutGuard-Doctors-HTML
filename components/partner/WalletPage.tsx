@@ -2,9 +2,10 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import {
-  getPartnerWallet, requestPartnerWithdrawal, type PartnerWallet, type PartnerWithdrawal, type WithdrawalMethod,
+  convertPartnerPoints, getPartnerWallet, requestPartnerWithdrawal,
+  type PartnerWallet, type PartnerWithdrawal, type WalletCredit, type WithdrawalMethod,
 } from "@/lib/api";
-import { EmptyState, Loading, PageHeader, StatTile, formatDate } from "./shared";
+import { EmptyState, Loading, MILESTONES, PageHeader, StatTile, formatDate } from "./shared";
 
 // Must match request_partner_withdrawal (20261030000000_partner_wallet.sql).
 const MIN_WITHDRAWAL = 500;
@@ -16,6 +17,14 @@ const STATUS_LABELS: Record<PartnerWithdrawal["status"], string> = { pending: "P
 // Centavos matter here, unlike the whole-peso `peso` used for sales.
 const money = (value: number) =>
   new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 2 }).format(value);
+
+function creditLabel(credit: WalletCredit) {
+  if (credit.type === "commission") {
+    return `10% of order ${credit.order_code ?? ""}${credit.subtotal ? ` (${money(credit.subtotal)} products)` : ""}`;
+  }
+  if (credit.type === "conversion") return `Converted ${credit.points} direct G-Points`;
+  return `Milestone rebate (${credit.points} pts)`;
+}
 
 function errorMessage(error: unknown, fallback: string) {
   const message = error && typeof error === "object" ? (error as { message?: unknown }).message : undefined;
@@ -33,6 +42,10 @@ export default function WalletPage() {
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
   const [notice, setNotice] = useState("");
+  // Two taps to convert: pick a tier, then confirm. No window.confirm, which in-app browsers block.
+  const [confirming, setConfirming] = useState<(typeof MILESTONES)[number] | null>(null);
+  const [converting, setConverting] = useState(false);
+  const [convertMessage, setConvertMessage] = useState("");
 
   function load() {
     return getPartnerWallet()
@@ -65,6 +78,22 @@ export default function WalletPage() {
     }
   }
 
+  async function convert() {
+    if (!confirming) return;
+    setConverting(true);
+    setConvertMessage("");
+    try {
+      await convertPartnerPoints(confirming.pts);
+      setConvertMessage(`${confirming.pts} G-Points converted. ${money(confirming.rebate)} added to your wallet.`);
+      setConfirming(null);
+      await load();
+    } catch (error) {
+      setConvertMessage(errorMessage(error, "The points could not be converted. Please try again."));
+    } finally {
+      setConverting(false);
+    }
+  }
+
   if (!wallet) {
     return loadError ? <EmptyState title={loadError} /> : <Loading>Loading your wallet…</Loading>;
   }
@@ -73,13 +102,48 @@ export default function WalletPage() {
 
   return (
     <>
-      <PageHeader kicker="Wallet" title="Rebate wallet" />
+      <PageHeader kicker="Wallet" title="My wallet" />
 
       <section className="pp-stats" aria-label="Wallet balance">
         <StatTile label="Available" value={money(wallet.available)} note="Ready to withdraw" />
         <StatTile label="Pending" value={money(wallet.pending)} note="Waiting for approval" />
         <StatTile label="Withdrawn" value={money(wallet.withdrawn)} note="Approved payouts" />
-        <StatTile label="Rebates earned" value={money(wallet.earned)} note="From G-Points milestones" />
+        <StatTile label="Total earned" value={money(wallet.earned)} note="10% commissions + converted G-Points" />
+      </section>
+
+      <section className="pp-card" aria-labelledby="pp-convert-title">
+        <div className="pp-card-head">
+          <h2 id="pp-convert-title">Convert G-Points to cash</h2>
+          <strong>{wallet.direct_points} direct G-Points</strong>
+        </div>
+        <p className="pp-muted">
+          Direct G-Points come from orders through your own shop link. Convert them into your wallet at any of these
+          levels. Only the points you convert are used; the rest stay.
+        </p>
+        <div className="pp-convert-tiers">
+          {MILESTONES.map((tier) => (
+            <button
+              key={tier.pts} type="button" className="shop-secondary"
+              disabled={converting || wallet.direct_points < tier.pts}
+              onClick={() => { setConfirming(tier); setConvertMessage(""); }}
+            >
+              {tier.pts} pts → {money(tier.rebate)}
+            </button>
+          ))}
+        </div>
+        {confirming ? (
+          <div className="pp-convert-confirm" role="group" aria-label="Confirm conversion">
+            <p>
+              Convert <strong>{confirming.pts} G-Points</strong> to <strong>{money(confirming.rebate)}</strong>?
+              You will have {wallet.direct_points - confirming.pts} direct G-Points left.
+            </p>
+            <button type="button" className="shop-primary" disabled={converting} onClick={convert}>
+              {converting ? "Converting…" : "Confirm"}
+            </button>
+            <button type="button" className="shop-secondary" disabled={converting} onClick={() => setConfirming(null)}>Cancel</button>
+          </div>
+        ) : null}
+        {convertMessage ? <p className="pp-wallet-notice" role="status">{convertMessage}</p> : null}
       </section>
 
       <section className="pp-card" aria-labelledby="pp-withdraw-title">
@@ -127,6 +191,25 @@ export default function WalletPage() {
           <p className="pp-muted"><strong>You can withdraw once your available balance reaches {money(MIN_WITHDRAWAL)}.</strong></p>
         )}
         {notice ? <p className="pp-wallet-notice" role="status">{notice}</p> : null}
+      </section>
+
+      <h2 className="pp-h2">Earnings</h2>
+      <section className="pp-card pp-card-flush" aria-label="Earnings">
+        {wallet.credits.length ? (
+          <ul className="pp-log">
+            {wallet.credits.map((credit, index) => (
+              <li key={`${credit.type}-${credit.created_at}-${index}`}>
+                <span>
+                  <strong>{creditLabel(credit)}</strong>
+                  <small>{formatDate(credit.created_at)}</small>
+                </span>
+                <b className="is-gold">+{money(credit.amount)}</b>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyState title="No earnings yet.">You earn 10% of the products on every paid order through your shop link.</EmptyState>
+        )}
       </section>
 
       <h2 className="pp-h2">Withdrawal history</h2>

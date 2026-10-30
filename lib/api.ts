@@ -70,7 +70,7 @@ export type AdminDoctorRegistration = {
   /** Partner Codes: admin-only description, and where the QR is used (pre-fills the join form). */
   code_note?: string;
   code_source?: string;
-  /** Not returned by admin_list_doctor_registrations yet; see 20261101000000_partner_code_label.sql. */
+  /** Public label shown on the join page. Read from the table, not admin_list_doctor_registrations. */
   code_label?: string;
 };
 
@@ -83,6 +83,10 @@ export type AdminDoctorRegistrationUpdate = {
   routing_slug?: string;
   specialty: string;
   practice_location: string;
+  /** Partner Codes fields; left out = unchanged. */
+  code_note?: string;
+  code_source?: string;
+  code_label?: string;
 };
 
 export type NewsletterSendHistory = {
@@ -440,7 +444,7 @@ export type PartnerInvitation = {
   can_refer: boolean;
   /** Set on Partner Codes; pre-fills "Where did you find us?" on this partner's join form. */
   code_source: string;
-  /** Public label set on Partner Codes ("GSC"), shown beside the ref number. "" until 20261101000000 runs. */
+  /** Public label set on Partner Codes ("GSC"), shown beside the ref number. "" until 20261102000000 runs. */
   code_label: string;
 };
 
@@ -634,15 +638,15 @@ export async function claimPrize(doctorId: string | null | undefined): Promise<P
   return PRIZES[pickPrizeIndex()];
 }
 
-export async function adminLogin(password: string): Promise<boolean> {
+export async function adminLogin(username: string, password: string): Promise<boolean> {
   const res = await fetch("/api/admin/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ password }),
+    body: JSON.stringify({ username, password }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || "Invalid admin password.");
+    throw new Error(data.error || "Wrong username or password.");
   }
   return true;
 }
@@ -651,14 +655,17 @@ export async function adminLogout(): Promise<void> {
   await fetch("/api/admin/logout", { method: "POST" });
 }
 
-export async function checkAdminSession(): Promise<boolean> {
+/** Who is logged in to /admin: the owner, or a staff login limited to `modules` (nav slugs). */
+export type AdminSessionInfo = { name: string; owner: boolean; modules: string[] };
+
+export async function checkAdminSession(): Promise<AdminSessionInfo | null> {
   try {
     const res = await fetch("/api/admin/session");
-    if (!res.ok) return false;
+    if (!res.ok) return null;
     const data = await res.json();
-    return Boolean(data.authenticated);
+    return data.authenticated ? { name: data.name, owner: Boolean(data.owner), modules: data.modules ?? [] } : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -669,7 +676,8 @@ export async function adminListWheelPrizes(): Promise<WheelPrize[]> {
     throw new Error(data.error || "Failed to load wheel prizes.");
   }
   const data = await res.json();
-  return ((data.prizes ?? []) as PrizeRow[]).map(mapWheelPrizeRow);
+  // The route already maps the rows (serverAdminListWheelPrizes); mapping again reset every field.
+  return (data.prizes ?? []) as WheelPrize[];
 }
 
 export async function adminSaveWheelPrize(
@@ -685,7 +693,7 @@ export async function adminSaveWheelPrize(
     throw new Error(data.error || "Failed to save wheel prize.");
   }
   const data = await res.json();
-  return mapWheelPrizeRow((Array.isArray(data.prize) ? data.prize[0] : data.prize) as PrizeRow);
+  return data.prize as WheelPrize;
 }
 
 export async function getWheelPrizes(): Promise<AdminWheelPrize[]> {
@@ -739,7 +747,7 @@ export async function adminImpersonateDoctor(
 
 export async function updateDoctorRegistration(
   doctor: AdminDoctorRegistrationUpdate,
-): Promise<AdminDoctorRegistration> {
+): Promise<AdminDoctorRegistration & { label_saved?: boolean }> {
   const res = await fetch("/api/admin/doctors", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -1158,12 +1166,28 @@ export type PartnerWithdrawal = {
   created_at: string;
   processed_at: string | null;
 };
+export type WalletCredit = {
+  type: "commission" | "conversion" | "rebate";
+  amount: number;
+  /** Commission: the order and its products subtotal. */
+  order_code?: string;
+  subtotal?: number;
+  /** Conversion / rebate: the G-Points it came from. */
+  points?: number;
+  created_at: string;
+};
 export type PartnerWallet = {
   earned: number;
+  rebates: number;
+  commissions: number;
+  converted: number;
+  /** Direct G-Points not converted yet. */
+  direct_points: number;
   pending: number;
   withdrawn: number;
   available: number;
   withdrawals: PartnerWithdrawal[];
+  credits: WalletCredit[];
 };
 
 export async function getPartnerWallet(): Promise<PartnerWallet> {
@@ -1171,7 +1195,15 @@ export async function getPartnerWallet(): Promise<PartnerWallet> {
 
   const { data, error } = await supabaseShop.rpc("partner_wallet");
   if (error) throw error;
-  return data as PartnerWallet;
+  // The earnings fields arrive with 20261101000000_wallet_earnings_*; default them until it runs.
+  return { rebates: 0, commissions: 0, converted: 0, direct_points: 0, credits: [], ...(data as Partial<PartnerWallet>) } as PartnerWallet;
+}
+
+export async function convertPartnerPoints(points: 300 | 750 | 1500): Promise<void> {
+  if (!isSupabaseConfigured || !supabaseShop) throw new Error("Supabase is not configured.");
+
+  const { error } = await supabaseShop.rpc("convert_partner_points", { p_points: points });
+  if (error) throw error;
 }
 
 export async function requestPartnerWithdrawal(input: {

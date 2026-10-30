@@ -219,7 +219,15 @@ export async function serverGetDoctorRegistrations(adminPassword: string): Promi
   });
 
   if (error) throw error;
-  return ((data ?? []) as AdminDoctorRegistration[]).map(normalizeAdminDoctorRegistration);
+
+  // code_label isn't in admin_list_doctor_registrations, so read it from the table. Only labelled
+  // rows, to stay under PostgREST's row cap. Errors (no column before 20261102000000) mean no labels.
+  const { data: labelled } = await supabase.from("doctor_registrations").select("id, code_label").neq("code_label", "");
+  const labels = new Map(((labelled ?? []) as { id: string; code_label: string }[]).map((row) => [row.id, row.code_label]));
+
+  return ((data ?? []) as AdminDoctorRegistration[]).map((doctor) =>
+    normalizeAdminDoctorRegistration({ ...doctor, code_label: labels.get(doctor.id) ?? "" }),
+  );
 }
 
 /** A blank partner with just a code; admin fills the details (and email, to sign in) later. */
@@ -233,7 +241,7 @@ export async function serverAdminCreatePendingPartner(
   const client = supabase;
 
   // Empty fields are left out so the call still matches the older functions until
-  // 20261028000000_partner_code_note_source.sql / 20261101000000_partner_code_label.sql are applied.
+  // 20261028000000_partner_code_note_source.sql / 20261102000000_partner_code_label.sql are applied.
   const create = (withLabel: boolean) =>
     client.rpc("admin_create_pending_partner", {
       p_admin_password: adminPassword,
@@ -257,7 +265,7 @@ export async function serverAdminCreatePendingPartner(
 export async function serverUpdateDoctorRegistration(
   adminPassword: string,
   doctor: AdminDoctorRegistrationUpdate,
-): Promise<AdminDoctorRegistration> {
+): Promise<AdminDoctorRegistration & { label_saved?: boolean }> {
   if (!isSupabaseConfigured || !supabase) throw new Error("Supabase is not configured.");
 
   const { data, error } = await supabase.rpc("admin_update_doctor_registration", {
@@ -273,7 +281,10 @@ export async function serverUpdateDoctorRegistration(
 
   if (error) throw error;
 
-  const updated = normalizeAdminDoctorRegistration((Array.isArray(data) ? data[0] : data) as AdminDoctorRegistration);
+  const updated = {
+    ...normalizeAdminDoctorRegistration((Array.isArray(data) ? data[0] : data) as AdminDoctorRegistration),
+    ...(await saveCodeFields(doctor)),
+  };
   const cleanSlug = doctor.routing_slug?.trim().toLowerCase();
   if (!cleanSlug || cleanSlug === updated.routing_slug) return updated;
 
@@ -291,6 +302,37 @@ export async function serverUpdateDoctorRegistration(
     throw slugError.code === "23505" ? new Error(`The routing slug "${cleanSlug}" is already taken.`) : slugError;
   }
   return { ...updated, routing_slug: cleanSlug };
+}
+
+/**
+ * Partner Codes fields (label, description, where the QR is used), editable after the code is
+ * made. Written to the table directly, like routing_slug, so admin_update_doctor_registration
+ * (also recreated by the TikTok migrations) stays as it is.
+ */
+async function saveCodeFields(
+  doctor: AdminDoctorRegistrationUpdate,
+): Promise<Partial<AdminDoctorRegistration> & { label_saved?: boolean }> {
+  const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : undefined);
+  const fields: Record<string, string> = {};
+  for (const [key, max] of [["code_note", 200], ["code_source", 120], ["code_label", 40]] as const) {
+    const value = text(doctor[key], max);
+    if (value !== undefined) fields[key] = value;
+  }
+  if (Object.keys(fields).length === 0) return {};
+
+  const save = (values: Record<string, string>) => supabase!.from("doctor_registrations").update(values).eq("id", doctor.id);
+  const { error } = await save(fields);
+  if (!error) return fields;
+
+  // PGRST204: no code_label column until 20261102000000_partner_code_label.sql. Save the rest.
+  if (error.code !== "PGRST204" || !("code_label" in fields)) throw error;
+  const withoutLabel = { ...fields };
+  delete withoutLabel.code_label;
+  if (Object.keys(withoutLabel).length > 0) {
+    const retry = await save(withoutLabel);
+    if (retry.error) throw retry.error;
+  }
+  return { ...withoutLabel, label_saved: false };
 }
 
 export async function serverAdminUpgradeToMainStore(

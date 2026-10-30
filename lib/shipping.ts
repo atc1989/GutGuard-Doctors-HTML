@@ -15,10 +15,11 @@ const BOTTLE_WEIGHT_GRAMS = 50;
 const CAPS_PER_BOTTLE = 30;
 
 // J&T Express public rates from Davao City (jtexpress.ph "Shipping Rates", EZ service), plus
-// ₱5 per parcel for packaging. Collected 2026-10-23; J&T's brackets are these same weights.
+// ₱50 per parcel for packaging and handling. Rates collected 2026-10-23; J&T's brackets are
+// these same weights.
 // J&T base:   mindanao 85/155/180/270/360/435   visayas 105/175/195/285/370/435
 //             luzon    105/195/215/325/370/435   island  115/185/205/295/380/445
-const HANDLING_FEE = 5;
+const HANDLING_FEE = 50;
 const JNT_RATES: Record<ShippingArea, number[]> = {
   mindanao: [85, 155, 180, 270, 360, 435],
   visayas: [105, 175, 195, 285, 370, 435],

@@ -15,9 +15,9 @@ import { getSupabaseAdmin, isSupabaseAdminConfigured, SHOP_SCHEMA } from "@/lib/
  * catalog price of the items.
  */
 export async function POST(req: NextRequest) {
-  const adminPassword = await getAdminPasswordFromSession();
+  const adminPassword = await getAdminPasswordFromSession("orders");
   if (!adminPassword) {
-    return NextResponse.json({ error: "Unauthorized: Admin session expired." }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized: admin session expired, or this login can't open this section." }, { status: 401 });
   }
   if (!isSupabaseAdminConfigured) {
     return NextResponse.json({ error: "Orders cannot be added on this environment." }, { status: 503 });
