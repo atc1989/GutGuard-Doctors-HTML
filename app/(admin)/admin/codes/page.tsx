@@ -301,7 +301,7 @@ export default function AdminCodesPage() {
             htmlFor="edit-code-label"
             hint={`Doctors who join through this QR see “Ref number #${selected.partner_code}${fields.label.trim() ? ` · ${fields.label.trim()}` : ""}”`}
           >
-            <Input id="edit-code-label" value={fields.label} maxLength={40} placeholder="GSC" onChange={(event) => setFields((current) => ({ ...current, label: event.target.value }))} />
+            <Input id="edit-code-label" value={fields.label} maxLength={40} onChange={(event) => setFields((current) => ({ ...current, label: event.target.value }))} />
           </Field>
           <Field label="Description (admin only)" htmlFor="edit-code-note">
             <Input id="edit-code-note" value={fields.note} maxLength={200} onChange={(event) => setFields((current) => ({ ...current, note: event.target.value }))} />
@@ -344,7 +344,7 @@ export default function AdminCodesPage() {
           htmlFor="code-label"
           hint={`Doctors who join through this QR see “Ref number #${preview.partner_code}${label.trim() ? ` · ${label.trim()}` : ""}”`}
         >
-          <Input id="code-label" value={label} maxLength={40} placeholder="GSC" onChange={(event) => setLabel(event.target.value)} />
+          <Input id="code-label" value={label} maxLength={40} onChange={(event) => setLabel(event.target.value)} />
         </Field>
         <Field label="Description (optional, admin only)" htmlFor="code-note">
           <Input id="code-note" value={note} maxLength={200} placeholder="Dr. Cruz, Makati clinic" onChange={(event) => setNote(event.target.value)} />
