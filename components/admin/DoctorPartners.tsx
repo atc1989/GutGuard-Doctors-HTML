@@ -515,7 +515,7 @@ export default function DoctorPartners() {
                 htmlFor="partner-code-label"
                 hint={`Shown on the join page: Ref number #${original.partner_code ?? ""}${draft.code_label?.trim() ? ` · ${draft.code_label.trim()}` : ""}`}
               >
-                <Input id="partner-code-label" value={draft.code_label ?? ""} maxLength={40} placeholder="GSC" onChange={(e) => edit({ code_label: e.target.value })} />
+                <Input id="partner-code-label" value={draft.code_label ?? ""} maxLength={40} onChange={(e) => edit({ code_label: e.target.value })} />
               </Field>
               <Field label="Description" htmlFor="partner-code-note" hint="Admin only.">
                 <Input id="partner-code-note" value={draft.code_note ?? ""} maxLength={200} onChange={(e) => edit({ code_note: e.target.value })} />
