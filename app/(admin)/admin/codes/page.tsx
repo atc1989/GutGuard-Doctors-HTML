@@ -10,8 +10,10 @@ import { ConfirmDialog, EditSheet, Field } from "@/components/admin/form";
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
 import { PartnerQrCard } from "@/components/admin/partner-qr";
-import { getPartnerQrLink, useCopy } from "@/components/partner/shared";
+import { getPartnerQrLink, useCopy, type PartnerQrMode } from "@/components/partner/shared";
 import type { AdminDoctorRegistration } from "@/lib/api";
+
+const LINK_NAMES: Record<PartnerQrMode, string> = { shop: "Shop", referral: "Join", landing: "Landing" };
 
 type PendingPartner = {
   id: string;
@@ -182,9 +184,9 @@ export default function AdminCodesPage() {
   }
 
   const columns = useMemo<ColumnDef<PendingPartner, unknown>[]>(() => {
-    const shareLink = async (partner: PendingPartner, mode: "shop" | "referral") => {
+    const shareLink = async (partner: PendingPartner, mode: PartnerQrMode) => {
       const shared = await share(getPartnerQrLink(partner, mode));
-      if (shared) setNotice(`${mode === "shop" ? "Shop" : "Join"} link for #${partner.partner_code} copied or shared.`);
+      if (shared) setNotice(`${LINK_NAMES[mode]} link for #${partner.partner_code} copied or shared.`);
     };
     return [
       {
@@ -229,6 +231,7 @@ export default function AdminCodesPage() {
                 { label: "Edit and show QR codes", onSelect: () => showQrs(row.original) },
                 { label: "Share shop link", onSelect: () => shareLink(row.original, "shop") },
                 { label: "Share join link", onSelect: () => shareLink(row.original, "referral") },
+                { label: "Share landing link", onSelect: () => shareLink(row.original, "landing") },
               ]}
             />
           </div>
@@ -313,9 +316,10 @@ export default function AdminCodesPage() {
           >
             <Input id="edit-code-source" value={fields.source} maxLength={120} onChange={(event) => setFields((current) => ({ ...current, source: event.target.value }))} />
           </Field>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <PartnerQrCard partner={selected} mode="shop" label="Shop" fileName={`gutguard-shop-${selected.partner_code}.png`} />
             <PartnerQrCard partner={selected} mode="referral" label="Join" fileName={`gutguard-join-${selected.partner_code}.png`} />
+            <PartnerQrCard partner={selected} mode="landing" label="Landing" fileName={`gutguard-landing-${selected.partner_code}.png`} />
           </div>
           <p className="text-xs text-muted-foreground">
             Sales and sign-ups through these QRs are credited to #{selected.partner_code} from the first scan. To let the
@@ -333,11 +337,13 @@ export default function AdminCodesPage() {
         busy={isCreating}
         onConfirm={generate}
       >
-        <dl className="grid grid-cols-[72px_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-lg border border-border bg-chrome p-3 text-xs">
+        <dl className="grid grid-cols-[84px_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-lg border border-border bg-chrome p-3 text-xs">
           <dt className="text-muted-foreground">Shop link</dt>
           <dd className="truncate font-mono">{getPartnerQrLink(preview, "shop")}</dd>
           <dt className="text-muted-foreground">Join link</dt>
           <dd className="truncate font-mono">{getPartnerQrLink(preview, "referral")}</dd>
+          <dt className="text-muted-foreground">Landing link</dt>
+          <dd className="truncate font-mono">{getPartnerQrLink(preview, "landing")}</dd>
         </dl>
         <Field
           label="Label (optional, shown publicly on the join page)"

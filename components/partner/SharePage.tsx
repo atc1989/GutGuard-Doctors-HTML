@@ -87,10 +87,22 @@ export default function SharePage() {
         ? `Hello Doctor! Join our GutGuard physician network and register your clinic store under our umbrella: ${getPartnerQrLink(dashboard.partner, "referral")}`
         : `Hello Doctor! Register your verified physician account on GutGuard to prescribe and earn partner points: ${getPartnerQrLink(dashboard.partner, "referral")}`,
     },
+    {
+      mode: "landing",
+      label: "Landing QR",
+      linkTitle: "Patient landing page",
+      description:
+        "Send patients a page that explains SynBIOTIC+, how to order it and how to take it. Its Buy now button is your shop link, so orders still credit your account.",
+      tag: "Commission attributed",
+      tagClass: "pp-tag-blue",
+      hint: "Give this QR to patients who want to read about SynBIOTIC+ before they order.",
+      presetMessage: `Hi! Here is how to order and take the GutGuard SynBIOTIC+ I recommended: ${getPartnerQrLink(dashboard.partner, "landing")}`,
+    },
   ];
 
   function posterTitle(mode: PartnerQrMode) {
     if (mode === "shop") return isMainStore ? "Scan to order from Main Store" : "Scan to order GutGuard";
+    if (mode === "landing") return "Scan to learn about SynBIOTIC+";
     return isMainStore ? "Scan to register as a partner" : "Scan to become a GutGuard partner";
   }
 
