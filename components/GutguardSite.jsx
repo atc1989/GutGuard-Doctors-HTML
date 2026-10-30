@@ -1012,6 +1012,9 @@ footer{padding:54px 0;border-top:1px solid var(--rule);}
 .gg .nav-cta{min-height:44px;padding:10px 16px;background:var(--blue);color:var(--bone);white-space:nowrap;}
 .gg .nav-cta:hover{background:var(--blue-press);}
 .nav-shop-mobile{display:none;min-width:44px;min-height:44px;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--blue);}
+.nav-join{min-height:44px;padding:9px 16px;display:inline-flex;align-items:center;border:1.5px solid var(--blue);border-radius:999px;color:var(--blue);font-size:14px;font-weight:700;transition:background .2s,color .2s;}
+.nav-join:hover{background:var(--blue);color:var(--bone);}
+.nav-join-mobile{display:none;}
 .sheet .nav-cta{background:var(--blue);color:var(--bone);border-bottom:0;}
 .sheet .sheet-login{margin-top:auto;padding-top:24px;}
 
@@ -1069,6 +1072,7 @@ footer{padding:54px 0;border-top:1px solid var(--rule);}
   .nav-inner{display:flex;min-height:0;padding-block:10px}.nav.scrolled .nav-inner{padding-block:8px}
   .nav-actions{display:none}
   .nav-shop-mobile{display:inline-flex;margin-left:auto}.burger{flex:none}.nav-here{display:none}
+  .nav-join-mobile{display:inline-flex;margin-left:auto;min-height:38px;padding:6px 14px;font-size:13px}.nav-join-mobile+.nav-shop-mobile{margin-left:6px}
   .sheet a{min-height:52px;display:flex;align-items:center}.sheet .nav-cta{min-height:52px}
   .footer-main{grid-template-columns:1fr;gap:22px;padding:24px 0 44px}.footer-groups{grid-template-columns:1fr;gap:0;border-top:1px solid var(--rule)}
   .footer-group{border-bottom:1px solid var(--rule)}.footer-group-toggle{cursor:pointer;font-size:16px}
@@ -1291,8 +1295,9 @@ function useReveal(dep) {
 }
 
 /* `shop` set = a single page (the partner landing page): no page links or menu, and the shop
-   buttons go to that partner's link. Plain <a>, since prefetching /s/ would count a click. */
-function Nav({ route, scrolled, open, setOpen, sheetRef, burgerRef, shop }) {
+   buttons go to that partner's link. Plain <a>, since prefetching /s/ would count a click.
+   `recruit` (their join link) puts "Become a partner" where Log in is, as the shop does. */
+function Nav({ route, scrolled, open, setOpen, sheetRef, burgerRef, shop, recruit }) {
   const here = route === "/" ? "Home" : (NAV.find(([, r]) => r === route) || [])[0];
   return (
     <>
@@ -1308,11 +1313,14 @@ function Nav({ route, scrolled, open, setOpen, sheetRef, burgerRef, shop }) {
             ))}
           </div>
           <div className="nav-actions">
-            <Link className="nav-login" href="/partner" aria-label="Open the partner login page">Log in</Link>
+            {recruit
+              ? <a className="nav-join" href={recruit}>Become a partner</a>
+              : <Link className="nav-login" href="/partner" aria-label="Open the partner login page">Log in</Link>}
             {shop
               ? <a className="nav-cta" href={shop}>Buy now <ArrowRight size={14} /></a>
               : <Link className="nav-cta" href="/shop">Choose Your Protocol <ArrowRight size={14} /></Link>}
           </div>
+          {recruit && <a className="nav-join nav-join-mobile" href={recruit}>Join</a>}
           {shop ? <a className="nav-shop-mobile" href={shop}>Shop</a> : <Link className="nav-shop-mobile" href="/shop">Shop</Link>}
           {!shop && (
             <button ref={burgerRef} className="burger" aria-label="Open menu" aria-haspopup="dialog" aria-expanded={open} aria-controls="mobile-menu" onClick={() => setOpen(true)}>
@@ -2200,7 +2208,7 @@ function BuyBar({ route, shop }) {
 
 /* The partner landing page (app/(site)/l/[code]): the site's top bar, footer and buy bar around
    a page that brings its own sections and CSS. `shop` / `join` are the partner's links. */
-export function LandingShell({ shop, join, css, children }) {
+export function LandingShell({ shop, join, recruit, css, children }) {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -2214,7 +2222,7 @@ export function LandingShell({ shop, join, css, children }) {
       <style>{CSS}</style>
       <style>{css}</style>
       <a className="skip" href="#main">Skip to content</a>
-      <Nav route="/l" scrolled={scrolled} open={false} setOpen={() => {}} shop={shop} />
+      <Nav route="/l" scrolled={scrolled} open={false} setOpen={() => {}} shop={shop} recruit={recruit ? join : undefined} />
       <main id="main" tabIndex={-1}>{children}</main>
       <Footer shop={shop} join={join} />
       <BuyBar route="/l" shop={shop} />
