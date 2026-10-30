@@ -545,6 +545,7 @@ export default function DoctorPartners() {
                 </div>
               </PartnerQrCard>
               <PartnerQrCard partner={original} mode="referral" label="Join" fileName={`${slugFor(original)}-referral-qr.png`} margin={2} />
+              <PartnerQrCard partner={original} mode="landing" label="Landing" fileName={`${slugFor(original)}-landing-qr.png`} margin={2} />
             </div>
             <p className="text-xs text-muted-foreground">The Full Protocol switch saves right away.</p>
           </FieldGroup>
