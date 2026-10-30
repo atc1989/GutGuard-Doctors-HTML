@@ -45,7 +45,8 @@ export default async function LandingPage({ params }: { params: Promise<{ code: 
     .replace("{{REF_NOTE}}", known ? `<p class="sec-sub">Ref. No. #${code} is applied automatically in the shop.</p>` : "");
 
   return (
-    <LandingShell shop={shop} join={join} css={LANDING_CSS}>
+    // Locked affiliates keep Log in in the top bar, like their shop does.
+    <LandingShell shop={shop} join={join} recruit={!known || canRefer} css={LANDING_CSS}>
       <div dangerouslySetInnerHTML={{ __html: body }} />
     </LandingShell>
   );
