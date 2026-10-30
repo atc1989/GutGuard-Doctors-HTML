@@ -18,15 +18,20 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
+// The label is admin-typed and goes into raw HTML.
+const escapeHtml = (text: string) =>
+  text.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
+
 async function lookUp(code: string) {
-  if (!/^\d{1,9}$/.test(code) || !supabase) return { known: false, canRefer: false };
+  if (!/^\d{1,9}$/.test(code) || !supabase) return { known: false, canRefer: false, label: "" };
   const slug = (await supabase.rpc("partner_slug_by_code", { p_code: code })).data;
-  if (typeof slug !== "string" || !slug) return { known: false, canRefer: false };
+  if (typeof slug !== "string" || !slug) return { known: false, canRefer: false, label: "" };
   // Locked affiliates can't recruit yet - the same rule as the share page and the shop's
   // "Become a partner" (get_partner_invitation.can_refer).
   const { data } = await supabase.rpc("get_partner_invitation", { p_slug: slug });
   const invitation = Array.isArray(data) ? data[0] : data;
-  return { known: true, canRefer: invitation?.can_refer === true };
+  // code_label arrives with 20261102000000_partner_code_label.sql; "" until then.
+  return { known: true, canRefer: invitation?.can_refer === true, label: String(invitation?.code_label ?? "").trim() };
 }
 
 /**
@@ -36,13 +41,18 @@ async function lookUp(code: string) {
  */
 export default async function LandingPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
-  const { known, canRefer } = await lookUp(code);
+  const { known, canRefer, label } = await lookUp(code);
   const shop = known ? `/s/${code}` : `${SHOP_ORIGIN}/shop`;
   const join = canRefer ? `/j/${code}` : "/physicians/register";
 
   const body = LANDING_BODY.replaceAll("{{SHOP_URL}}", shop)
     .replaceAll("{{JOIN_URL}}", join)
-    .replace("{{REF_NOTE}}", known ? `<p class="sec-sub">Ref. No. #${code} is applied automatically in the shop.</p>` : "");
+    .replace("{{REF_NOTE}}", known ? `<p class="sec-sub">Ref. No. #${code} is applied automatically in the shop.</p>` : "")
+    // Bottom of the "Are you a doctor?" card: the same ref line as the join form and the shop.
+    .replace(
+      "{{DOC_REF}}",
+      known ? `<p class="doc-ref">Ref number <strong>#${code}</strong>${label ? ` · ${escapeHtml(label)}` : ""}</p>` : "",
+    );
 
   return (
     // Locked affiliates keep Log in in the top bar, like their shop does.
