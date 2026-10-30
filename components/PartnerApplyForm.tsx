@@ -12,7 +12,7 @@ import {
 } from "@/lib/validation";
 
 type PartnerApplyFormProps = {
-  invitedBy?: { slug: string; fullName: string; code: number | null; source: string } | null;
+  invitedBy?: { slug: string; fullName: string; code: number | null; source: string; label?: string } | null;
   onRegistered: (email: string, doctorId: string) => Promise<void>;
   onSignIn: () => void;
 };
@@ -252,6 +252,7 @@ export default function PartnerApplyForm({
       {invitedBy?.code || invitedBy?.fullName ? (
         <p className="partner-invite-note">
           Ref number <strong>{invitedBy.code ? `#${invitedBy.code}` : invitedBy.fullName}</strong>
+          {invitedBy.code && invitedBy.label ? <> · {invitedBy.label}</> : null}
         </p>
       ) : null}
 

@@ -157,10 +157,18 @@ export default function DoctorPartners() {
         routing_slug: draft.routing_slug.trim().toLowerCase(),
         specialty: draft.specialty.trim(),
         practice_location: draft.practice_location.trim(),
+        code_label: (draft.code_label ?? "").trim(),
+        code_note: (draft.code_note ?? "").trim(),
+        code_source: (draft.code_source ?? "").trim(),
       });
-      patchPartner(saved.id, saved);
+      const { label_saved: labelSaved, ...savedPartner } = saved;
+      patchPartner(savedPartner.id, savedPartner);
       setPanelOpen(false);
-      setNotice(`${nameOf({ ...draft, ...saved })} saved.`);
+      if (labelSaved === false && draft.code_label?.trim()) {
+        setNotice(`${nameOf({ ...draft, ...savedPartner })} saved, except the label: the database doesn't support labels yet.`);
+      } else {
+        setNotice(`${nameOf({ ...draft, ...savedPartner })} saved.`);
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to update doctor details.");
     } finally {
@@ -497,6 +505,28 @@ export default function DoctorPartners() {
             </div>
             <Field label="Clinic address" htmlFor="partner-address">
               <Input id="partner-address" value={draft.practice_location} required onChange={(e) => edit({ practice_location: e.target.value })} />
+            </Field>
+          </FieldGroup>
+
+          <FieldGroup title="Partner code">
+            <div className="grid grid-cols-2 gap-3">
+              <Field
+                label="Label"
+                htmlFor="partner-code-label"
+                hint={`Shown on the join page: Ref number #${original.partner_code ?? ""}${draft.code_label?.trim() ? ` · ${draft.code_label.trim()}` : ""}`}
+              >
+                <Input id="partner-code-label" value={draft.code_label ?? ""} maxLength={40} placeholder="GSC" onChange={(e) => edit({ code_label: e.target.value })} />
+              </Field>
+              <Field label="Description" htmlFor="partner-code-note" hint="Admin only.">
+                <Input id="partner-code-note" value={draft.code_note ?? ""} maxLength={200} onChange={(e) => edit({ code_note: e.target.value })} />
+              </Field>
+            </div>
+            <Field
+              label="Where the QR is used"
+              htmlFor="partner-code-source"
+              hint={"Pre-fills “Where did you find us?” for doctors who join through this partner's QR."}
+            >
+              <Input id="partner-code-source" value={draft.code_source ?? ""} maxLength={120} onChange={(e) => edit({ code_source: e.target.value })} />
             </Field>
           </FieldGroup>
 

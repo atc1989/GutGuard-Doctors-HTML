@@ -13,7 +13,12 @@ export async function POST(request: Request) {
   const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
   try {
-    const partner = await serverAdminCreatePendingPartner(adminPassword, text(body.note, 200), text(body.source, 120));
+    const partner = await serverAdminCreatePendingPartner(
+      adminPassword,
+      text(body.note, 200),
+      text(body.source, 120),
+      text(body.label, 40),
+    );
     return NextResponse.json({ partner });
   } catch (error) {
     return NextResponse.json(

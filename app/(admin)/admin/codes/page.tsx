@@ -20,11 +20,12 @@ type PendingPartner = {
   created_at?: string;
   code_note?: string;
   code_source?: string;
+  code_label?: string;
 };
 
 const day = (value: string) =>
   new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
-const searchText = (partner: PendingPartner) => [partner.partner_code, partner.code_note, partner.code_source].join(" ");
+const searchText = (partner: PendingPartner) => [partner.partner_code, partner.code_label, partner.code_note, partner.code_source].join(" ");
 
 /**
  * Staff mint a blank partner: one click -> a code and its two QRs. When the doctor gets in
@@ -37,8 +38,9 @@ export default function AdminCodesPage() {
   const [notice, setNotice] = useState<string | null>(null);
   // Highest code in use; the Generate window previews the next one.
   const [maxCode, setMaxCode] = useState(0);
-  // Generate window and its two optional fields.
+  // Generate window and its optional fields.
   const [generateOpen, setGenerateOpen] = useState(false);
+  const [label, setLabel] = useState("");
   const [note, setNote] = useState("");
   const [source, setSource] = useState("");
   const [isCreating, setIsCreating] = useState(false);
@@ -67,6 +69,7 @@ export default function AdminCodesPage() {
             created_at: doctor.created_at,
             code_note: doctor.code_note,
             code_source: doctor.code_source,
+            code_label: doctor.code_label,
           })),
       );
     } catch (caught) {
@@ -87,6 +90,7 @@ export default function AdminCodesPage() {
   };
 
   const openGenerate = () => {
+    setLabel("");
     setNote("");
     setSource("");
     setError(null);
@@ -101,16 +105,21 @@ export default function AdminCodesPage() {
       const res = await fetch("/api/admin/codes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note, source }),
+        body: JSON.stringify({ note, source, label }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Could not create a code.");
+      const { label_saved: labelSaved, ...partner } = data.partner;
       const created: PendingPartner = {
-        ...data.partner,
+        ...partner,
         created_at: new Date().toISOString(),
         code_note: note.trim(),
         code_source: source.trim(),
+        code_label: labelSaved ? label.trim() : "",
       };
+      if (label.trim() && !labelSaved) {
+        setError(`Code #${created.partner_code} was created without its label: the database doesn't support labels yet.`);
+      }
       setPending((current) => [created, ...current]);
       setMaxCode((current) => Math.max(current, created.partner_code));
       setGenerateOpen(false);
@@ -134,6 +143,12 @@ export default function AdminCodesPage() {
         accessorKey: "partner_code",
         meta: { label: "Code" },
         cell: ({ row }) => <span className="font-medium tabular-nums">#{row.original.partner_code}</span>,
+      },
+      {
+        id: "label",
+        accessorFn: (partner) => partner.code_label ?? "",
+        meta: { label: "Label" },
+        cell: ({ getValue }) => (getValue() ? String(getValue()) : <span className="text-subtle-foreground">—</span>),
       },
       {
         id: "note",
@@ -232,7 +247,8 @@ export default function AdminCodesPage() {
           </div>
           <p className="text-xs text-muted-foreground">
             Sales and sign-ups through these QRs are credited to #{selected.partner_code} from the first scan. To let the
-            doctor sign in, fill in their details and email on Doctor partners.
+            doctor sign in, fill in their details and email on Doctor partners, where the label, description and where it&apos;s
+            used can also be changed.
           </p>
         </EditSheet>
       ) : null}
@@ -252,6 +268,13 @@ export default function AdminCodesPage() {
           <dt className="text-muted-foreground">Join link</dt>
           <dd className="truncate font-mono">{getPartnerQrLink(preview, "referral")}</dd>
         </dl>
+        <Field
+          label="Label (optional, shown publicly on the join page)"
+          htmlFor="code-label"
+          hint={`Doctors who join through this QR see “Ref number #${preview.partner_code}${label.trim() ? ` · ${label.trim()}` : ""}”`}
+        >
+          <Input id="code-label" value={label} maxLength={40} placeholder="GSC" onChange={(event) => setLabel(event.target.value)} />
+        </Field>
         <Field label="Description (optional, admin only)" htmlFor="code-note">
           <Input id="code-note" value={note} maxLength={200} placeholder="Dr. Cruz, Makati clinic" onChange={(event) => setNote(event.target.value)} />
         </Field>
