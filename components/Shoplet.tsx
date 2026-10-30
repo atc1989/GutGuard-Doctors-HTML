@@ -138,7 +138,7 @@ export default function Shoplet() {
   const [referralShopName, setReferralShopName] = useState("");
   // Set when the visitor came through a partner's shop link: whose shop this is, and whether
   // that partner may recruit (locked affiliates get Log in instead of "Become a partner").
-  const [referrer, setReferrer] = useState<{ code: number | null; canRefer: boolean } | null>(null);
+  const [referrer, setReferrer] = useState<{ code: number | null; canRefer: boolean; label: string } | null>(null);
   // Set by /r/<slug> for partners whose link may not sell the Full Protocol.
   const [trialOnly, setTrialOnly] = useState(false);
   // null until loaded; the fallback list until then. See loadCatalog for failure handling.
@@ -212,7 +212,7 @@ export default function Shoplet() {
     if (referralSlug) {
       getPartnerInvitation(referralSlug)
         .then((invite) => {
-          if (invite) setReferrer({ code: invite.partner_code, canRefer: invite.can_refer });
+          if (invite) setReferrer({ code: invite.partner_code, canRefer: invite.can_refer, label: invite.code_label });
         })
         .catch(() => {
           // Unknown or unreachable referrer: the plain shop header.
@@ -748,6 +748,14 @@ export default function Shoplet() {
               <p className="shop-note">Loading prices…</p>
             </div>
           )}
+
+          {/* Same line as the join form: who this sale is credited to, plus the code's public label. */}
+          {referrer?.code ? (
+            <p className="shop-referral-ref">
+              Ref number <strong>#{referrer.code}</strong>
+              {referrer.label ? <> · {referrer.label}</> : null}
+            </p>
+          ) : null}
         </div>
       </section>
 
