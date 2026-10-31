@@ -4,12 +4,12 @@ import { useRef } from "react";
 import { QRCodeCanvas, QRCodeSVG } from "qrcode.react";
 import { Download, Share2 } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
-import { QR_LOGO_PROPS, getPartnerQrLink, useCopy } from "@/components/partner/shared";
+import { QR_LOGO_PROPS, getPartnerQrLink, useCopy, type PartnerQrMode } from "@/components/partner/shared";
 
 const QR_RENDER_PX = 1024;
 
 /**
- * One partner QR (Shop or Join) with its link, Share link and Download PNG. Drawn at 1024px with
+ * One partner QR (Shop, Join or Landing) with its link, Share link and Download PNG. Drawn at 1024px with
  * the logo so the PNG matches what partners get. `fileName` and `margin` keep each page's
  * downloads identical to what it produced before.
  */
@@ -22,7 +22,7 @@ export function PartnerQrCard({
   children,
 }: {
   partner: { id: string; routing_slug: string; partner_code?: number | null };
-  mode: "shop" | "referral";
+  mode: PartnerQrMode;
   label: string;
   fileName: string;
   margin?: number;
