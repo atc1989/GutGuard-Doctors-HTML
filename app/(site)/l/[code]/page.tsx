@@ -46,17 +46,18 @@ export default async function LandingPage({ params }: { params: Promise<{ code: 
   const join = canRefer ? `/j/${code}` : "/physicians/register";
 
   const body = LANDING_BODY.replaceAll("{{SHOP_URL}}", shop)
-    .replaceAll("{{JOIN_URL}}", join)
     .replace("{{REF_NOTE}}", known ? `<p class="sec-sub">Ref. No. #${code} is applied automatically in the shop.</p>` : "")
-    // Bottom of the "Are you a doctor?" card: the same ref line as the join form and the shop.
+    // Last thing before the footer: the same ref line as the join form and the shop.
     .replace(
-      "{{DOC_REF}}",
-      known ? `<p class="doc-ref">Ref number <strong>#${code}</strong>${label ? ` · ${escapeHtml(label)}` : ""}</p>` : "",
+      "{{REF_LINE}}",
+      known
+        ? `<section class="landing-ref"><div class="wrap"><p>Ref number <strong>#${code}</strong>${label ? ` · ${escapeHtml(label)}` : ""}</p></div></section>`
+        : "",
     );
 
   return (
-    // Locked affiliates keep Log in in the top bar, like their shop does.
-    <LandingShell shop={shop} join={join} recruit={!known || canRefer} css={LANDING_CSS}>
+    // A patient page: no partner sign-up or log-in in the top bar. The footer still links the join page.
+    <LandingShell shop={shop} join={join} css={LANDING_CSS}>
       <div dangerouslySetInnerHTML={{ __html: body }} />
     </LandingShell>
   );
