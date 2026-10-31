@@ -5027,6 +5027,15 @@
   line-height: 1.15;
 }
 
+/* Below the product card when the visitor came through a partner's shop link. */
+.shop-referral-ref {
+  margin: 14px 2px 0;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Secondary to Basket: same pill, outlined. */
 .shop-site-join {
   min-height: 44px;

@@ -1290,7 +1290,10 @@ function useReveal(dep) {
   }, [dep]);
 }
 
-function Nav({ route, scrolled, open, setOpen, sheetRef, burgerRef }) {
+/* `shop` set = a single page (the partner landing page): no page links or menu, and the shop
+   buttons go to that partner's link, with no Log in (patients don't have accounts). Plain <a>,
+   since prefetching /s/ would count a click. */
+function Nav({ route, scrolled, open, setOpen, sheetRef, burgerRef, shop }) {
   const here = route === "/" ? "Home" : (NAV.find(([, r]) => r === route) || [])[0];
   return (
     <>
@@ -1301,21 +1304,25 @@ function Nav({ route, scrolled, open, setOpen, sheetRef, burgerRef }) {
             {here && <span className="nav-here" aria-hidden="true">{here}</span>}
           </div>
           <div className="nav-links">
-            {NAV.map(([l, r]) => (
+            {!shop && NAV.map(([l, r]) => (
               <a key={r} href={r} aria-current={(route === r || (route === "/" && r.startsWith("/#"))) ? "page" : undefined}>{l}</a>
             ))}
           </div>
           <div className="nav-actions">
-            <Link className="nav-login" href="/partner" aria-label="Open the partner login page">Log in</Link>
-            <Link className="nav-cta" href="/shop">Choose Your Protocol <ArrowRight size={14} /></Link>
+            {!shop && <Link className="nav-login" href="/partner" aria-label="Open the partner login page">Log in</Link>}
+            {shop
+              ? <a className="nav-cta" href={shop}>Buy now <ArrowRight size={14} /></a>
+              : <Link className="nav-cta" href="/shop">Choose Your Protocol <ArrowRight size={14} /></Link>}
           </div>
-          <Link className="nav-shop-mobile" href="/shop">Shop</Link>
-          <button ref={burgerRef} className="burger" aria-label="Open menu" aria-haspopup="dialog" aria-expanded={open} aria-controls="mobile-menu" onClick={() => setOpen(true)}>
-            <Menu size={20} />
-          </button>
+          {shop ? <a className="nav-shop-mobile" href={shop}>Shop</a> : <Link className="nav-shop-mobile" href="/shop">Shop</Link>}
+          {!shop && (
+            <button ref={burgerRef} className="burger" aria-label="Open menu" aria-haspopup="dialog" aria-expanded={open} aria-controls="mobile-menu" onClick={() => setOpen(true)}>
+              <Menu size={20} />
+            </button>
+          )}
         </div>
       </nav>
-      <div id="mobile-menu" ref={sheetRef} className={"sheet" + (open ? " open" : "")} role="dialog" aria-modal="true" aria-label="Site menu">
+      {!shop && <div id="mobile-menu" ref={sheetRef} className={"sheet" + (open ? " open" : "")} role="dialog" aria-modal="true" aria-label="Site menu">
         <button className="burger sheet-close" aria-label="Close menu" onClick={() => setOpen(false)}><X size={20} /></button>
         {NAV.map(([l, r], i) => (
           <a key={r} href={r} aria-current={(route === r || (route === "/" && r.startsWith("/#"))) ? "page" : undefined} onClick={() => setOpen(false)}>
@@ -1324,12 +1331,15 @@ function Nav({ route, scrolled, open, setOpen, sheetRef, burgerRef }) {
         ))}
         <Link className="nav-cta" href="/shop" onClick={() => setOpen(false)}>Choose Your Protocol <ArrowRight size={16} /></Link>
         <Link className="sheet-login" href="/partner">Already a partner? Log in →</Link>
-      </div>
+      </div>}
     </>
   );
 }
 
-function Footer() {
+/* `shop` / `join` swap the shop and register links for a partner's own links (the landing page). */
+function Footer({ shop, join }) {
+  const partnerHref = (href) =>
+    (shop && href.startsWith("/shop") ? shop : join && href === "/physicians/register" ? join : href);
   const currentYear = new Date().getFullYear();
   const [isCompact, setIsCompact] = useState(false);
   const [openGroups, setOpenGroups] = useState(() =>
@@ -1379,7 +1389,7 @@ function Footer() {
                   </button>
                   <ul id={panelId}>
                     {links.map(([text, href]) => (
-                      <li key={text}><a href={href}>{text}</a></li>
+                      <li key={text}><a href={partnerHref(href)}>{text}</a></li>
                     ))}
                   </ul>
                 </section>
@@ -2110,7 +2120,8 @@ function SectionTabs({ items }) {
   );
 }
 
-function BuyBar({ route }) {
+/* `shop` set = the landing page: always on, and the button is that partner's shop link. */
+function BuyBar({ route, shop }) {
   const [shown, setShown] = useState(false);
   // Grow as admin last set it, at today's promo price. Fallback list until it loads.
   // Hidden until the real catalog loads, so the built-in fallback price never flashes.
@@ -2125,7 +2136,7 @@ function BuyBar({ route }) {
     });
   }, []);
   const GROW = grow?.product;
-  const enabled = route === "/" || route === "/shop";
+  const enabled = Boolean(shop) || route === "/" || route === "/shop";
   useEffect(() => {
     if (!enabled) { setShown(false); return; }
     let anchorPassed = false;
@@ -2180,9 +2191,35 @@ function BuyBar({ route }) {
             <span className="bb-phase">{GROW.phase} protocol · </span>₱{grow.live.price.toLocaleString("en-PH")} total
           </span>
         </div>
-        <Link className="btn-primary bb-cta" tabIndex={shown ? 0 : -1} href="/shop#flagship">Compare Protocols <Arrow /></Link>
+        {shop
+          ? <a className="btn-primary bb-cta" tabIndex={shown ? 0 : -1} href={shop}>Buy now <Arrow /></a>
+          : <Link className="btn-primary bb-cta" tabIndex={shown ? 0 : -1} href="/shop#flagship">Compare Protocols <Arrow /></Link>}
       </div>
     </nav>
+  );
+}
+
+/* The partner landing page (app/(site)/l/[code]): the site's top bar, footer and buy bar around
+   a page that brings its own sections and CSS. `shop` / `join` are the partner's links. */
+export function LandingShell({ shop, join, css, children }) {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  return (
+    <div className="gg">
+      <style>{CSS}</style>
+      <style>{css}</style>
+      <a className="skip" href="#main">Skip to content</a>
+      <Nav route="/l" scrolled={scrolled} open={false} setOpen={() => {}} shop={shop} />
+      <main id="main" tabIndex={-1}>{children}</main>
+      <Footer shop={shop} join={join} />
+      <BuyBar route="/l" shop={shop} />
+    </div>
   );
 }
 

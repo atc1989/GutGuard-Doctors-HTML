@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Plus, RefreshCw } from "lucide-react";
 import { Alert, PageBody } from "@/components/admin/blocks";
@@ -10,8 +10,10 @@ import { ConfirmDialog, EditSheet, Field } from "@/components/admin/form";
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
 import { PartnerQrCard } from "@/components/admin/partner-qr";
-import { getPartnerQrLink, useCopy } from "@/components/partner/shared";
+import { getPartnerQrLink, useCopy, type PartnerQrMode } from "@/components/partner/shared";
 import type { AdminDoctorRegistration } from "@/lib/api";
+
+const LINK_NAMES: Record<PartnerQrMode, string> = { shop: "Shop", referral: "Join", landing: "Landing" };
 
 type PendingPartner = {
   id: string;
@@ -20,11 +22,12 @@ type PendingPartner = {
   created_at?: string;
   code_note?: string;
   code_source?: string;
+  code_label?: string;
 };
 
 const day = (value: string) =>
   new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
-const searchText = (partner: PendingPartner) => [partner.partner_code, partner.code_note, partner.code_source].join(" ");
+const searchText = (partner: PendingPartner) => [partner.partner_code, partner.code_label, partner.code_note, partner.code_source].join(" ");
 
 /**
  * Staff mint a blank partner: one click -> a code and its two QRs. When the doctor gets in
@@ -37,14 +40,19 @@ export default function AdminCodesPage() {
   const [notice, setNotice] = useState<string | null>(null);
   // Highest code in use; the Generate window previews the next one.
   const [maxCode, setMaxCode] = useState(0);
-  // Generate window and its two optional fields.
+  // Generate window and its optional fields.
   const [generateOpen, setGenerateOpen] = useState(false);
+  const [label, setLabel] = useState("");
   const [note, setNote] = useState("");
   const [source, setSource] = useState("");
   const [isCreating, setIsCreating] = useState(false);
-  // QR panel; the open flag is separate so it keeps its content while sliding out.
+  // QR panel with the code's editable fields; the open flag is separate so it keeps its content
+  // while sliding out.
   const [selected, setSelected] = useState<PendingPartner | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [fields, setFields] = useState({ label: "", note: "", source: "" });
+  const [isSaving, setIsSaving] = useState(false);
+  const [panelError, setPanelError] = useState<string | null>(null);
   const { share } = useCopy();
 
   async function load() {
@@ -67,6 +75,7 @@ export default function AdminCodesPage() {
             created_at: doctor.created_at,
             code_note: doctor.code_note,
             code_source: doctor.code_source,
+            code_label: doctor.code_label,
           })),
       );
     } catch (caught) {
@@ -83,10 +92,56 @@ export default function AdminCodesPage() {
 
   const showQrs = (partner: PendingPartner) => {
     setSelected(partner);
+    setFields({ label: partner.code_label ?? "", note: partner.code_note ?? "", source: partner.code_source ?? "" });
+    setPanelError(null);
     setPanelOpen(true);
   };
 
+  const fieldsChanged = Boolean(
+    selected &&
+      (fields.label.trim() !== (selected.code_label ?? "") ||
+        fields.note.trim() !== (selected.code_note ?? "") ||
+        fields.source.trim() !== (selected.code_source ?? "")),
+  );
+
+  async function saveFields(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selected) return;
+    setIsSaving(true);
+    setPanelError(null);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/admin/codes", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: selected.id, ...fields }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Could not save the code.");
+      const labelSaved = data.partner?.label_saved !== false;
+      const saved: PendingPartner = {
+        ...selected,
+        code_label: labelSaved ? fields.label.trim() : selected.code_label,
+        code_note: fields.note.trim(),
+        code_source: fields.source.trim(),
+      };
+      setPending((current) => current.map((partner) => (partner.id === saved.id ? saved : partner)));
+      setSelected(saved);
+      setPanelOpen(false);
+      setNotice(
+        labelSaved || !fields.label.trim()
+          ? `#${saved.partner_code} saved.`
+          : `#${saved.partner_code} saved, except the label: the database doesn't support labels yet.`,
+      );
+    } catch (caught) {
+      setPanelError(caught instanceof Error ? caught.message : "Could not save the code.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   const openGenerate = () => {
+    setLabel("");
     setNote("");
     setSource("");
     setError(null);
@@ -101,16 +156,21 @@ export default function AdminCodesPage() {
       const res = await fetch("/api/admin/codes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note, source }),
+        body: JSON.stringify({ note, source, label }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Could not create a code.");
+      const { label_saved: labelSaved, ...partner } = data.partner;
       const created: PendingPartner = {
-        ...data.partner,
+        ...partner,
         created_at: new Date().toISOString(),
         code_note: note.trim(),
         code_source: source.trim(),
+        code_label: labelSaved ? label.trim() : "",
       };
+      if (label.trim() && !labelSaved) {
+        setError(`Code #${created.partner_code} was created without its label: the database doesn't support labels yet.`);
+      }
       setPending((current) => [created, ...current]);
       setMaxCode((current) => Math.max(current, created.partner_code));
       setGenerateOpen(false);
@@ -124,9 +184,9 @@ export default function AdminCodesPage() {
   }
 
   const columns = useMemo<ColumnDef<PendingPartner, unknown>[]>(() => {
-    const shareLink = async (partner: PendingPartner, mode: "shop" | "referral") => {
+    const shareLink = async (partner: PendingPartner, mode: PartnerQrMode) => {
       const shared = await share(getPartnerQrLink(partner, mode));
-      if (shared) setNotice(`${mode === "shop" ? "Shop" : "Join"} link for #${partner.partner_code} copied or shared.`);
+      if (shared) setNotice(`${LINK_NAMES[mode]} link for #${partner.partner_code} copied or shared.`);
     };
     return [
       {
@@ -134,6 +194,12 @@ export default function AdminCodesPage() {
         accessorKey: "partner_code",
         meta: { label: "Code" },
         cell: ({ row }) => <span className="font-medium tabular-nums">#{row.original.partner_code}</span>,
+      },
+      {
+        id: "label",
+        accessorFn: (partner) => partner.code_label ?? "",
+        meta: { label: "Label" },
+        cell: ({ getValue }) => (getValue() ? String(getValue()) : <span className="text-subtle-foreground">—</span>),
       },
       {
         id: "note",
@@ -162,9 +228,10 @@ export default function AdminCodesPage() {
             <RowActions
               label={`Actions for code ${row.original.partner_code}`}
               actions={[
-                { label: "Show QR codes", onSelect: () => showQrs(row.original) },
+                { label: "Edit and show QR codes", onSelect: () => showQrs(row.original) },
                 { label: "Share shop link", onSelect: () => shareLink(row.original, "shop") },
                 { label: "Share join link", onSelect: () => shareLink(row.original, "referral") },
+                { label: "Share landing link", onSelect: () => shareLink(row.original, "landing") },
               ]}
             />
           </div>
@@ -219,16 +286,40 @@ export default function AdminCodesPage() {
           size="wide"
           title={`Partner #${selected.partner_code}`}
           description={[selected.created_at ? `Created ${day(selected.created_at)}` : "", selected.code_note].filter(Boolean).join(" · ") || undefined}
-          onSubmit={(event) => event.preventDefault()}
+          onSubmit={saveFields}
           footer={
-            <Button type="button" variant="ghost" size="sm" onClick={() => setPanelOpen(false)}>
-              Close
-            </Button>
+            <>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setPanelOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" size="sm" disabled={!fieldsChanged || isSaving}>
+                {isSaving ? "Saving" : "Save"}
+              </Button>
+            </>
           }
         >
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {panelError ? <Alert tone="error">{panelError}</Alert> : null}
+          <Field
+            label="Label (shown publicly on the join page)"
+            htmlFor="edit-code-label"
+            hint={`Doctors who join through this QR see “Ref number #${selected.partner_code}${fields.label.trim() ? ` · ${fields.label.trim()}` : ""}”`}
+          >
+            <Input id="edit-code-label" value={fields.label} maxLength={40} onChange={(event) => setFields((current) => ({ ...current, label: event.target.value }))} />
+          </Field>
+          <Field label="Description (admin only)" htmlFor="edit-code-note">
+            <Input id="edit-code-note" value={fields.note} maxLength={200} onChange={(event) => setFields((current) => ({ ...current, note: event.target.value }))} />
+          </Field>
+          <Field
+            label="Where will this QR be used?"
+            htmlFor="edit-code-source"
+            hint={"Doctors who join through this QR see it already filled in as “Where did you find us?”"}
+          >
+            <Input id="edit-code-source" value={fields.source} maxLength={120} onChange={(event) => setFields((current) => ({ ...current, source: event.target.value }))} />
+          </Field>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <PartnerQrCard partner={selected} mode="shop" label="Shop" fileName={`gutguard-shop-${selected.partner_code}.png`} />
             <PartnerQrCard partner={selected} mode="referral" label="Join" fileName={`gutguard-join-${selected.partner_code}.png`} />
+            <PartnerQrCard partner={selected} mode="landing" label="Landing" fileName={`gutguard-landing-${selected.partner_code}.png`} />
           </div>
           <p className="text-xs text-muted-foreground">
             Sales and sign-ups through these QRs are credited to #{selected.partner_code} from the first scan. To let the
@@ -246,12 +337,21 @@ export default function AdminCodesPage() {
         busy={isCreating}
         onConfirm={generate}
       >
-        <dl className="grid grid-cols-[72px_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-lg border border-border bg-chrome p-3 text-xs">
+        <dl className="grid grid-cols-[84px_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-lg border border-border bg-chrome p-3 text-xs">
           <dt className="text-muted-foreground">Shop link</dt>
           <dd className="truncate font-mono">{getPartnerQrLink(preview, "shop")}</dd>
           <dt className="text-muted-foreground">Join link</dt>
           <dd className="truncate font-mono">{getPartnerQrLink(preview, "referral")}</dd>
+          <dt className="text-muted-foreground">Landing link</dt>
+          <dd className="truncate font-mono">{getPartnerQrLink(preview, "landing")}</dd>
         </dl>
+        <Field
+          label="Label (optional, shown publicly on the join page)"
+          htmlFor="code-label"
+          hint={`Doctors who join through this QR see “Ref number #${preview.partner_code}${label.trim() ? ` · ${label.trim()}` : ""}”`}
+        >
+          <Input id="code-label" value={label} maxLength={40} onChange={(event) => setLabel(event.target.value)} />
+        </Field>
         <Field label="Description (optional, admin only)" htmlFor="code-note">
           <Input id="code-note" value={note} maxLength={200} placeholder="Dr. Cruz, Makati clinic" onChange={(event) => setNote(event.target.value)} />
         </Field>

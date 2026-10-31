@@ -9,7 +9,7 @@ const SHOP_ORIGIN = (process.env.NEXT_PUBLIC_SHOP_URL ?? "https://shop.gutguard.
 const PUBLIC_SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://partners.gutguard.ph").replace(/\/$/, "");
 export const PUBLIC_MARKETING_ORIGIN = (process.env.NEXT_PUBLIC_MARKETING_URL ?? "https://www.gutguard.ph").replace(/\/$/, "");
 
-export type PartnerQrMode = "shop" | "referral";
+export type PartnerQrMode = "shop" | "referral" | "landing";
 
 /**
  * Every QR is drawn at 1024px with the GutGuard logo in the middle. Level H error correction
@@ -58,12 +58,14 @@ export function getPartnerQrLink(
   partner: { id: string; routing_slug: string; partner_code?: number | null },
   mode: PartnerQrMode,
 ) {
+  const code = partner.partner_code;
+  // The landing page is newer than partner codes, so it has no key link; /l/0 is the plain page.
+  if (mode === "landing") return `${PUBLIC_MARKETING_ORIGIN}/l/${(partner.id && code) || 0}`;
   if (!partner.id) {
     if (mode === "shop") return SHOP_ORIGIN;
     return `${PUBLIC_SITE_ORIGIN}/physicians/register`;
   }
   const key = partnerLinkKey(partner.id);
-  const code = partner.partner_code;
   // Shop and join share one partner code and differ only in the prefix. The key links are the
   // fallback until partner_code is deployed; printed ones keep working either way.
   if (mode === "referral") return code ? `${PUBLIC_MARKETING_ORIGIN}/j/${code}` : `${PUBLIC_MARKETING_ORIGIN}/${key.toUpperCase()}`;

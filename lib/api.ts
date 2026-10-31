@@ -70,6 +70,8 @@ export type AdminDoctorRegistration = {
   /** Partner Codes: admin-only description, and where the QR is used (pre-fills the join form). */
   code_note?: string;
   code_source?: string;
+  /** Public label shown on the join page. Read from the table, not admin_list_doctor_registrations. */
+  code_label?: string;
 };
 
 export type AdminDoctorRegistrationUpdate = {
@@ -81,6 +83,10 @@ export type AdminDoctorRegistrationUpdate = {
   routing_slug?: string;
   specialty: string;
   practice_location: string;
+  /** Partner Codes fields; left out = unchanged. */
+  code_note?: string;
+  code_source?: string;
+  code_label?: string;
 };
 
 export type NewsletterSendHistory = {
@@ -438,6 +444,8 @@ export type PartnerInvitation = {
   can_refer: boolean;
   /** Set on Partner Codes; pre-fills "Where did you find us?" on this partner's join form. */
   code_source: string;
+  /** Public label set on Partner Codes ("GSC"), shown beside the ref number. "" until 20261102000000 runs. */
+  code_label: string;
 };
 
 export type RegistrationEmailAttachment = {
@@ -547,6 +555,7 @@ export async function getPartnerInvitation(slug: string): Promise<PartnerInvitat
     partner_code: code,
     can_refer: row?.can_refer === true,
     code_source: String(row?.code_source ?? "").trim(),
+    code_label: String(row?.code_label ?? "").trim(),
   };
 }
 
@@ -738,7 +747,7 @@ export async function adminImpersonateDoctor(
 
 export async function updateDoctorRegistration(
   doctor: AdminDoctorRegistrationUpdate,
-): Promise<AdminDoctorRegistration> {
+): Promise<AdminDoctorRegistration & { label_saved?: boolean }> {
   const res = await fetch("/api/admin/doctors", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
