@@ -55,7 +55,25 @@ export async function sendPaidReceipt(supabase: ShopAdminClient, orderId: string
   const { data, error } = await supabase.functions.invoke("send-shop-order-email", {
     body: { orderId, kind: "paid", schema: SHOP_SCHEMA },
   });
+  await sendOrderSms(supabase, orderId, "paid");
   if (error || (!data?.sent && !data?.duplicate)) throw new Error("Paid receipt delivery failed; retry required.");
+}
+
+/**
+ * Texts the customer about their order. Best-effort on purpose: this runs inside the Maya
+ * webhook path, where a throw makes Maya retry the whole payment, and a missing text is not
+ * worth replaying a payment for. The send-once row in shop_order_sms_sends is what stops a
+ * replay from texting twice.
+ */
+export async function sendOrderSms(supabase: ShopAdminClient, orderId: string, kind: "paid" | "shipped") {
+  try {
+    const { error } = await supabase.functions.invoke("send-order-sms", {
+      body: { orderId, kind, schema: SHOP_SCHEMA },
+    });
+    if (error) console.error(`Order SMS (${kind}) failed`, orderId, error.message);
+  } catch (smsError) {
+    console.error(`Order SMS (${kind}) failed`, orderId, smsError);
+  }
 }
 
 /**

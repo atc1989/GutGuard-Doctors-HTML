@@ -50,6 +50,20 @@ function getLoginLimiter(): Ratelimit | null {
   return loginLimiter;
 }
 
+// One lazy limiter per prefix, so a new throttled route is a line rather than another copy of
+// the boilerplate above. Null until the UPSTASH_* vars exist.
+const limiters = new Map<string, Ratelimit>();
+function slidingLimiter(prefix: string, count: number, window: `${number} ${"s" | "m" | "h"}`) {
+  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) return null;
+  if (!limiters.has(prefix)) {
+    limiters.set(
+      prefix,
+      new Ratelimit({ redis: Redis.fromEnv(), limiter: Ratelimit.slidingWindow(count, window), prefix, analytics: false }),
+    );
+  }
+  return limiters.get(prefix) ?? null;
+}
+
 // Upstash unreachable: stay closed (as before) but answer with a readable 503, not a crash.
 const limiterUnavailable = (what: string) =>
   NextResponse.json({ error: `${what} is temporarily unavailable. Try again shortly.` }, { status: 503 });
@@ -75,6 +89,35 @@ export async function proxy(req: NextRequest) {
         { error: "Too many login attempts. Try again in a few minutes." },
         { status: 429, headers: { "Retry-After": String(Math.ceil((result.reset - Date.now()) / 1000)) } },
       );
+    }
+    return NextResponse.next();
+  }
+
+  // Every checkout code is a real SMS credit, so this one is throttled per order as well as per
+  // network: 3 sends per order per 10 minutes covers a mistyped number and a resend, no more.
+  if (req.nextUrl.pathname === "/api/shop/otp/send" && req.method === "POST") {
+    const ipLimit = slidingLimiter("rl:shop-otp:ip", 20, "10 m");
+    const orderLimit = slidingLimiter("rl:shop-otp:order", 3, "10 m");
+    if (!ipLimit || !orderLimit) return NextResponse.next();
+
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "127.0.0.1";
+    let orderId = "";
+    try {
+      const body = await req.clone().json();
+      orderId = typeof body?.orderId === "string" ? body.orderId : "";
+    } catch {
+      // Unparseable body: the IP limit below still applies and the route will reject it.
+    }
+
+    for (const [limiter, key] of [[ipLimit, clientIp], [orderLimit, orderId || clientIp]] as const) {
+      const result = await limiter.limit(key).catch(() => null);
+      if (!result) return limiterUnavailable("Mobile verification");
+      if (!result.success) {
+        return NextResponse.json(
+          { error: "Too many code requests. Wait a few minutes and try again." },
+          { status: 429, headers: { "Retry-After": String(Math.ceil((result.reset - Date.now()) / 1000)) } },
+        );
+      }
     }
     return NextResponse.next();
   }

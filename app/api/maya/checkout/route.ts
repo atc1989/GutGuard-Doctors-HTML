@@ -139,6 +139,24 @@ export async function POST(request: Request) {
     );
   }
 
+  // The buyer must have proved their mobile number before we start a payment. Checked here,
+  // after the recovery block above - a payment that was already taken must stay reconcilable -
+  // and before the reservation below, so a blocked attempt leaves no CHECKOUT_CREATING behind.
+  // Both this route and the retry button pass through here, which is why the gate is not in the
+  // cart form. With no SMS provider configured nothing can send a code, so the gate stands down
+  // and checkout behaves exactly as it did before.
+  if (process.env.SMS_PROVIDER) {
+    const { data: otp } = await supabase
+      .from("shop_mobile_otps")
+      .select("mobile, verified_at")
+      .eq("order_id", order.id)
+      .maybeSingle();
+    const sameNumber = otp?.mobile && phoneDigits(otp.mobile) === phoneDigits(order.mobile);
+    if (!otp?.verified_at || !sameNumber) {
+      return NextResponse.json({ error: "Mobile not verified.", needsMobileVerification: true }, { status: 403 });
+    }
+  }
+
   // Maya wants a unique reference per transaction, so retries get a suffix while
   // the order code (and therefore reconciliation) stays one-to-one with the order.
   const attempt = (Number(order.payment_attempts) || 0) + 1;
@@ -265,4 +283,10 @@ function getSiteUrl(request: Request) {
   const configured = process.env.NEXT_PUBLIC_SHOP_URL;
   if (configured) return configured.replace(/\/$/, "");
   return new URL(request.url).origin;
+}
+
+/** `09XXXXXXXXX` from whatever shape the number is stored in, so the gate compares like with like. */
+function phoneDigits(value: string | null | undefined) {
+  const digits = (value ?? "").replace(/\D/g, "");
+  return digits.startsWith("63") ? `0${digits.slice(2)}` : digits;
 }

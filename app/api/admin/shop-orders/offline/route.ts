@@ -4,6 +4,7 @@ import { getAdminPasswordFromSession } from "@/lib/admin-session";
 import { serverAdminGetShopOrder, serverAdminUpdateShopOrder } from "@/lib/admin-server-api";
 import type { AdminOfflineOrderInput } from "@/lib/api";
 import { loadCatalog, priceOrderLines } from "@/lib/catalog";
+import { sendOrderSms } from "@/lib/maya-orders";
 import { cleanFulfillment } from "@/lib/order-fulfillment";
 import { getSupabaseAdmin, isSupabaseAdminConfigured, SHOP_SCHEMA } from "@/lib/supabase-admin";
 
@@ -133,6 +134,9 @@ export async function POST(req: NextRequest) {
         console.error("Paid receipt email failed", saved.id, emailError);
       }
     }
+
+    // Outside the email check: an order with a mobile and no email still gets its text.
+    await sendOrderSms(supabase, saved.id, "paid");
 
     return NextResponse.json({ order: saved });
   } catch (error) {

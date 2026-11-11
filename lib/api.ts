@@ -882,10 +882,38 @@ export async function startMayaCheckout(orderId: string): Promise<{ redirectUrl?
 
   const body = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(body?.error ?? "Maya checkout could not be started.");
+    const error = new Error(body?.error ?? "Maya checkout could not be started.");
+    // The caller sends the buyer back to the code step instead of showing this as a dead end.
+    if (body?.needsMobileVerification) error.name = "MobileNotVerified";
+    throw error;
   }
 
   return body as { redirectUrl?: string; orderUrl: string; alreadyPaid?: boolean };
+}
+
+/**
+ * Texts the buyer a checkout code. `skipped` means no SMS provider is configured, in which case
+ * the payment gate is off too and the caller goes straight on to Maya.
+ */
+export async function sendCheckoutCode(orderId: string): Promise<{ sent: boolean; skipped: boolean }> {
+  const response = await fetch("/api/shop/otp/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderId }),
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(body?.error ?? "We could not text your code. Try again.");
+  return { sent: Boolean(body?.sent), skipped: Boolean(body?.skipped) };
+}
+
+export async function verifyCheckoutCode(orderId: string, code: string): Promise<void> {
+  const response = await fetch("/api/shop/otp/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderId, code }),
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok || !body?.verified) throw new Error(body?.error ?? "That code does not match.");
 }
 
 /**
