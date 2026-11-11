@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON lib/catalog.test.mjs && node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON lib/validation.test.mjs && node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON lib/testimonials.test.mjs && node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON lib/admin-token.test.mjs && node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON lib/psgc-data.test.mjs && node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON lib/order-address.test.mjs && node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON lib/order-fulfillment.test.mjs && node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON lib/csv.test.mjs && npm run test:payments",
-    "test:payments": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test lib/payment-recovery.test.mjs lib/shop-email.test.mjs",
+    "test:payments": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test lib/payment-recovery.test.mjs lib/shop-email.test.mjs supabase/functions/_shared/sms.test.ts",
     "psgc:build": "node scripts/build-psgc.mjs"
   },
   "dependencies": {
