@@ -8,6 +8,7 @@ import { PARTNER_SLUG_PATTERN, RESERVED_PARTNER_SLUGS } from "@/lib/referral";
 import type { AdminTestimonial, TestimonialStatus } from "@/lib/testimonials";
 import type { Prize, WheelPrize, WheelPrizeInput } from "@/lib/types";
 import { cleanFulfillment } from "@/lib/order-fulfillment";
+import { sendOrderSms } from "@/lib/maya-orders";
 import type {
   AdminDoctorRegistration,
   AdminDoctorRegistrationUpdate,
@@ -613,7 +614,19 @@ export async function serverAdminUpdateShopOrder(
     .select("*")
     .single();
   if (extraError) throw extraError;
-  return normalizeShopOrder(extra);
+  const updated = normalizeShopOrder(extra);
+
+  // "We text you when it ships": only on the move into in_transit, so re-saving the same order
+  // (or walking it on to delivered) does not text again. This is the only place tracking_status
+  // is ever set - there is no bulk import.
+  if (
+    updated.fulfillment.tracking_status === "in_transit" &&
+    saved.fulfillment.tracking_status !== "in_transit"
+  ) {
+    await sendOrderSms(supabaseShop, updated.id, "shipped");
+  }
+
+  return updated;
 }
 
 // ─── Sequence ───────────────────────────────────────────────────────────────

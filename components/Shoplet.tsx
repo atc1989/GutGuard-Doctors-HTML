@@ -7,7 +7,7 @@ import { Menu, X } from "lucide-react";
 import { ArrowRightIcon, CheckIcon } from "@/components/Icons";
 import { Logo } from "@/components/GutguardSite";
 import { CompareSheet, FullCompare } from "@/components/ShopCompare";
-import { createShopOrder, getPartnerInvitation, loadShopCatalog, sendShopOrderEmail, startMayaCheckout, type ShopOrderItem } from "@/lib/api";
+import { createShopOrder, getPartnerInvitation, loadShopCatalog, sendCheckoutCode, sendShopOrderEmail, startMayaCheckout, verifyCheckoutCode, type ShopOrderItem } from "@/lib/api";
 import {
   DEFAULT_PRODUCTS,
   formatPromoDay,
@@ -72,7 +72,7 @@ const FACTS = {
 const SCIENCE_URL = "https://gutguard.ph/#/science";
 
 type Mode = "trial" | "protocol";
-type Stage = "shop" | "saving" | "redirecting" | "payment-blocked";
+type Stage = "shop" | "saving" | "verify" | "redirecting" | "payment-blocked";
 type InfoModal = "inside" | "trust" | null;
 type FormState = {
   email: string;
@@ -127,6 +127,9 @@ export default function Shoplet() {
   const [submitting, setSubmitting] = useState(false);
   const [createdCode, setCreatedCode] = useState("");
   const [createdOrderId, setCreatedOrderId] = useState("");
+  // The checkout code the buyer is texted before payment starts.
+  const [smsCode, setSmsCode] = useState("");
+  const [canResend, setCanResend] = useState(false);
   const [provinces, setProvinces] = useState<ProvinceOption[]>([]);
   const [localities, setLocalities] = useState<LocalityOption[]>([]);
   const [barangays, setBarangays] = useState<BarangayOption[]>([]);
@@ -453,13 +456,28 @@ export default function Shoplet() {
       savedOrderId = order.id;
       setCreatedCode(order.order_code);
       setCreatedOrderId(order.id);
-      setStage("redirecting");
 
+      // Prove the mobile number before the payment starts. The order is already durable, so
+      // nothing is lost if the buyer stops here - their order page can still be paid later.
+      let noProvider = false;
+      try {
+        noProvider = (await sendCheckoutCode(order.id)).skipped;
+      } catch (codeError) {
+        setStage("verify");
+        startResendTimer();
+        setSubmitError(codeError instanceof Error ? codeError.message : "We could not text your code.");
+        return;
+      }
+      if (!noProvider) {
+        setStage("verify");
+        startResendTimer();
+        return;
+      }
+
+      setStage("redirecting");
       // The order is already durable at this point, so a Maya failure is recoverable:
       // keep the customer on the page with a retry instead of dropping them.
-      const checkout = await startMayaCheckout(order.id);
-      window.localStorage.removeItem(BASKET_STORAGE_KEY);
-      window.location.assign(checkout.redirectUrl ?? checkout.orderUrl);
+      await beginPayment(order.id);
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Something went wrong. Please try again.";
       if (savedOrderId) {
@@ -480,11 +498,61 @@ export default function Shoplet() {
     setSubmitError("");
 
     try {
-      const checkout = await startMayaCheckout(createdOrderId);
-      window.localStorage.removeItem(BASKET_STORAGE_KEY);
-      window.location.assign(checkout.redirectUrl ?? checkout.orderUrl);
+      await beginPayment(createdOrderId);
     } catch (caught) {
+      // The payment gate, not a Maya problem: send them back to the code step.
+      if (caught instanceof Error && caught.name === "MobileNotVerified") {
+        setStage("verify");
+        setSubmitError("Confirm your mobile number to continue.");
+        return;
+      }
       setSubmitError(caught instanceof Error ? caught.message : "Maya checkout could not be started.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function beginPayment(orderId: string) {
+    const checkout = await startMayaCheckout(orderId);
+    window.localStorage.removeItem(BASKET_STORAGE_KEY);
+    window.location.assign(checkout.redirectUrl ?? checkout.orderUrl);
+  }
+
+  // ponytail: a plain 60-second lockout instead of a ticking countdown - the button says so.
+  function startResendTimer() {
+    setCanResend(false);
+    window.setTimeout(() => setCanResend(true), 60_000);
+  }
+
+  async function confirmCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!createdOrderId) return;
+    setSubmitting(true);
+    setSubmitError("");
+
+    try {
+      await verifyCheckoutCode(createdOrderId, smsCode);
+      setStage("redirecting");
+      await beginPayment(createdOrderId);
+    } catch (caught) {
+      setStage("verify");
+      setSubmitError(caught instanceof Error ? caught.message : "That code does not match.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function resendCode() {
+    if (!createdOrderId) return;
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      await sendCheckoutCode(createdOrderId);
+      setSmsCode("");
+      startResendTimer();
+      setSubmitError("A new code is on its way.");
+    } catch (caught) {
+      setSubmitError(caught instanceof Error ? caught.message : "We could not text your code.");
     } finally {
       setSubmitting(false);
     }
@@ -783,7 +851,45 @@ export default function Shoplet() {
               </button>
             </div>
 
-            {stage === "redirecting" ? (
+            {stage === "verify" ? (
+              <section className="shop-success">
+                <CheckIcon />
+                <h2>Order {createdCode} saved.</h2>
+                <p>
+                  We texted a 6-digit code to {form.mobile || "your mobile"}. Enter it to open the secure Maya
+                  checkout.
+                </p>
+                <form className="shop-form" onSubmit={confirmCode}>
+                  <label className="shop-field" htmlFor="sms-code">
+                    <span>Checkout code</span>
+                    <input
+                      id="sms-code"
+                      name="code"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={6}
+                      placeholder="123456"
+                      value={smsCode}
+                      onChange={(event) => setSmsCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                    />
+                  </label>
+                  {submitError ? <div className="shop-error">{submitError}</div> : null}
+                  <button type="submit" className="shop-primary" disabled={submitting || smsCode.length !== 6}>
+                    <span>
+                      {submitting ? "Checking your code" : `Confirm and pay - ${peso(totalAmount)}`}
+                      <small>Card, Maya wallet, QRPh or online banking</small>
+                    </span>
+                    <ArrowRightIcon />
+                  </button>
+                </form>
+                <button type="button" className="shop-secondary" onClick={resendCode} disabled={submitting || !canResend}>
+                  {canResend ? "Send me a new code" : "A new code can be sent in a minute"}
+                </button>
+                <Link className="shop-secondary" href={`/shop/order/${createdCode}`}>
+                  Open my order page
+                </Link>
+              </section>
+            ) : stage === "redirecting" ? (
               <section className="shop-success" role="status">
                 <CheckIcon />
                 <h2>Order {createdCode} saved.</h2>
