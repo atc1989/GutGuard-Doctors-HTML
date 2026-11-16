@@ -46,12 +46,11 @@ export default async function LandingPage({ params }: { params: Promise<{ code: 
   const join = canRefer ? `/j/${code}` : "/physicians/register";
 
   const body = LANDING_BODY.replaceAll("{{SHOP_URL}}", shop)
-    .replace("{{REF_NOTE}}", known ? `<p class="sec-sub">Ref. No. #${code} is applied automatically in the shop.</p>` : "")
     // Last thing before the footer: the same ref line as the join form and the shop.
     .replace(
       "{{REF_LINE}}",
       known
-        ? `<section class="landing-ref"><div class="wrap"><p>Ref number <strong>#${code}</strong>${label ? ` · ${escapeHtml(label)}` : ""}</p></div></section>`
+        ? `<section class="landing-ref"><div class="wrap"><p>Ref number <strong>#${code}</strong>${label ? ` · ${escapeHtml(label)}` : ""} is applied automatically in the shop.</p></div></section>`
         : "",
     );
 
