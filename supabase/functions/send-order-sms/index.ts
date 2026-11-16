@@ -15,6 +15,7 @@ import { serveWithCors } from "../_shared/cors.ts";
 import { isServiceRoleRequest } from "../_shared/service-auth.ts";
 import {
   getSmsProvider,
+  smsProviderEnvVar,
   normalizeSmsMobile,
   orderSmsMessages,
   otpMessage,
@@ -104,7 +105,7 @@ serveWithCors(async (req) => {
       return jsonResponse({ error: "Order is not with the courier" }, 409);
     }
 
-    const provider = getSmsProvider();
+    const provider = getSmsProvider(smsProviderEnvVar(dbSchema));
     if (!provider) return jsonResponse({ sent: false, skipped: true, reason: "no provider" });
 
     const siteUrl = dbSchema === "sandbox" ? SANDBOX_SITE_URL : PROD_SITE_URL;
@@ -208,7 +209,7 @@ async function sendOtp(supabase: ReturnType<typeof createClient>, schema: string
   const mobile = normalizeSmsMobile(order.mobile);
   if (!mobile) return jsonResponse({ error: "Order has no mobile number" }, 400);
 
-  const provider = getSmsProvider();
+  const provider = getSmsProvider(smsProviderEnvVar(schema));
   if (!provider) return jsonResponse({ sent: false, skipped: true, reason: "no provider" });
 
   const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, "0");

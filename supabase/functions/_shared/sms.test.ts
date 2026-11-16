@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { normalizeSmsMobile, orderSmsMessages, otpMessage, textsCustomer, type SmsKind, type SmsOrder } from "./sms.ts";
+import { normalizeSmsMobile, orderSmsMessages, otpMessage, smsProviderEnvVar, textsCustomer, type SmsKind, type SmsOrder } from "./sms.ts";
 
 const SITE = "https://gutguard.ph";
 /** The longest origin the function is given in practice; the sandbox shop is 8 characters longer. */
@@ -95,4 +95,11 @@ test("the OTP text carries the code and no link", () => {
 test("textsCustomer: the email-only kinds never text", () => {
   for (const kind of KINDS) assert.equal(textsCustomer(kind), true, kind);
   for (const kind of ["saved", "delivered", "renewal_due", ""]) assert.equal(textsCustomer(kind), false, kind);
+});
+
+test("only the production schema reads the secret that sends for real", () => {
+  assert.equal(smsProviderEnvVar("doctors"), "SMS_PROVIDER");
+  for (const schema of ["sandbox", "public", ""]) {
+    assert.equal(smsProviderEnvVar(schema), "SANDBOX_SMS_PROVIDER", schema);
+  }
 });

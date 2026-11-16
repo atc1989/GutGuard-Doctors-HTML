@@ -662,7 +662,6 @@ export default function Shoplet() {
         <div className="shop-buy-inner">
           <div className="shop-section-head">
             <div>
-              {referrer?.code ? <p className="shop-referral-of">Shop of #{referrer.code}</p> : null}
               <p className="shop-kicker">Choose your order</p>
               <h2>{protocolOff ? "Start small - try it first." : "Start small or begin the protocol."}</h2>
             </div>

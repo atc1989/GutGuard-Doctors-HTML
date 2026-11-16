@@ -15,9 +15,22 @@ export type SmsProvider = {
   send: (input: { to: string; message: string }) => Promise<string | null>;
 };
 
-/** null when `SMS_PROVIDER` is unset: the caller skips SMS and behaves exactly as before. */
-export function getSmsProvider(): SmsProvider | null {
-  const providerName = (Deno.env.get("SMS_PROVIDER") ?? "").trim().toLowerCase();
+/**
+ * Which secret picks the adapter for a schema. Production reads `SMS_PROVIDER` and sends for
+ * real; every other schema reads `SANDBOX_SMS_PROVIDER`, so a sandbox test cannot spend credits
+ * or text a real customer just because production is live. Both schemas live in one Supabase
+ * project and therefore share one set of secrets, which is why the names have to differ.
+ *
+ * Unset means that schema sends nothing at all - the safe default, and what sandbox gets until
+ * somebody sets it.
+ */
+export function smsProviderEnvVar(schema: string): string {
+  return schema === "doctors" ? "SMS_PROVIDER" : "SANDBOX_SMS_PROVIDER";
+}
+
+/** null when the secret is unset: the caller skips SMS and behaves exactly as before. */
+export function getSmsProvider(envVar = "SMS_PROVIDER"): SmsProvider | null {
+  const providerName = (Deno.env.get(envVar) ?? "").trim().toLowerCase();
   if (!providerName) return null;
 
   if (providerName === "semaphore") return getSemaphoreProvider();
